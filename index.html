@@ -28,22 +28,20 @@
     --radius-lg: 18px;
   }
 
-  html, body { height: 100%; overflow: hidden; }
+  html { height: 100%; }
 
   body {
     font-family: 'DM Sans', sans-serif;
     background: var(--bg);
     color: var(--text);
     display: flex;
-    height: 100vh;
-    max-height: 100vh;
+    height: 100dvh;
     overflow: hidden;
   }
 
   /* ── SIDEBAR ── */
   .sidebar {
     width: var(--sidebar);
-    top: 49px;
     background: var(--surface);
     border-right: 1px solid var(--border);
     display: flex;
@@ -435,7 +433,7 @@
     box-sizing: border-box;
   }
 
-  .messages-wrap.visible { display: flex; }
+  .messages-wrap.visible { display: block; }
 
   .msg {
     display: flex;
