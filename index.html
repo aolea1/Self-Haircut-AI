@@ -917,31 +917,14 @@
 
   let conversationStarted = false;
   let pendingFiles = [];
-  let messageCount = 0;
-
-  // Conversation flow
-  const aiFlow = [
-    {
-      trigger: null,
-      text: `<p>Let's get you looking fresh. First things first — <strong>what haircut are you trying to achieve today?</strong></p><p>A few common ones I can walk you through:</p>`,
-      options: ['Low Taper', 'Mid Taper', 'High Taper', 'Buzz Cut', 'Skin Fade']
-    },
-    {
-      trigger: 'taper',
-      text: `<p>Great choice. Now — <strong>what skill level are you at?</strong> This helps me calibrate my instructions.</p>`,
-      options: ['First time ever', 'Done it a few times', 'Pretty comfortable']
-    },
-    {
-      trigger: 'skill',
-      text: `<p>Perfect. The last thing I need to dial in your guide line is a <strong>side profile photo</strong> of your head.</p><p>Just snap one in a mirror showing your ear and the side of your head. I'll mark exactly where your bald line should go based on your head shape.</p>`,
-      options: null
-    }
-  ];
-
   let flowStep = 0;
 
+  const BACKEND_URL = 'https://selfhaircut-backend.onrender.com';
+  const FREE_DAILY_LIMIT = 5;
+
+  // ── INPUT HANDLING ──
   chatInput.addEventListener('input', () => {
-    sendBtn.disabled = chatInput.value.trim().length === 0;
+    sendBtn.disabled = chatInput.value.trim().length === 0 && pendingFiles.length === 0;
   });
 
   function autoGrow(el) {
@@ -956,6 +939,7 @@
     }
   }
 
+  // ── CHAT UI ──
   function showMessages() {
     if (!conversationStarted) {
       conversationStarted = true;
@@ -964,61 +948,63 @@
     }
   }
 
+  function scrollBottom() {
+    chatArea.scrollTop = chatArea.scrollHeight;
+  }
+
+  function escHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function aiAvatar() {
+    return `<div class="msg-avatar ai">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 3h12M6 3c-1.1 0-2 .9-2 2v14a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2"/>
+        <path d="M9 9h6M9 13h4"/>
+      </svg>
+    </div>`;
+  }
+
   function addUserMessage(text, files) {
     showMessages();
-    messageCount++;
     const msg = document.createElement('div');
     msg.className = 'msg';
-
-    // Build message, then append file thumbnails via DOM (not innerHTML) to avoid src corruption
     msg.innerHTML = `
       <div class="msg-avatar user">JD</div>
       <div class="msg-body">
         <div class="msg-name">You</div>
         <div class="msg-text">
-          <p>${escHtml(text || '')}</p>
-          <div class="user-file-thumbs" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;"></div>
+          ${text ? '<p>' + escHtml(text) + '</p>' : ''}
+          <div class="thumbs-row" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:${files && files.length ? '8px' : '0'};"></div>
         </div>
       </div>`;
-
     messagesWrap.appendChild(msg);
 
-    // Append file previews via DOM to ensure correct blob URLs
     if (files && files.length) {
-      const thumbsContainer = msg.querySelector('.user-file-thumbs');
+      const row = msg.querySelector('.thumbs-row');
       files.forEach(f => {
-        const url = URL.createObjectURL(f);
-        const imgEl = document.createElement('img');
-        imgEl.src = url;
-        imgEl.alt = 'Uploaded haircut photo';
-        imgEl.style.cssText = 'width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid rgba(255,255,255,0.1);';
-        thumbsContainer.appendChild(imgEl);
+        const img = document.createElement('img');
+        img.style.cssText = 'width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid rgba(255,255,255,0.1);display:block;';
+        img.alt = 'Your photo';
+        const reader = new FileReader();
+        reader.onload = e => { img.src = e.target.result; };
+        reader.readAsDataURL(f);
+        row.appendChild(img);
       });
     }
-
     scrollBottom();
   }
 
   function addAIMessage(html, options) {
     const msg = document.createElement('div');
     msg.className = 'msg';
-
     let optHtml = '';
     if (options) {
-      optHtml = `<div class="taper-options">`;
-      options.forEach(o => {
-        optHtml += `<button class="taper-btn" onclick="handleOptionClick(this, '${o}')">${o}</button>`;
-      });
-      optHtml += `</div>`;
+      optHtml = `<div class="taper-options">` + options.map(o =>
+        `<button class="taper-btn" onclick="handleOptionClick(this,'${o}')">${o}</button>`
+      ).join('') + `</div>`;
     }
-
-    msg.innerHTML = `
-      <div class="msg-avatar ai">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M6 3h12M6 3c-1.1 0-2 .9-2 2v14a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2"/>
-          <path d="M9 9h6M9 13h4"/>
-        </svg>
-      </div>
+    msg.innerHTML = `${aiAvatar()}
       <div class="msg-body">
         <div class="msg-name">SelfHaircut.ai</div>
         <div class="msg-text">${html}${optHtml}</div>
@@ -1027,17 +1013,40 @@
     scrollBottom();
   }
 
+  function addAIMessageWithImage(html, canvas) {
+    const msg = document.createElement('div');
+    msg.className = 'msg';
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = `${aiAvatar()}
+      <div class="msg-body">
+        <div class="msg-name">SelfHaircut.ai</div>
+        <div class="msg-text">
+          ${html}
+          <div class="guide-img-wrap" style="margin-top:12px;border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,0.1);max-width:460px;"></div>
+          <div class="taper-options" style="margin-top:10px;">
+            <button class="taper-btn" onclick="chipClick('Can you adjust the line higher?')">Move line higher</button>
+            <button class="taper-btn" onclick="chipClick('Can you adjust the line lower?')">Move line lower</button>
+            <button class="taper-btn" onclick="chipClick('What clipper guard should I use here?')">What guard to use?</button>
+          </div>
+        </div>
+      </div>`;
+    msg.appendChild(wrapper.firstChild);
+    msg.appendChild(wrapper.lastChild);
+
+    // Append canvas directly — no data URL conversion needed
+    const imgWrap = msg.querySelector('.guide-img-wrap');
+    canvas.style.cssText = 'width:100%;display:block;';
+    imgWrap.appendChild(canvas);
+
+    messagesWrap.appendChild(msg);
+    scrollBottom();
+  }
+
   function addTypingIndicator() {
     const msg = document.createElement('div');
     msg.className = 'msg';
     msg.id = 'typingMsg';
-    msg.innerHTML = `
-      <div class="msg-avatar ai">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M6 3h12M6 3c-1.1 0-2 .9-2 2v14a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2"/>
-          <path d="M9 9h6M9 13h4"/>
-        </svg>
-      </div>
+    msg.innerHTML = `${aiAvatar()}
       <div class="msg-body">
         <div class="msg-name">SelfHaircut.ai</div>
         <div class="typing-indicator">
@@ -1055,49 +1064,16 @@
     if (t) t.remove();
   }
 
-  function getAIResponse(userText) {
-    const lower = userText.toLowerCase();
-    const step = flowStep;
-    flowStep++;
-
-    if (lower.includes('photo') || lower.includes('upload') || lower.includes('picture')) {
-      return {
-        html: `<p>I'm ready to analyze your photo. Once you upload a side profile shot, I'll draw your <strong>bald line guide</strong> directly onto the image — showing you exactly where to position your clippers.</p><p>Hit the 📷 <strong>Upload photo</strong> button below and send me your best side-profile mirror selfie.</p>`,
-        options: null
-      };
-    }
-
-    if (lower.includes('buzz')) {
-      return {
-        html: `<p>Buzz cuts are the perfect starting point — and they're very forgiving. Here's the basic plan:</p><p><strong>Step 1</strong> — Choose your guard. For a classic buzz, a #3 or #4 gives a clean look. #1 or #2 for shorter.</p><p><strong>Step 2</strong> — Go with the grain first (back to front, ear to ear across the top).</p><p><strong>Step 3</strong> — Clean up the edges. What are you using — clippers, a trimmer, or both?</p>`,
-        options: ['Clippers only', 'Clippers + trimmer', 'Just a trimmer']
-      };
-    }
-
-    if (step === 0) {
-      return {
-        html: `<p>I can work with that. Now tell me — <strong>which taper style</strong> are you aiming for?</p>`,
-        options: ['Low Taper', 'Mid Taper', 'High Taper', 'Skin Fade']
-      };
-    } else if (step === 1) {
-      return {
-        html: `<p>Perfect. To give you a precise guide line, I need one thing: <strong>a side profile photo</strong> of your head.</p><p>Take a mirror selfie from the side showing your ear and temple. I'll overlay the exact line where your bald line should be cut.</p>`,
-        options: null
-      };
-    } else {
-      return {
-        html: `<p>Got it. Based on what you've told me, here's what I'd recommend for your next step — upload a side profile photo and I'll generate a <strong>personalized guide line</strong> overlay for your exact head shape.</p><p>No two heads are the same. Your bald line placement depends on your ear height and temple shape.</p>`,
-        options: null
-      };
-    }
-  }
-
+  // ── SEND MESSAGE ──
   async function sendMessage() {
     const text = chatInput.value.trim();
     if (!text && pendingFiles.length === 0) return;
 
-    const files = [...pendingFiles];
-    addUserMessage(text || "Here's my photo", files);
+    // Grab files FIRST before clearing anything
+    const filesToProcess = [...pendingFiles];
+    const displayText = text || (filesToProcess.length > 0 ? '' : '');
+
+    addUserMessage(displayText, filesToProcess);
 
     chatInput.value = '';
     chatInput.style.height = 'auto';
@@ -1108,156 +1084,85 @@
 
     addTypingIndicator();
 
-    if (files.length > 0) {
-      try {
-        await analyzePhotoWithClaude(files[0]);
-      } catch(err) {
-        removeTyping();
-        console.error('Claude API error:', err);
-        addAIMessage('<p>Error: ' + err.message + '</p>', null);
-      }
+    if (filesToProcess.length > 0) {
+      await analyzePhoto(filesToProcess[0]);
       return;
     }
 
-    const delay = 800 + Math.random() * 600;
     setTimeout(() => {
       removeTyping();
-      const response = getAIResponse(text);
-      addAIMessage(response.html, response.options);
-    }, delay);
+      const r = getAIResponse(text);
+      addAIMessage(r.html, r.options);
+    }, 800 + Math.random() * 600);
   }
 
-  // ── FREE TIER: Canvas-based guide line (no external dependencies) ──
-  // ── PAID TIER: Claude Vision (called from backend) ──
-  const BACKEND_URL = 'https://selfhaircut-backend.onrender.com';
-  const FREE_DAILY_LIMIT = 5;
+  // ── AI RESPONSE (text) ──
+  function getAIResponse(text) {
+    const lower = text.toLowerCase();
+    const step = flowStep++;
 
-  function getTodayUsage() {
-    const today = new Date().toDateString();
-    const stored = JSON.parse(localStorage.getItem('shc_usage') || '{"date":"","count":0}');
-    if (stored.date !== today) return 0;
-    return stored.count;
+    if (lower.includes('photo') || lower.includes('upload') || lower.includes('picture')) {
+      return { html: `<p>Ready to analyze! Hit the 📷 <strong>Upload photo</strong> button below and send me a side-profile shot showing your ear.</p>`, options: null };
+    }
+    if (lower.includes('buzz')) {
+      return { html: `<p>Buzz cuts are forgiving and great for beginners. Choose a #3 or #4 guard, go with the grain, then clean up edges. What clippers are you using?</p>`, options: ['Clippers only', 'Clippers + trimmer', 'Just a trimmer'] };
+    }
+    if (step === 0) {
+      return { html: `<p>Got it. Which taper style are you going for?</p>`, options: ['Low Taper', 'Mid Taper', 'High Taper', 'Skin Fade'] };
+    } else if (step === 1) {
+      return { html: `<p>Perfect. Upload a side profile photo and I'll draw your exact bald line.</p>`, options: null };
+    }
+    return { html: `<p>Upload a side profile photo and I'll place your guide line right on it.</p>`, options: null };
   }
 
-  function incrementUsage() {
-    const today = new Date().toDateString();
-    const count = getTodayUsage() + 1;
-    localStorage.setItem('shc_usage', JSON.stringify({ date: today, count }));
-  }
-
-  function isPaidUser() {
-    return localStorage.getItem('shc_paid') === 'true';
-  }
-
-  async function analyzePhotoWithClaude(file) {
+  // ── PHOTO ANALYSIS ──
+  async function analyzePhoto(file) {
     const usage = getTodayUsage();
-
     if (!isPaidUser() && usage >= FREE_DAILY_LIMIT) {
       removeTyping();
-      addAIMessageWithUpgrade(
-        `<p>You've used your <strong>${FREE_DAILY_LIMIT} free analyses</strong> for today. Upgrade to <strong>SelfHaircut Pro ($12/mo)</strong> for unlimited analyses, personalized AI barber advice, and progress photo feedback.</p>`
-      );
+      addAIMessageWithUpgrade(`<p>You've used your <strong>${FREE_DAILY_LIMIT} free analyses</strong> for today. Upgrade to <strong>SelfHaircut Pro ($12/mo)</strong> for unlimited analyses and personalized AI guidance.</p>`);
       return;
     }
-
     incrementUsage();
-
-    if (isPaidUser()) {
-      await analyzeWithClaudeVision(file);
-    } else {
-      await analyzeWithFreeVision(file);
-    }
+    isPaidUser() ? await analyzeWithClaudeVision(file) : await analyzeWithFreeVision(file);
   }
 
-  // ── FREE: Smart proportional guide placement ──
+  // ── FREE TIER ──
   async function analyzeWithFreeVision(file) {
     try {
-      const result = await placeGuideOnPhoto(file);
-      const overlayDataUrl = await drawGuideOverlay(file, result.guide);
-      const usageLeft = FREE_DAILY_LIMIT - getTodayUsage();
-      const taperLabel = result.guide.taperType === 'low' ? 'Low Taper' : result.guide.taperType === 'mid' ? 'Mid Taper' : 'High Taper';
-
+      const canvas = await drawGuideOnFile(file);
       removeTyping();
+      const used = getTodayUsage();
       addAIMessageWithImage(
-        `<p>Here's your <strong>${taperLabel} guide line</strong>. The white line shows where to start your fade — blend everything above it up into the shaded grid zone.</p>
-         <p>${result.guide.advice}</p>
-         <p style="color:var(--text3);font-size:12px;">Free analysis ${getTodayUsage()}/${FREE_DAILY_LIMIT} today · <span style="color:var(--accent2);cursor:pointer;" onclick="showUpgradePrompt()">Upgrade to Pro</span> for personalized AI analysis</p>`,
-        overlayDataUrl,
-        file
+        `<p>Here's your <strong>Mid Taper guide line</strong>. The white line is your fade starting point — blend everything above it upward into the shaded grid zone with a #2 guard.</p>
+         <p style="color:var(--text3);font-size:12px;">Free analysis ${used}/${FREE_DAILY_LIMIT} today · <span style="color:var(--accent2);cursor:pointer;" onclick="showUpgradePrompt()">Upgrade to Pro</span> for AI-personalized placement</p>`,
+        canvas
       );
     } catch(err) {
       removeTyping();
+      addAIMessage('<p>Something went wrong. Please try again with a clear side profile photo.</p>', null);
       console.error(err);
-      addAIMessage('<p>Something went wrong analyzing your photo. Please try again.</p>', null);
     }
   }
 
-  async function placeGuideOnPhoto(file) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        const W = img.width;
-        const H = img.height;
-
-        // Determine orientation — landscape vs portrait affects placement
-        const isLandscape = W > H;
-
-        // For side profile photos, place line at ~55% down the image height
-        // This lands roughly at the ear/temple area in most side profile shots
-        const lineYRatio = isLandscape ? 0.52 : 0.48;
-        const startXRatio = isLandscape ? 0.15 : 0.1;
-        const endXRatio = isLandscape ? 0.82 : 0.88;
-
-        // Determine taper type based on aspect ratio and typical head position
-        // This is a smart default — Pro tier gives exact placement
-        const taperType = 'mid';
-        const advice = 'Position your clipper along the white line — this is your fade starting point. Use a #2 guard and work upward into the shaded zone, blending with a #3 then #4 as you go higher. Upload more photos as you cut for real-time Pro feedback.';
-
-        resolve({
-          guide: {
-            tapperLineY: lineYRatio,
-            tapperLineStartX: startXRatio,
-            tapperLineEndX: endXRatio,
-            fadeZoneHeight: 0.13,
-            taperType,
-            advice,
-            confidence: 'medium'
-          }
-        });
-      };
-      img.src = url;
-    });
-  }
-
-
-    // ── PAID: Claude Vision via backend ──
+  // ── PAID TIER ──
   async function analyzeWithClaudeVision(file) {
-    const formData = new FormData();
-    formData.append('photo', file);
-
     try {
-      const response = await fetch(BACKEND_URL + '/analyze', {
-        method: 'POST',
-        body: formData
-      });
-
+      const formData = new FormData();
+      formData.append('photo', file);
+      const response = await fetch(BACKEND_URL + '/analyze', { method: 'POST', body: formData });
       removeTyping();
-
       if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: 'Server error' }));
-        addAIMessage('<p>Server error: ' + (err.error || response.statusText) + '</p>', null);
+        const err = await response.json().catch(() => ({}));
+        addAIMessage('<p>Server error: ' + (err.error || 'please try again') + '</p>', null);
         return;
       }
-
-      const parsed = await response.json();
-      const overlayDataUrl = await drawGuideOverlay(file, parsed);
-      const taperLabel = parsed.taperType === 'low' ? 'Low Taper' : parsed.taperType === 'mid' ? 'Mid Taper' : 'High Taper';
-
+      const guide = await response.json();
+      const canvas = await drawGuideOnFile(file, guide);
+      const label = guide.taperType === 'low' ? 'Low Taper' : guide.taperType === 'mid' ? 'Mid Taper' : 'High Taper';
       addAIMessageWithImage(
-        `<p>⭐ <strong>Pro Analysis:</strong> I analyzed your exact head shape and placed your <strong>${taperLabel} guide</strong>.</p><p>${parsed.advice}</p>`,
-        overlayDataUrl
+        `<p>⭐ <strong>Pro Analysis — ${label}:</strong> ${guide.advice}</p>`,
+        canvas
       );
     } catch(err) {
       removeTyping();
@@ -1265,28 +1170,121 @@
     }
   }
 
+  // ── DRAW GUIDE ON CANVAS ──
+  function drawGuideOnFile(file, guide) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxW = 560;
+          const scale = Math.min(1, maxW / img.width);
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          const W = canvas.width;
+          const H = canvas.height;
+
+          // Use guide from Claude or smart defaults
+          const isLandscape = img.width > img.height;
+          const g = guide || {
+            tapperLineY: isLandscape ? 0.52 : 0.48,
+            tapperLineStartX: isLandscape ? 0.15 : 0.1,
+            tapperLineEndX: isLandscape ? 0.82 : 0.88,
+            fadeZoneHeight: 0.13
+          };
+
+          const lineY = g.tapperLineY * H;
+          const startX = g.tapperLineStartX * W;
+          const endX = g.tapperLineEndX * W;
+          const fadeH = g.fadeZoneHeight * H;
+
+          // Fade zone
+          ctx.save();
+          ctx.globalAlpha = 0.15;
+          ctx.fillStyle = 'white';
+          ctx.fillRect(startX, lineY, endX - startX, fadeH);
+          ctx.restore();
+
+          // Grid
+          ctx.save();
+          ctx.globalAlpha = 0.22;
+          ctx.strokeStyle = 'white';
+          ctx.lineWidth = 0.8;
+          for (let x = startX; x <= endX; x += 14) {
+            ctx.beginPath(); ctx.moveTo(x, lineY); ctx.lineTo(x, lineY + fadeH); ctx.stroke();
+          }
+          for (let y = lineY; y <= lineY + fadeH; y += 14) {
+            ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(endX, y); ctx.stroke();
+          }
+          ctx.restore();
+
+          // Guide line
+          ctx.save();
+          ctx.shadowColor = 'rgba(255,255,255,0.9)';
+          ctx.shadowBlur = 10;
+          ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+          ctx.lineWidth = 2.5;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(startX, lineY);
+          ctx.lineTo(endX, lineY);
+          ctx.stroke();
+          ctx.restore();
+
+          // Dots
+          [startX, endX].forEach(x => {
+            ctx.save();
+            ctx.shadowColor = 'white';
+            ctx.shadowBlur = 12;
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(x, lineY, 4.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          });
+
+          // Label
+          ctx.save();
+          ctx.font = 'bold 13px sans-serif';
+          ctx.fillStyle = 'rgba(255,255,255,0.92)';
+          ctx.shadowColor = 'rgba(0,0,0,0.9)';
+          ctx.shadowBlur = 8;
+          const label = '▲ fade up to here';
+          const lx = startX + (endX - startX) / 2 - ctx.measureText(label).width / 2;
+          ctx.fillText(label, lx, lineY - 10);
+          ctx.restore();
+
+          resolve(canvas);
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // ── UPGRADE ──
   function showUpgradePrompt() {
-    addAIMessageWithUpgrade('<p>Upgrade to <strong>SelfHaircut Pro</strong> for personalized AI barber advice on your exact head shape, unlimited daily analyses, and mid-cut progress photo feedback.</p>');
+    addAIMessageWithUpgrade('<p>Go Pro for Claude AI personalized guidance on your exact head shape, unlimited analyses, and mid-cut progress feedback.</p>');
   }
 
   function addAIMessageWithUpgrade(html) {
     const msg = document.createElement('div');
     msg.className = 'msg';
-    msg.innerHTML = `
-      <div class="msg-avatar ai">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M6 3h12M6 3c-1.1 0-2 .9-2 2v14a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2"/>
-          <path d="M9 9h6M9 13h4"/>
-        </svg>
-      </div>
+    msg.innerHTML = `${aiAvatar()}
       <div class="msg-body">
         <div class="msg-name">SelfHaircut.ai</div>
         <div class="msg-text">
           ${html}
           <div style="margin-top:14px;padding:16px;background:linear-gradient(135deg,rgba(232,213,163,0.08),rgba(232,213,163,0.04));border:1px solid rgba(232,213,163,0.2);border-radius:12px;">
             <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--accent);margin-bottom:4px;">SelfHaircut Pro — $12/mo</div>
-            <div style="font-size:13px;color:var(--text2);margin-bottom:12px;line-height:1.5;">✓ Claude AI analyzes your exact head shape<br>✓ Unlimited daily photo analyses<br>✓ Mid-cut progress feedback<br>✓ Personalized clipper guard recommendations</div>
-            <button onclick="handleUpgradeClick()" style="padding:10px 20px;background:var(--accent);color:#0d0d0d;border:none;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#c9aa72'" onmouseout="this.style.background='var(--accent)'">Upgrade to Pro →</button>
+            <div style="font-size:13px;color:var(--text2);margin-bottom:12px;line-height:1.6;">✓ Claude AI analyzes your exact head shape<br>✓ Unlimited daily photo analyses<br>✓ Mid-cut progress feedback<br>✓ Personalized clipper guard recommendations</div>
+            <button onclick="handleUpgradeClick()" style="padding:10px 20px;background:var(--accent);color:#0d0d0d;border:none;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;">Upgrade to Pro →</button>
           </div>
         </div>
       </div>`;
@@ -1295,126 +1293,26 @@
   }
 
   function handleUpgradeClick() {
-    // TODO: Replace with your Stripe/Lemon Squeezy checkout link
-    addAIMessage('<p>Payment coming soon! We\'re setting up checkout. Check back shortly.</p>', null);
+    addAIMessage('<p>Payment coming soon! Check back shortly.</p>', null);
   }
 
-
-  async function drawGuideOverlay(file, guide) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const maxW = 600;
-        const scale = Math.min(1, maxW / img.width);
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        const ctx = canvas.getContext('2d');
-
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-        const W = canvas.width;
-        const H = canvas.height;
-        const lineY = guide.tapperLineY * H;
-        const startX = guide.tapperLineStartX * W;
-        const endX = guide.tapperLineEndX * W;
-        const fadeH = guide.fadeZoneHeight * H;
-
-        // Fade zone fill
-        ctx.save();
-        ctx.globalAlpha = 0.15;
-        ctx.fillStyle = 'white';
-        ctx.fillRect(startX, lineY, endX - startX, fadeH);
-        ctx.restore();
-
-        // Grid lines
-        ctx.save();
-        ctx.globalAlpha = 0.22;
-        ctx.strokeStyle = 'white';
-        ctx.lineWidth = 0.8;
-        const spacing = 14;
-        for (let x = startX; x <= endX; x += spacing) {
-          ctx.beginPath(); ctx.moveTo(x, lineY); ctx.lineTo(x, lineY + fadeH); ctx.stroke();
-        }
-        for (let y = lineY; y <= lineY + fadeH; y += spacing) {
-          ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(endX, y); ctx.stroke();
-        }
-        ctx.restore();
-
-        // Main guide line with glow
-        ctx.save();
-        ctx.shadowColor = 'rgba(255,255,255,0.9)';
-        ctx.shadowBlur = 10;
-        ctx.strokeStyle = 'rgba(255,255,255,0.95)';
-        ctx.lineWidth = 2.5;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(startX, lineY);
-        ctx.lineTo(endX, lineY);
-        ctx.stroke();
-        ctx.restore();
-
-        // Endpoint dots
-        [startX, endX].forEach(x => {
-          ctx.save();
-          ctx.shadowColor = 'white';
-          ctx.shadowBlur = 12;
-          ctx.fillStyle = 'white';
-          ctx.beginPath();
-          ctx.arc(x, lineY, 4.5, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-        });
-
-        // Label
-        ctx.save();
-        ctx.font = 'bold 13px sans-serif';
-        ctx.fillStyle = 'rgba(255,255,255,0.92)';
-        ctx.shadowColor = 'rgba(0,0,0,0.9)';
-        ctx.shadowBlur = 8;
-        const label = '▲ fade up to here';
-        const lx = startX + (endX - startX) / 2 - ctx.measureText(label).width / 2;
-        ctx.fillText(label, lx, lineY - 10);
-        ctx.restore();
-
-        URL.revokeObjectURL(url);
-        resolve(canvas.toDataURL('image/jpeg', 0.92));
-      };
-      img.src = url;
-    });
+  // ── USAGE TRACKING ──
+  function getTodayUsage() {
+    const today = new Date().toDateString();
+    const stored = JSON.parse(localStorage.getItem('shc_usage') || '{"date":"","count":0}');
+    return stored.date === today ? stored.count : 0;
   }
 
-  function addAIMessageWithImage(html, imgDataUrl, originalFile) {
-    const msg = document.createElement('div');
-    msg.className = 'msg';
-    msg.innerHTML = `
-      <div class="msg-avatar ai">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M6 3h12M6 3c-1.1 0-2 .9-2 2v14a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2"/>
-          <path d="M9 9h6M9 13h4"/>
-        </svg>
-      </div>
-      <div class="msg-body">
-        <div class="msg-name">SelfHaircut.ai</div>
-        <div class="msg-text">
-          ${html}
-          <div style="margin-top:12px;border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,0.1);max-width:460px;">
-            <img src="${imgDataUrl}" style="width:100%;display:block;" alt="Your haircut guide">
-          </div>
-          <div class="taper-options" style="margin-top:10px;">
-            <button class="taper-btn" onclick="chipClick('Can you adjust the line higher?')">Move line higher</button>
-            <button class="taper-btn" onclick="chipClick('Can you adjust the line lower?')">Move line lower</button>
-            <button class="taper-btn" onclick="chipClick('What clipper guard should I use here?')">What guard to use?</button>
-          </div>
-        </div>
-      </div>`;
-    messagesWrap.appendChild(msg);
-    scrollBottom();
+  function incrementUsage() {
+    const today = new Date().toDateString();
+    localStorage.setItem('shc_usage', JSON.stringify({ date: today, count: getTodayUsage() + 1 }));
   }
 
+  function isPaidUser() {
+    return localStorage.getItem('shc_paid') === 'true';
+  }
 
-
+  // ── MISC ──
   function chipClick(text) {
     chatInput.value = text;
     sendBtn.disabled = false;
@@ -1423,24 +1321,17 @@
   }
 
   function handleOptionClick(btn, value) {
-    // Highlight selected
     btn.closest('.taper-options').querySelectorAll('.taper-btn').forEach(b => b.classList.remove('selected'));
     btn.classList.add('selected');
-
     setTimeout(() => {
       addUserMessage(value, null);
-
       addTypingIndicator();
       setTimeout(() => {
         removeTyping();
-        const response = getAIResponse(value);
-        addAIMessage(response.html, response.options);
+        const r = getAIResponse(value);
+        addAIMessage(r.html, r.options);
       }, 900);
     }, 200);
-  }
-
-  function scrollBottom() {
-    chatArea.scrollTop = chatArea.scrollHeight;
   }
 
   function triggerUpload() {
@@ -1448,13 +1339,21 @@
   }
 
   function handleFiles(e) {
-    const files = Array.from(e.target.files);
-    files.forEach(f => {
+    Array.from(e.target.files).forEach(f => {
       pendingFiles.push(f);
-      const url = URL.createObjectURL(f);
       const thumb = document.createElement('div');
       thumb.className = 'preview-thumb';
-      thumb.innerHTML = `<img src="${url}" alt="Upload preview"><button class="preview-thumb-remove" onclick="removeThumb(this, '${url}')">✕</button>`;
+      const img = document.createElement('img');
+      const reader = new FileReader();
+      reader.onload = ev => { img.src = ev.target.result; };
+      reader.readAsDataURL(f);
+      img.alt = 'Preview';
+      const rmBtn = document.createElement('button');
+      rmBtn.className = 'preview-thumb-remove';
+      rmBtn.textContent = '✕';
+      rmBtn.onclick = () => removeThumb(rmBtn, f);
+      thumb.appendChild(img);
+      thumb.appendChild(rmBtn);
       uploadPreview.appendChild(thumb);
     });
     uploadPreview.classList.add('has-files');
@@ -1462,10 +1361,10 @@
     e.target.value = '';
   }
 
-  function removeThumb(btn, url) {
+  function removeThumb(btn, file) {
     const thumb = btn.parentElement;
-    const idx = Array.from(uploadPreview.children).indexOf(thumb);
-    pendingFiles.splice(idx, 1);
+    const idx = pendingFiles.indexOf(file);
+    if (idx > -1) pendingFiles.splice(idx, 1);
     thumb.remove();
     if (uploadPreview.children.length === 0) {
       uploadPreview.classList.remove('has-files');
@@ -1496,10 +1395,6 @@
   function closeSidebar() {
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('overlay').classList.remove('visible');
-  }
-
-  function escHtml(str) {
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 </script>
 </body>
