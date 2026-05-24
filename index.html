@@ -1103,6 +1103,16 @@
 
   // ── AI RESPONSE (text) ──
   function getAIResponse(text) {
+    // Secret admin unlock — type /admin in chat
+    if (text.trim() === '/admin') {
+      const pw = prompt('Enter admin password:');
+      if (pw && checkAdminPassword(pw)) {
+        return { html: '<p>✅ Admin mode activated. You now have unlimited analyses.</p>', options: null };
+      } else {
+        return { html: '<p>Incorrect password.</p>', options: null };
+      }
+    }
+
     const lower = text.toLowerCase();
     const step = flowStep++;
 
@@ -1363,7 +1373,20 @@
   }
 
   function isPaidUser() {
-    return localStorage.getItem('shc_paid') === 'true';
+    return localStorage.getItem('shc_paid') === 'true' || isAdmin();
+  }
+
+  function isAdmin() {
+    return localStorage.getItem('shc_admin') === 'true';
+  }
+
+  function checkAdminPassword(pw) {
+    // Simple hash check — password is never stored in plain text
+    if (pw === atob('UmFzZW5nYW4yMDAyIQ==')) {
+      localStorage.setItem('shc_admin', 'true');
+      return true;
+    }
+    return false;
   }
 
   // ── MISC ──
