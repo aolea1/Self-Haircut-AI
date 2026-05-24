@@ -186,6 +186,7 @@
     flex-direction: column;
     overflow: hidden;
     position: relative;
+    min-height: 0;
   }
 
   .topbar {
@@ -237,10 +238,11 @@
   /* ── CHAT AREA ── */
   .chat-area {
     flex: 1;
-    overflow-y: auto;
+    overflow-y: scroll;
     padding: 0 24px;
     display: flex;
     flex-direction: column;
+    min-height: 0;
     scrollbar-width: thin;
     scrollbar-color: var(--surface3) transparent;
   }
@@ -1282,7 +1284,7 @@
         <div class="msg-text">
           ${html}
           <div style="margin-top:14px;padding:16px;background:linear-gradient(135deg,rgba(232,213,163,0.08),rgba(232,213,163,0.04));border:1px solid rgba(232,213,163,0.2);border-radius:12px;">
-            <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--accent);margin-bottom:4px;">SelfHaircut Pro — $12/mo</div>
+            <div style="font-family:'DM Sans',sans-serif;font-size:18px;font-weight:700;color:var(--accent);margin-bottom:6px;letter-spacing:-0.2px;">✂ SelfHaircut Pro — $12/mo</div>
             <div style="font-size:13px;color:var(--text2);margin-bottom:12px;line-height:1.6;">✓ Claude AI analyzes your exact head shape<br>✓ Unlimited daily photo analyses<br>✓ Mid-cut progress feedback<br>✓ Personalized clipper guard recommendations</div>
             <button onclick="handleUpgradeClick()" style="padding:10px 20px;background:var(--accent);color:#0d0d0d;border:none;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;">Upgrade to Pro →</button>
           </div>
@@ -1293,7 +1295,9 @@
   }
 
   function handleUpgradeClick() {
-    addAIMessage('<p>Payment coming soon! Check back shortly.</p>', null);
+    // Replace this URL with your Lemon Squeezy checkout link
+    const CHECKOUT_URL = 'https://selfhaircut.lemonsqueezy.com/checkout';
+    window.open(CHECKOUT_URL, '_blank');
   }
 
   // ── USAGE TRACKING ──
