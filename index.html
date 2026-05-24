@@ -28,12 +28,7 @@
     --radius-lg: 18px;
   }
 
-  html, body {
-    height: 100%;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-  }
+  html, body { height: 100%; overflow: hidden; margin: 0; padding: 0; }
 
   body {
     font-family: 'DM Sans', sans-serif;
@@ -41,13 +36,7 @@
     color: var(--text);
     display: flex;
     height: 100vh;
-    width: 100vw;
     overflow: hidden;
-  }
-
-  /* Force sidebar to full height */
-  .sidebar {
-    height: 100vh;
   }
 
   /* ── SIDEBAR ── */
@@ -194,10 +183,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    height: 100vh;
-    max-height: 100vh;
     overflow: hidden;
-    position: relative;
     min-width: 0;
   }
 
@@ -251,15 +237,14 @@
   /* ── CHAT AREA ── */
   .chat-area {
     flex: 1;
-    overflow-x: hidden;
-    overflow-y: scroll !important;
-    padding: 0 24px 24px;
-    scrollbar-width: thin;
-    scrollbar-color: #555 #1a1a1a;
-    -webkit-overflow-scrolling: touch;
-    /* Explicit height so browser knows scroll container size */
     height: 0;
     min-height: 0;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    padding: 0 24px 24px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #555 #1a1a1a;
   }
 
   .chat-area::-webkit-scrollbar { width: 8px; }
