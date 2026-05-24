@@ -237,16 +237,17 @@
   /* ── CHAT AREA ── */
   .chat-area {
     flex: 1;
-    overflow-y: auto;
+    overflow-y: scroll;
     padding: 0 24px;
     min-height: 0;
     scrollbar-width: thin;
-    scrollbar-color: var(--surface3) transparent;
+    scrollbar-color: #444 #1a1a1a;
   }
 
-  .chat-area::-webkit-scrollbar { width: 5px; }
-  .chat-area::-webkit-scrollbar-track { background: transparent; }
-  .chat-area::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 99px; }
+  .chat-area::-webkit-scrollbar { width: 8px; }
+  .chat-area::-webkit-scrollbar-track { background: #1a1a1a; }
+  .chat-area::-webkit-scrollbar-thumb { background: #555; border-radius: 99px; }
+  .chat-area::-webkit-scrollbar-thumb:hover { background: #777; }
 
   /* Hero state (no messages yet) */
   .hero {
