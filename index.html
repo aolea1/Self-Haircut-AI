@@ -37,7 +37,6 @@
     display: flex;
     height: 100vh;
     overflow: hidden;
-    padding-top: 49px;
   }
 
   /* ── SIDEBAR ── */
@@ -729,13 +728,6 @@
 
 <div class="sidebar-overlay" id="overlay" onclick="closeSidebar()"></div>
 
-<!-- API KEY BANNER -->
-<div id="apiKeyBanner" style="position:fixed;top:0;left:0;right:0;z-index:100;background:#1a1500;border-bottom:1px solid rgba(232,213,163,0.3);padding:10px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-  <span style="font-size:13px;color:var(--accent);font-weight:500;white-space:nowrap;">🔑 Anthropic API Key:</span>
-  <input id="apiKeyInput" type="password" placeholder="sk-ant-..." style="flex:1;min-width:200px;background:#0d0d0d;border:1px solid rgba(232,213,163,0.3);border-radius:7px;padding:6px 12px;color:var(--text);font-size:13px;outline:none;font-family:monospace;">
-  <button onclick="saveApiKey()" style="padding:6px 14px;background:var(--accent);color:#0d0d0d;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">Save</button>
-  <span style="font-size:11px;color:var(--text3);">Get yours free at <a href="https://console.anthropic.com" target="_blank" style="color:var(--accent2);">console.anthropic.com</a> — stored only in your browser</span>
-</div>
 
 <!-- SIDEBAR -->
 <aside class="sidebar" id="sidebar">
@@ -1126,72 +1118,268 @@
     }, delay);
   }
 
+  // ── FREE TIER: MediaPipe computer vision (no API cost) ──
+  // ── PAID TIER: Claude Vision (called from backend) ──
+  const BACKEND_URL = 'https://your-backend-url.onrender.com';
+  const FREE_DAILY_LIMIT = 5;
+  const PAID_PRICE = 12;
+
+  function getTodayUsage() {
+    const today = new Date().toDateString();
+    const stored = JSON.parse(localStorage.getItem('shc_usage') || '{"date":"","count":0}');
+    if (stored.date !== today) return 0;
+    return stored.count;
+  }
+
+  function incrementUsage() {
+    const today = new Date().toDateString();
+    const count = getTodayUsage() + 1;
+    localStorage.setItem('shc_usage', JSON.stringify({ date: today, count }));
+  }
+
+  function isPaidUser() {
+    return localStorage.getItem('shc_paid') === 'true';
+  }
+
   async function analyzePhotoWithClaude(file) {
-    const base64 = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(',')[1]);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+    const usage = getTodayUsage();
 
-    const mediaType = file.type || 'image/jpeg';
-
-    const systemPrompt = `You are SelfHaircut.ai, an expert AI barber assistant. When given a side profile photo of a person's head, analyze it and return ONLY a JSON object with no extra text or markdown.
-
-JSON structure:
-{
-  "tapperLineY": <0.3-0.7, vertical position of bald line as fraction of image height>,
-  "tapperLineStartX": <0.0-0.5, where line starts horizontally>,
-  "tapperLineEndX": <0.5-1.0, where line ends horizontally>,
-  "fadeZoneHeight": <0.05-0.2, height of fade zone as fraction of image height>,
-  "taperType": <"low", "mid", or "high">,
-  "advice": <2-3 sentence plain text tip for this specific cut>,
-  "confidence": <"high", "medium", or "low">
-}
-
-Analyze the ear position, temple, and natural hairline. If photo is unclear, set confidence to "low" and use default values (tapperLineY:0.5, startX:0.2, endX:0.8, fadeZoneHeight:0.1).`;
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': getApiKey(), 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: systemPrompt,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-            { type: 'text', text: 'Analyze this side profile and return only the JSON.' }
-          ]
-        }]
-      })
-    });
-
-    const data = await response.json();
-    removeTyping();
-
-    let parsed;
-    try {
-      const raw = data.content.map(c => c.text || '').join('');
-      parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
-    } catch(e) {
-      const errDetail = data.error ? data.error.message : JSON.stringify(data).slice(0, 200);
-      addAIMessage('<p>API response: ' + errDetail + '</p>', null);
+    // Check free limit for non-paid users
+    if (!isPaidUser() && usage >= FREE_DAILY_LIMIT) {
+      removeTyping();
+      addAIMessageWithUpgrade(
+        `<p>You've used your <strong>${FREE_DAILY_LIMIT} free analyses</strong> for today. Upgrade to <strong>SelfHaircut Pro ($${PAID_PRICE}/mo)</strong> for unlimited analyses, personalized AI barber advice, and progress photo feedback.</p>`
+      );
       return;
     }
 
-    const overlayDataUrl = await drawGuideOverlay(file, parsed);
-    const taperLabel = parsed.taperType === 'low' ? 'Low Taper' : parsed.taperType === 'mid' ? 'Mid Taper' : 'High Taper';
-    const confidenceNote = parsed.confidence === 'low'
-      ? '<p style="color:var(--text3);font-size:13px;">Photo clarity was low — try a clearer side profile for more accurate placement.</p>'
-      : '';
+    incrementUsage();
 
-    addAIMessageWithImage(
-      `<p>I analyzed your head shape. Here is your personalized <strong>${taperLabel} guide</strong> — the white line shows where to start your fade, and the grid shows the zone to blend up into.</p><p>${parsed.advice}</p>${confidenceNote}`,
-      overlayDataUrl
-    );
+    // Show what tier they're getting
+    if (isPaidUser()) {
+      await analyzeWithClaudeVision(file);
+    } else {
+      await analyzeWithMediaPipe(file);
+    }
   }
+
+  // ── FREE: MediaPipe face landmark detection ──
+  async function analyzeWithMediaPipe(file) {
+    try {
+      // Load MediaPipe FaceMesh lazily
+      if (!window.faceMeshReady) {
+        addAIMessage('<p style="color:var(--text3);font-size:13px;">Loading face detection model... (~3 seconds)</p>', null);
+        await loadMediaPipe();
+      }
+
+      const img = await fileToImageElement(file);
+      const landmarks = await detectFaceLandmarks(img);
+
+      if (!landmarks) {
+        removeTyping();
+        addAIMessage('<p>I could not detect a face clearly. Please upload a side profile photo with good lighting and your ear visible.</p>', null);
+        return;
+      }
+
+      const guide = computeGuideFromLandmarks(landmarks, img.width, img.height);
+      const overlayDataUrl = await drawGuideOverlay(file, guide);
+      const usageLeft = FREE_DAILY_LIMIT - getTodayUsage();
+      const taperLabel = guide.taperType === 'low' ? 'Low Taper' : guide.taperType === 'mid' ? 'Mid Taper' : 'High Taper';
+
+      removeTyping();
+      addAIMessageWithImage(
+        `<p>I detected your head shape and placed your <strong>${taperLabel} guide line</strong>. The white line shows where to start your fade — blend everything above it up into the grid zone.</p>
+         <p>${guide.advice}</p>
+         <p style="color:var(--text3);font-size:12px;">Free analysis ${getTodayUsage()}/${FREE_DAILY_LIMIT} today. <span style="color:var(--accent2);cursor:pointer;" onclick="showUpgradePrompt()">Upgrade to Pro</span> for personalized AI barber advice.</p>`,
+        overlayDataUrl
+      );
+    } catch(err) {
+      removeTyping();
+      console.error(err);
+      addAIMessage('<p>Face detection failed: ' + err.message + '. Try a clearer side profile photo.</p>', null);
+    }
+  }
+
+  async function loadMediaPipe() {
+    return new Promise((resolve, reject) => {
+      const script1 = document.createElement('script');
+      script1.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js';
+      script1.onload = () => {
+        const script2 = document.createElement('script');
+        script2.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js';
+        script2.onload = () => { window.faceMeshReady = true; resolve(); };
+        script2.onerror = reject;
+        document.head.appendChild(script2);
+      };
+      script1.onerror = reject;
+      document.head.appendChild(script1);
+    });
+  }
+
+  async function fileToImageElement(file) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.src = URL.createObjectURL(file);
+    });
+  }
+
+  async function detectFaceLandmarks(img) {
+    return new Promise((resolve) => {
+      const faceMesh = new FaceMesh({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+      });
+      faceMesh.setOptions({
+        maxNumFaces: 1,
+        refineLandmarks: true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+      faceMesh.onResults((results) => {
+        if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+          resolve(results.multiFaceLandmarks[0]);
+        } else {
+          resolve(null);
+        }
+      });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      faceMesh.send({ image: canvas }).catch(() => resolve(null));
+    });
+  }
+
+  function computeGuideFromLandmarks(landmarks, imgW, imgH) {
+    // Key MediaPipe face mesh landmark indices
+    // 234 = left ear tragus area, 454 = right ear tragus
+    // 10 = top of head, 152 = chin
+    // 127 = left temple, 356 = right temple
+
+    const toPixel = (lm) => ({ x: lm.x * imgW, y: lm.y * imgH });
+
+    // Get key points
+    const earL = toPixel(landmarks[234]);
+    const earR = toPixel(landmarks[454]);
+    const templeL = toPixel(landmarks[127]);
+    const templeR = toPixel(landmarks[356]);
+    const chin = toPixel(landmarks[152]);
+    const foreheadTop = toPixel(landmarks[10]);
+
+    // Use whichever ear is more visible (side profile)
+    // For a left-facing profile, right ear (454) is visible
+    // For a right-facing profile, left ear (234) is visible
+    const ear = earL.x < earR.x ? earR : earL;
+    const temple = earL.x < earR.x ? templeR : templeL;
+
+    const faceHeight = chin.y - foreheadTop.y;
+    const earY = ear.y;
+
+    // Determine taper type based on ear position relative to face height
+    const earRatio = (earY - foreheadTop.y) / faceHeight;
+    let taperType, lineOffsetRatio, advice;
+
+    if (earRatio < 0.55) {
+      taperType = 'high';
+      lineOffsetRatio = -0.05;
+      advice = 'Your hairline sits high — a high taper will look clean and modern. Start your fade just above the ear and blend up aggressively with a #1.5 guard.';
+    } else if (earRatio < 0.65) {
+      taperType = 'mid';
+      lineOffsetRatio = 0.0;
+      advice = 'A mid taper suits your proportions well. Position your clipper right at ear level and blend upward with a #2 guard for a natural graduation.';
+    } else {
+      taperType = 'low';
+      lineOffsetRatio = 0.05;
+      advice = 'Your ear sits lower on your head — a low taper will give a clean, subtle fade. Start just below the ear with a #1 guard and blend upward gradually.';
+    }
+
+    // Guide line Y = ear Y + small offset
+    const lineY = (earY + faceHeight * lineOffsetRatio) / imgH;
+
+    // Line runs from just past nose to right edge of frame
+    const startX = Math.min(temple.x, ear.x) / imgW * 0.6;
+    const endX = Math.max(temple.x, ear.x) / imgW + 0.15;
+
+    return {
+      tapperLineY: Math.max(0.3, Math.min(0.75, lineY)),
+      tapperLineStartX: Math.max(0.05, Math.min(0.45, startX)),
+      tapperLineEndX: Math.max(0.55, Math.min(0.98, endX)),
+      fadeZoneHeight: 0.12,
+      taperType,
+      advice,
+      confidence: 'high'
+    };
+  }
+
+  // ── PAID: Claude Vision via backend ──
+  async function analyzeWithClaudeVision(file) {
+    const formData = new FormData();
+    formData.append('photo', file);
+
+    try {
+      const response = await fetch(BACKEND_URL + '/analyze', {
+        method: 'POST',
+        body: formData
+      });
+
+      removeTyping();
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: 'Server error' }));
+        addAIMessage('<p>Server error: ' + (err.error || response.statusText) + '</p>', null);
+        return;
+      }
+
+      const parsed = await response.json();
+      const overlayDataUrl = await drawGuideOverlay(file, parsed);
+      const taperLabel = parsed.taperType === 'low' ? 'Low Taper' : parsed.taperType === 'mid' ? 'Mid Taper' : 'High Taper';
+
+      addAIMessageWithImage(
+        `<p>⭐ <strong>Pro Analysis:</strong> I analyzed your exact head shape and placed your <strong>${taperLabel} guide</strong>.</p><p>${parsed.advice}</p>`,
+        overlayDataUrl
+      );
+    } catch(err) {
+      removeTyping();
+      addAIMessage('<p>Could not reach the server. Please try again.</p>', null);
+    }
+  }
+
+  function showUpgradePrompt() {
+    addAIMessageWithUpgrade('<p>Upgrade to <strong>SelfHaircut Pro</strong> for personalized AI barber advice on your exact head shape, unlimited daily analyses, and mid-cut progress photo feedback.</p>');
+  }
+
+  function addAIMessageWithUpgrade(html) {
+    const msg = document.createElement('div');
+    msg.className = 'msg';
+    msg.innerHTML = `
+      <div class="msg-avatar ai">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 3h12M6 3c-1.1 0-2 .9-2 2v14a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2"/>
+          <path d="M9 9h6M9 13h4"/>
+        </svg>
+      </div>
+      <div class="msg-body">
+        <div class="msg-name">SelfHaircut.ai</div>
+        <div class="msg-text">
+          ${html}
+          <div style="margin-top:14px;padding:16px;background:linear-gradient(135deg,rgba(232,213,163,0.08),rgba(232,213,163,0.04));border:1px solid rgba(232,213,163,0.2);border-radius:12px;">
+            <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--accent);margin-bottom:4px;">SelfHaircut Pro — $12/mo</div>
+            <div style="font-size:13px;color:var(--text2);margin-bottom:12px;line-height:1.5;">✓ Claude AI analyzes your exact head shape<br>✓ Unlimited daily photo analyses<br>✓ Mid-cut progress feedback<br>✓ Personalized clipper guard recommendations</div>
+            <button onclick="handleUpgradeClick()" style="padding:10px 20px;background:var(--accent);color:#0d0d0d;border:none;border-radius:9px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#c9aa72'" onmouseout="this.style.background='var(--accent)'">Upgrade to Pro →</button>
+          </div>
+        </div>
+      </div>`;
+    messagesWrap.appendChild(msg);
+    scrollBottom();
+  }
+
+  function handleUpgradeClick() {
+    // TODO: Replace with your Stripe/Lemon Squeezy checkout link
+    addAIMessage('<p>Payment coming soon! We\'re setting up checkout. Check back shortly.</p>', null);
+  }
+
 
   async function drawGuideOverlay(file, guide) {
     return new Promise((resolve) => {
@@ -1390,34 +1578,6 @@ Analyze the ear position, temple, and natural hairline. If photo is unclear, set
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('overlay').classList.remove('visible');
   }
-
-  function getApiKey() {
-    return localStorage.getItem('shc_api_key') || '';
-  }
-
-  function saveApiKey() {
-    const key = document.getElementById('apiKeyInput').value.trim();
-    if (!key) return;
-    localStorage.setItem('shc_api_key', key);
-    const banner = document.getElementById('apiKeyBanner');
-    banner.style.background = '#001a00';
-    banner.style.borderColor = 'rgba(100,200,100,0.3)';
-    banner.innerHTML = '<span style="font-size:13px;color:#7dda7d;font-weight:500;">✓ API key saved! Upload a photo to analyze your haircut.</span><button onclick="clearApiKey()" style="padding:4px 10px;background:none;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:var(--text3);font-size:12px;cursor:pointer;margin-left:8px;">Change key</button>';
-  }
-
-  function clearApiKey() {
-    localStorage.removeItem('shc_api_key');
-    location.reload();
-  }
-
-  // Load saved key on startup
-  window.addEventListener('DOMContentLoaded', () => {
-    const saved = localStorage.getItem('shc_api_key');
-    if (saved) {
-      document.getElementById('apiKeyInput').value = saved;
-      saveApiKey();
-    }
-  });
 
   function escHtml(str) {
     return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
