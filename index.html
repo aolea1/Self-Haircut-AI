@@ -954,7 +954,25 @@
     }
   }
 
+  let userScrolledUp = false;
+
+  // Track if user has manually scrolled up
+  chatArea.addEventListener('scroll', () => {
+    const distFromBottom = chatArea.scrollHeight - chatArea.scrollTop - chatArea.clientHeight;
+    userScrolledUp = distFromBottom > 60;
+  });
+
   function scrollBottom() {
+    if (!userScrolledUp) {
+      requestAnimationFrame(() => {
+        chatArea.scrollTop = chatArea.scrollHeight;
+      });
+    }
+  }
+
+  // Force scroll to bottom on new user message (always)
+  function scrollBottomForce() {
+    userScrolledUp = false;
     requestAnimationFrame(() => {
       chatArea.scrollTop = chatArea.scrollHeight;
     });
@@ -1082,6 +1100,7 @@
     const displayText = text || (filesToProcess.length > 0 ? '' : '');
 
     addUserMessage(displayText, filesToProcess);
+    scrollBottomForce();
 
     chatInput.value = '';
     chatInput.style.height = 'auto';
