@@ -27,7 +27,7 @@
     --radius: 12px;
     --radius-lg: 18px;
     --topbar-h: 57px;
-    --inputdock-h: 120px;
+    --inputdock-h: 140px;
   }
 
   html, body {
@@ -253,6 +253,7 @@
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
     scrollbar-color: #555 #1a1a1a;
+    z-index: 2;
   }
   .chat-area::-webkit-scrollbar { width: 8px; }
   .chat-area::-webkit-scrollbar-track { background: #1a1a1a; }
@@ -532,7 +533,7 @@
     padding: 12px 24px 16px;
     background: var(--bg);
     border-top: 1px solid var(--border);
-    z-index: 2;
+    z-index: 1;
     overflow: hidden;
   }
 
