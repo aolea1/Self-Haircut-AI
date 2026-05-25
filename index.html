@@ -26,9 +26,14 @@
     --sidebar: 240px;
     --radius: 12px;
     --radius-lg: 18px;
+    --topbar-h: 57px;
+    --inputdock-h: 120px;
   }
 
-  html, body { height: 100%; overflow: hidden; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    overflow: hidden;
+  }
 
   body {
     font-family: 'DM Sans', sans-serif;
@@ -38,7 +43,6 @@
     height: 100vh;
     overflow: hidden;
   }
-
   /* ── SIDEBAR ── */
   .sidebar {
     width: var(--sidebar);
@@ -184,20 +188,19 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
-    position: relative;
+    height: 100vh;
     overflow: hidden;
+    position: relative;
   }
 
   .topbar {
+    height: var(--topbar-h);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 24px;
+    padding: 0 24px;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
-    width: 100%;
-    position: relative;
-    z-index: 1;
   }
 
   .menu-btn {
@@ -240,18 +243,17 @@
   /* ── CHAT AREA ── */
   .chat-area {
     position: absolute;
-    top: 57px;
-    bottom: 120px;
+    top: var(--topbar-h);
+    bottom: var(--inputdock-h);
     left: 0;
     right: 0;
     overflow-y: scroll;
     overflow-x: hidden;
-    padding: 0 24px 24px;
+    padding: 20px 24px 40px;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
     scrollbar-color: #555 #1a1a1a;
   }
-
   .chat-area::-webkit-scrollbar { width: 8px; }
   .chat-area::-webkit-scrollbar-track { background: #1a1a1a; }
   .chat-area::-webkit-scrollbar-thumb { background: #555; border-radius: 99px; }
@@ -526,11 +528,12 @@
     bottom: 0;
     left: 0;
     right: 0;
+    height: var(--inputdock-h);
     padding: 12px 24px 16px;
     background: var(--bg);
     border-top: 1px solid var(--border);
     z-index: 2;
-    height: 120px;
+    overflow: hidden;
   }
 
   .input-wrap {
@@ -964,23 +967,8 @@
 
   let userScrolledUp = false;
 
-  // Keep chat-area bottom in sync with input-dock height dynamically
-  function syncLayout() {
-    const inputDock = document.querySelector('.input-dock');
-    const chatArea = document.getElementById('chatArea');
-    if (inputDock && chatArea) {
-      const h = inputDock.offsetHeight;
-      chatArea.style.bottom = h + 'px';
-    }
-  }
 
-  const resizeObserver = new ResizeObserver(syncLayout);
-  resizeObserver.observe(document.querySelector('.input-dock') || document.body);
-  window.addEventListener('resize', syncLayout);
-  document.addEventListener('DOMContentLoaded', syncLayout);
-  setTimeout(syncLayout, 100);
 
-  // Track if user has manually scrolled up
   chatArea.addEventListener('scroll', () => {
     const distFromBottom = chatArea.scrollHeight - chatArea.scrollTop - chatArea.clientHeight;
     userScrolledUp = distFromBottom > 60;
