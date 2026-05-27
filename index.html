@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SelfHaircut.ai — Cut Your Own Hair, Perfectly</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -430,36 +430,7 @@ body {
   overflow: hidden; border: 1px solid rgba(255,255,255,0.1);
   max-width: 460px;
 }
-.guide-img-wrap canvas { width: 100%; display: block; cursor: ns-resize; }
-
-.drag-hint {
-  text-align: center; font-size: 11px; color: var(--text3);
-  margin-top: 6px; letter-spacing: 0.02em;
-}
-
-/* ── STEPS PANEL ── */
-.steps-panel {
-  margin-top: 4px; padding: 16px;
-  background: var(--surface2); border: 1px solid var(--border);
-  border-radius: 14px;
-}
-.steps-title {
-  font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700;
-  color: var(--accent); margin-bottom: 14px; letter-spacing: -0.1px;
-}
-.step-item {
-  display: flex; gap: 12px; margin-bottom: 12px;
-}
-.step-item:last-child { margin-bottom: 0; }
-.step-num {
-  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
-  background: rgba(232,213,163,0.12); border: 1px solid rgba(232,213,163,0.25);
-  color: var(--accent2); font-size: 11px; font-weight: 700;
-  display: flex; align-items: center; justify-content: center; margin-top: 1px;
-}
-.step-content {}
-.step-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
-.step-desc { font-size: 12.5px; color: var(--text2); line-height: 1.5; }
+.guide-img-wrap canvas { width: 100%; display: block; }
 
 /* ── SIDEBAR OVERLAY ── */
 .sidebar-overlay {
@@ -477,14 +448,8 @@ body {
   .menu-btn { display: flex; }
   .topbar { padding: 0 16px; }
   .chat-area { padding: 16px 16px 40px; }
-  .input-dock {
-    padding: 10px 16px 14px;
-    padding-bottom: max(14px, env(safe-area-inset-bottom));
-  }
+  .input-dock { padding: 10px 16px 14px; }
   .inspo-grid { gap: 8px; }
-  .hero-headline { font-size: 22px; }
-  .inspo-card:nth-child(3) { max-width: 100%; }
-  .upgrade-card { font-size: 13px; }
 }
 </style>
 </head>
@@ -539,8 +504,8 @@ body {
   <div class="chat-area" id="chatArea">
 
     <div class="hero" id="hero">
-      <h1 class="hero-headline">Cut your own hair.<br>Get it right.</h1>
-      <p class="hero-sub">Upload a side profile photo — AI places your exact taper line, then walks you through every step.</p>
+      <h1 class="hero-headline">How can I help you cut your own hair?</h1>
+      <p class="hero-sub">Step-by-step guidance, tailored to your head shape and skill level</p>
 
       <div class="inspo-grid">
         <div class="inspo-card" onclick="chipClick('Low taper fade — where do I start?')">
@@ -569,11 +534,10 @@ body {
       </div>
 
       <div class="chip-row">
-        <button class="chip" onclick="chipClick('Low Taper')">Low Taper</button>
-        <button class="chip" onclick="chipClick('Mid Taper')">Mid Taper</button>
-        <button class="chip" onclick="chipClick('High Taper')">High Taper</button>
-        <button class="chip" onclick="chipClick('Skin Fade')">Skin Fade</button>
-        <button class="chip" onclick="chipClick('Buzz Cut')">Buzz Cut</button>
+        <button class="chip" onclick="chipClick('What haircut are you trying to do today?')">✂ What cut am I doing?</button>
+        <button class="chip" onclick="chipClick('Which taper is right for me?')">Which taper is right for me?</button>
+        <button class="chip" onclick="chipClick('I want to upload a side profile photo')">📷 Upload my photo</button>
+        <button class="chip" onclick="chipClick('Show me a beginner buzz cut guide')">Buzz cut guide</button>
       </div>
     </div>
 
@@ -618,16 +582,8 @@ const uploadPreview = document.getElementById('uploadPreview');
 
 let started = false;
 let pendingFiles = [];
+let flowStep = 0;
 let userScrolledUp = false;
-
-const FREE_CLAUDE_LIMIT = 2; // first N free analyses use real Claude
-
-const state = {
-  taperStyle: null,   // 'low'|'mid'|'high'|'skin'|'buzz'
-  tools: null,        // 'clippers'|'trimmer'|'both'
-  phase: 'intro',     // 'intro'|'style-chosen'|'tools-known'|'photo-prompted'|'guide-shown'
-  shownPhotoTip: false,
-};
 
 const BACKEND_URL = 'https://selfhaircut-backend.onrender.com';
 const FREE_LIMIT = 5;
@@ -712,7 +668,7 @@ function addAIMessage(html, options) {
   let opts = '';
   if (options) {
     opts = '<div class="opt-row">' + options.map(o =>
-      '<button class="opt-btn" onclick="optionClick(this,\'' + o + '\')">' + o + '</button>'
+      `<button class="opt-btn" onclick="optionClick(this,'${o}')">${o}</button>`
     ).join('') + '</div>';
   }
   msg.innerHTML = `${aiAvatar()}<div class="msg-body"><div class="msg-name">SelfHaircut.ai</div><div class="msg-text">${html}${opts}</div></div>`;
@@ -726,11 +682,10 @@ function addAIMessageWithCanvas(html, canvas) {
   msg.innerHTML = `${aiAvatar()}<div class="msg-body"><div class="msg-name">SelfHaircut.ai</div>
     <div class="msg-text">${html}
       <div class="guide-img-wrap"></div>
-      <div class="drag-hint">↕ Drag the line to adjust its position</div>
       <div class="opt-row" style="margin-top:10px;">
+        <button class="opt-btn" onclick="chipClick('Can you adjust the line higher?')">Move line higher</button>
+        <button class="opt-btn" onclick="chipClick('Can you adjust the line lower?')">Move line lower</button>
         <button class="opt-btn" onclick="chipClick('What guard should I use?')">What guard?</button>
-        <button class="opt-btn" onclick="chipClick('How do I blend the fade?')">How to blend?</button>
-        <button class="opt-btn" onclick="chipClick('How do I clean up the edges?')">Edge cleanup</button>
       </div>
     </div></div>`;
   messagesWrap.appendChild(msg);
@@ -777,7 +732,6 @@ function removeTyping() {
 async function sendMessage() {
   const text = chatInput.value.trim();
   if (!text && pendingFiles.length === 0) return;
-  chatInput.blur();
 
   const files = [...pendingFiles];
   addUserMessage(text, files);
@@ -803,49 +757,6 @@ async function sendMessage() {
   }, 700 + Math.random() * 500);
 }
 
-// ── STYLE REFERENCE DIAGRAM ──
-function styleReferenceSvg(style) {
-  const configs = {
-    low:  { lineY: 156, label: 'Low Taper',  sub: 'bottom of ear',      dotX: [30, 140] },
-    mid:  { lineY: 136, label: 'Mid Taper',  sub: 'middle of ear',      dotX: [18, 140] },
-    high: { lineY: 108, label: 'High Taper', sub: 'above ear / temple', dotX: [16, 140] },
-    skin: { lineY: 172, label: 'Skin Fade',  sub: 'below ear / jaw',    dotX: [42, 128] },
-  };
-  const cfg = configs[style];
-  if (!cfg) return '';
-  const { lineY, label, sub, dotX: [x1, x2] } = cfg;
-
-  // Human side-profile path (facing right — back of head on left, face on right)
-  const headPath = 'M82,20 C52,14 22,40 14,80 C8,114 15,150 40,172 L46,196 C56,210 72,216 88,216 C104,216 118,210 124,200 L127,186 C134,172 140,156 140,140 C140,122 136,105 130,88 C122,66 106,38 82,20 Z';
-  const uid = `hc-${style}`;
-
-  return `<div style="margin:12px 0 6px;display:inline-block;">
-<svg viewBox="0 0 185 228" width="155" height="191" style="display:block;border-radius:12px;background:#1a1a1a;border:1px solid rgba(255,255,255,0.1);">
-  <defs><clipPath id="${uid}"><path d="${headPath}"/></clipPath></defs>
-  <!-- Head base -->
-  <path d="${headPath}" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.40)" stroke-width="1.5"/>
-  <!-- Hair region (above guide line, clipped to head silhouette) -->
-  <rect x="0" y="0" width="185" height="${lineY}" fill="rgba(150,115,75,0.32)" clip-path="url(#${uid})"/>
-  <!-- Guide line (clipped to head) -->
-  <line x1="0" y1="${lineY}" x2="185" y2="${lineY}" stroke="#e8d5a3" stroke-width="2.5" stroke-dasharray="8,4" clip-path="url(#${uid})"/>
-  <!-- Ear (C-shape protruding from right side at y 116–156) -->
-  <path d="M140,116 C156,116 164,126 164,136 C164,146 156,156 140,156" fill="rgba(255,220,180,0.07)" stroke="rgba(255,255,255,0.40)" stroke-width="1.5"/>
-  <!-- Ear inner detail -->
-  <ellipse cx="146" cy="136" rx="5" ry="9" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
-  <!-- Ear label -->
-  <text x="166" y="140" fill="rgba(255,255,255,0.32)" font-size="8" font-family="sans-serif">ear</text>
-  <!-- Faint mid-ear reference -->
-  <line x1="16" y1="136" x2="140" y2="136" stroke="rgba(255,255,255,0.1)" stroke-width="0.8" stroke-dasharray="3,4"/>
-  <!-- Endpoint dots -->
-  <circle cx="${x1}" cy="${lineY}" r="3.5" fill="#e8d5a3"/>
-  <circle cx="${x2}" cy="${lineY}" r="3.5" fill="#e8d5a3"/>
-  <!-- Label above line -->
-  <text x="78" y="${lineY - 22}" text-anchor="middle" fill="rgba(232,213,163,0.6)" font-size="8" font-family="sans-serif">(${sub})</text>
-  <text x="78" y="${lineY - 10}" text-anchor="middle" fill="#e8d5a3" font-size="10" font-weight="bold" font-family="sans-serif">↓ ${label} line</text>
-</svg>
-</div>`;
-}
-
 // ── TEXT RESPONSES ──
 function getResponse(text) {
   if (text.trim() === '/admin') {
@@ -858,127 +769,23 @@ function getResponse(text) {
   }
 
   const lower = text.toLowerCase();
+  const step = flowStep++;
 
-  // Photo/upload prompt
-  if (/upload|photo|picture|camera|selfie|shot/.test(lower)) {
-    return { html: '<p>Ready! Hit the <strong>Upload photo</strong> button below and send me a clear side-profile shot with your ear fully visible.</p>', options: null };
+  if (lower.includes('upload') || lower.includes('photo') || lower.includes('picture')) {
+    return { html: '<p>Ready! Hit the 📷 <strong>Upload photo</strong> button below and send me a clear side-profile shot with your ear visible.</p>', options: null };
   }
-
-  // Guard number questions
-  if (/\bguard\b|which (guard|number|clipper)|\bwhat guard\b|#\d/.test(lower)) {
-    const guards = {
-      low: 'Start with a <strong>#2</strong> on the sides, blend with a <strong>#1.5</strong> at the taper line, then clean the fade zone with a <strong>#0.5</strong> or open-blade. Work bottom-up.',
-      mid: 'Use a <strong>#3</strong> on the top sides, transition to <strong>#2</strong> at the mid line, then <strong>#1</strong> into the fade zone. Keep tension on the skin.',
-      high: 'Go <strong>#3 or #4</strong> on top, <strong>#2</strong> at the high taper, <strong>#1</strong> or open-blade through the fade. The transition happens in the upper third of the side.',
-      skin: 'Use <strong>#2</strong> on the bulk, <strong>#1</strong> mid-fade, then <strong>#0</strong> / open-blade at the skin line. Finish with a trimmer for the hairline.',
-      buzz: 'Pick one guard for a uniform buzz — <strong>#3</strong> (10mm) for a short but soft look, <strong>#4</strong> (13mm) for a relaxed length. Go with the grain, against the grain for a cleaner finish.',
-      null: 'Tell me which taper style you\'re going for first and I\'ll give you the exact guard sequence.',
-    };
-    const advice = guards[state.taperStyle] || guards[null];
-    return { html: `<p>${advice}</p>`, options: null };
+  if (lower.includes('buzz')) {
+    return { html: '<p>Buzz cuts are great for beginners. Choose a #3 or #4 guard, go with the grain top-to-back, then clean up edges. What clippers are you using?</p>',
+      options: ['Clippers only', 'Clippers + trimmer', 'Just a trimmer'] };
   }
-
-  // Blending questions
-  if (/blend|blending|fade.*(in|into|up)|transition/.test(lower)) {
-    return { html: '<p>Blending tip: use a <strong>flicking wrist motion</strong> — press the clipper flat at the bottom of the fade zone, then rotate the blade away from the head as you move upward. Work in small overlapping passes. Check the blend every few passes by running your hand against the grain.</p>', options: null };
+  if (step === 0) {
+    return { html: '<p>Got it! Which taper style are you going for?</p>',
+      options: ['Low Taper', 'Mid Taper', 'High Taper', 'Skin Fade'] };
   }
-
-  // Edge/neckline questions
-  if (/edge|neckline|neck|sideburn|hairline|trim.*edge|clean.*(up|line)/.test(lower)) {
-    return { html: '<p>For edges: tilt your trimmer at a slight angle and outline the hairline first, then square or round the neckline based on your preference. Square looks sharper; rounded is more natural. Check symmetry in a mirror by lining up both sideburns at once.</p>', options: null };
+  if (step === 1) {
+    return { html: '<p>Perfect. Upload a side profile photo and I'll draw your exact bald line on it.</p>', options: null };
   }
-
-  // Line adjustment questions
-  if (/higher|lower|adjust|move.*line|line.*(too|more)/.test(lower)) {
-    if (state.phase === 'guide-shown') {
-      const dir = /higher|too low|move.*up/.test(lower) ? 'higher' : 'lower';
-      return { html: `<p>Got it — re-upload your photo and I'll shift the guide line ${dir}. Or describe approximately how many finger-widths you'd like it moved.</p>`, options: null };
-    }
-    return { html: '<p>Upload your photo first and I\'ll place the guide line, then you can ask me to adjust it up or down.</p>', options: null };
-  }
-
-  // Buzz cut
-  if (/\bbuzz\b/.test(lower)) {
-    state.taperStyle = 'buzz';
-    state.phase = 'style-chosen';
-    return {
-      html: '<p>Buzz cuts are great for beginners. Choose a <strong>#3 or #4</strong> guard, go with the grain top-to-back, then against the grain for a tighter finish. What are you cutting with?</p>',
-      options: ['Clippers only', 'Clippers + trimmer', 'Just a trimmer'],
-    };
-  }
-
-  // Taper / fade style selection
-  const taperMap = [
-    [/\blow[\s-]?taper\b|low.*taper|taper.*low/i, 'low', 'Low Taper'],
-    [/\bmid[\s-]?taper\b|mid.*taper|taper.*mid|medium.*taper/i, 'mid', 'Mid Taper'],
-    [/\bhigh[\s-]?taper\b|high.*taper|taper.*high/i, 'high', 'High Taper'],
-    [/\bskin[\s-]?fade\b|bald.?fade|zero.?fade/i, 'skin', 'Skin Fade'],
-  ];
-  for (const [re, key, label] of taperMap) {
-    if (re.test(lower)) {
-      state.taperStyle = key;
-      state.phase = 'style-chosen';
-      const tips = {
-        low:  'The fade starts at the <strong>bottom of the ear</strong> — clean and natural, works for any occasion.',
-        mid:  'The fade starts at the <strong>middle of the ear</strong> — the most popular style, suits almost every face.',
-        high: 'The fade starts <strong>above the ear at the temple</strong> — bold, high-contrast, great with texture on top.',
-        skin: 'The line sits <strong>just below the ear</strong> toward the jaw — maximum contrast, fades all the way to skin.',
-      };
-      const placement = {
-        low:  'Drag the guide line on your photo to the <strong>bottom of your ear</strong>. That\'s where your fade begins.',
-        mid:  'Drag the guide line level with the <strong>middle of your ear</strong>.',
-        high: 'Drag the guide line to just <strong>above your ear</strong> — the temple area.',
-        skin: 'Drag the guide line to <strong>just below your ear</strong>, near the jaw.',
-      };
-      return {
-        html: `<p><strong>${label}</strong> — ${tips[key]}</p>${styleReferenceSvg(key)}<p style="font-size:13px;color:var(--text2);margin-top:8px;">${placement[key]} The diagram shows the exact position on a typical head.</p>`,
-        options: ['Upload my photo', 'Which guard sizes?'],
-      };
-    }
-  }
-
-  // Tool selection
-  if (/clippers? only|just.*(clippers?|the clippers?)/i.test(lower)) {
-    state.tools = 'clippers';
-    state.phase = 'tools-known';
-    return { html: '<p>Clippers only is totally doable. You\'ll use different guard lengths for the blend — upload a side profile and I\'ll place your guide line.</p>', options: null };
-  }
-  if (/clippers?.*trimmer|trimmer.*clippers?/i.test(lower)) {
-    state.tools = 'both';
-    state.phase = 'tools-known';
-    return { html: '<p>Clipper + trimmer combo is ideal. Clippers for the bulk fade, trimmer for hairline cleanup. Upload a side profile photo and I\'ll draw your guide line.</p>', options: null };
-  }
-  if (/just.*(trimmer|a trimmer)|trimmer only/i.test(lower)) {
-    state.tools = 'trimmer';
-    state.phase = 'tools-known';
-    return { html: '<p>With just a trimmer you can still do a clean taper — you\'ll need to work in smaller sections. Upload your photo and I\'ll show you where the line sits.</p>', options: null };
-  }
-
-  // "Show example" option
-  if (/example|show me|reference|what.*(look|look like)/i.test(lower)) {
-    return { html: '<p>The best reference is your own head shape. Upload a <strong>side profile photo</strong> with your ear visible and I\'ll draw the exact guide line for your taper.</p>', options: null };
-  }
-
-  // "Draw guide" option
-  if (/draw guide|guide.*photo|photo.*guide|on my photo/i.test(lower)) {
-    return { html: '<p>Hit the <strong>Upload photo</strong> button below and attach a clear side profile shot — ear visible, good lighting. I\'ll place the line for you.</p>', options: null };
-  }
-
-  // Intro / first message
-  if (state.phase === 'intro') {
-    state.phase = 'style-chosen';
-    return {
-      html: '<p>Let\'s get you set up. Which taper style are you going for?</p>',
-      options: ['Low Taper', 'Mid Taper', 'High Taper', 'Skin Fade'],
-    };
-  }
-
-  // After style is chosen but no photo yet
-  if (state.phase === 'style-chosen' || state.phase === 'tools-known') {
-    return { html: '<p>Upload a clear side profile photo and I\'ll place your personalized guide line on it.</p>', options: null };
-  }
-
-  return { html: '<p>Upload a side profile photo and I\'ll place your guide line. Make sure your ear is visible and the lighting is decent.</p>', options: null };
+  return { html: '<p>Upload a clear side profile photo and I'll place your personalized guide line on it.</p>', options: null };
 }
 
 // ── PHOTO ANALYSIS ──
@@ -986,15 +793,11 @@ async function analyzePhoto(file) {
   const usage = getUsage();
   if (!isPro() && usage >= FREE_LIMIT) {
     removeTyping();
-    addUpgradeMessage(`<p>You've used all <strong>${FREE_LIMIT} free analyses</strong> for today. Upgrade to <strong>SelfHaircut Pro</strong> for unlimited AI-personalized guidance.</p>`);
+    addUpgradeMessage(`<p>You've used your <strong>${FREE_LIMIT} free analyses</strong> for today. Upgrade to <strong>SelfHaircut Pro</strong> for unlimited analyses and personalized AI guidance.</p>`);
     return;
   }
   incUsage();
-  if (isPro() || usage < FREE_CLAUDE_LIMIT) {
-    await claudeAnalysis(file, usage < FREE_CLAUDE_LIMIT && !isPro());
-  } else {
-    await freeAnalysis(file);
-  }
+  isPro() ? await claudeAnalysis(file) : await freeAnalysis(file);
 }
 
 async function freeAnalysis(file) {
@@ -1002,126 +805,32 @@ async function freeAnalysis(file) {
     const canvas = await drawGuide(file, null);
     removeTyping();
     const used = getUsage();
-    state.phase = 'guide-shown';
-    const styleLabel = { low: 'Low Taper', mid: 'Mid Taper', high: 'High Taper', skin: 'Skin Fade', buzz: 'Buzz Cut' }[state.taperStyle] || 'Taper';
-    const guardTip = { low: '#1.5', mid: '#2', high: '#2', skin: '#0.5', buzz: '#3' }[state.taperStyle] || '#1.5';
     addAIMessageWithCanvas(
-      `<p>I placed your <strong>${styleLabel} guide line</strong> based on your sideburn area. Drag the line to fine-tune the position, then clip along it and blend upward with a <strong>${guardTip} guard</strong>.</p>
-       <p style="color:var(--text3);font-size:12px;">Heuristic analysis ${used}/${FREE_LIMIT} · <span style="color:var(--accent2);cursor:pointer;text-decoration:underline;" onclick="showUpgrade()">Upgrade to Pro</span> for Claude AI placement</p>`,
+      `<p>I detected your <strong>sideburn area</strong> and placed your <strong>Low Taper guide line</strong> just below it. Position your clipper along the white line and blend upward into the shaded zone with a #1.5 guard.</p>
+       <p style="color:var(--text3);font-size:12px;">Free analysis ${used}/${FREE_LIMIT} today · <span style="color:var(--accent2);cursor:pointer;text-decoration:underline;" onclick="showUpgrade()">Upgrade to Pro</span> for AI-personalized placement</p>`,
       canvas
     );
-    addGuideSteps();
   } catch(e) {
     removeTyping();
     addAIMessage('<p>Something went wrong. Please try again with a clear side profile photo.</p>', null);
   }
 }
 
-async function claudeAnalysis(file, isFreePreview = false) {
-  let res;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const fd = new FormData();
-      fd.append('photo', file);
-      if (state.taperStyle) fd.append('style', state.taperStyle);
-      res = await fetch(BACKEND_URL + '/analyze', { method: 'POST', body: fd });
-      break;
-    } catch(e) {
-      if (attempt === 1) {
-        removeTyping();
-        addAIMessage('<p>Could not reach the server — check your connection and try again.</p>', null);
-        return;
-      }
-      await new Promise(r => setTimeout(r, 1200));
-    }
+async function claudeAnalysis(file) {
+  try {
+    const fd = new FormData();
+    fd.append('photo', file);
+    const res = await fetch(BACKEND_URL + '/analyze', { method: 'POST', body: fd });
+    removeTyping();
+    if (!res.ok) { addAIMessage('<p>Server error. Please try again.</p>', null); return; }
+    const guide = await res.json();
+    const canvas = await drawGuide(file, guide);
+    const label = guide.taperType === 'low' ? 'Low Taper' : guide.taperType === 'mid' ? 'Mid Taper' : 'High Taper';
+    addAIMessageWithCanvas(`<p>⭐ <strong>Pro Analysis — ${label}:</strong> ${guide.advice}</p>`, canvas);
+  } catch(e) {
+    removeTyping();
+    addAIMessage('<p>Could not reach the server. Please try again.</p>', null);
   }
-  removeTyping();
-  if (!res.ok) {
-    if (isFreePreview) {
-      await freeAnalysis(file);
-    } else {
-      addAIMessage(`<p>Server error (${res.status}). Please try again in a moment.</p>`, null);
-    }
-    return;
-  }
-  let guide;
-  try { guide = await res.json(); } catch(e) {
-    addAIMessage('<p>Unexpected server response. Please try again.</p>', null);
-    return;
-  }
-  const canvas = await drawGuide(file, guide);
-  state.phase = 'guide-shown';
-  const styleLabels = { low: 'Low Taper', mid: 'Mid Taper', high: 'High Taper', skin: 'Skin Fade' };
-  const label = styleLabels[guide.taperType] || styleLabels[state.taperStyle] || 'Taper';
-  const used = getUsage();
-  const footer = isFreePreview
-    ? `<p style="color:var(--text3);font-size:12px;">Free AI analysis ${used}/${FREE_CLAUDE_LIMIT} · <span style="color:var(--accent2);cursor:pointer;text-decoration:underline;" onclick="showUpgrade()">Upgrade to Pro</span> for unlimited</p>`
-    : '';
-  addAIMessageWithCanvas(`<p>⭐ <strong>${isFreePreview ? 'AI Analysis' : 'Pro Analysis'} — ${label}:</strong> ${guide.advice}</p>${footer}`, canvas);
-  addGuideSteps();
-}
-
-// ── GUIDE OVERLAY (shared by draw + drag redraw) ──
-function drawGuideOverlay(ctx, W, H, lineY, startX, endX, fadeH, guardLbl, styleLbl) {
-  ctx.save(); ctx.globalAlpha = 0.13; ctx.fillStyle = 'white';
-  ctx.fillRect(startX, lineY, endX - startX, fadeH); ctx.restore();
-
-  ctx.save(); ctx.globalAlpha = 0.18; ctx.strokeStyle = 'white'; ctx.lineWidth = 0.7;
-  for (let x = startX; x <= endX; x += 14) { ctx.beginPath(); ctx.moveTo(x, lineY); ctx.lineTo(x, lineY + fadeH); ctx.stroke(); }
-  for (let y = lineY; y <= lineY + fadeH; y += 14) { ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(endX, y); ctx.stroke(); }
-  ctx.restore();
-
-  ctx.save(); ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 10;
-  ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(startX, lineY); ctx.lineTo(endX, lineY); ctx.stroke(); ctx.restore();
-
-  [startX, endX].forEach(x => {
-    ctx.save(); ctx.shadowColor = 'white'; ctx.shadowBlur = 12;
-    ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(x, lineY, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-  });
-
-  ctx.save(); ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.92)';
-  ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 8;
-  const lbl = '▲ fade up to here';
-  ctx.fillText(lbl, startX + (endX - startX) / 2 - ctx.measureText(lbl).width / 2, lineY - 10);
-  ctx.restore();
-
-  const badgeText = `${styleLbl}  ${guardLbl}`;
-  ctx.save(); ctx.font = 'bold 12px sans-serif';
-  const bw = ctx.measureText(badgeText).width + 16;
-  const bx = endX - bw - 6, by = lineY + fadeH + 6;
-  ctx.fillStyle = 'rgba(0,0,0,0.65)';
-  ctx.beginPath(); ctx.roundRect(bx, by, bw, 22, 5); ctx.fill();
-  ctx.fillStyle = 'rgba(232,213,163,0.95)';
-  ctx.fillText(badgeText, bx + 8, by + 15); ctx.restore();
-}
-
-// ── DRAGGABLE GUIDE ──
-function makeGuideDraggable(canvas, img, initialLineY, startX, endX, fadeH, guardLbl, styleLbl) {
-  let lineY = initialLineY;
-  let dragging = false;
-  const W = canvas.width, H = canvas.height;
-  const ctx = canvas.getContext('2d');
-
-  const clamp = y => Math.max(H * 0.1, Math.min(H * 0.9, y));
-  const clientToY = clientY => {
-    const r = canvas.getBoundingClientRect();
-    return clamp((clientY - r.top) * (H / r.height));
-  };
-  const redraw = y => {
-    lineY = y;
-    ctx.clearRect(0, 0, W, H);
-    ctx.drawImage(img, 0, 0, W, H);
-    drawGuideOverlay(ctx, W, H, lineY, startX, endX, fadeH, guardLbl, styleLbl);
-  };
-
-  canvas.addEventListener('mousedown', e => { dragging = true; redraw(clientToY(e.clientY)); });
-  canvas.addEventListener('mousemove', e => { if (dragging) redraw(clientToY(e.clientY)); });
-  canvas.addEventListener('mouseup', () => { dragging = false; });
-  canvas.addEventListener('mouseleave', () => { dragging = false; });
-  canvas.addEventListener('touchstart', e => { dragging = true; e.preventDefault(); redraw(clientToY(e.touches[0].clientY)); }, { passive: false });
-  canvas.addEventListener('touchmove', e => { if (!dragging) return; e.preventDefault(); redraw(clientToY(e.touches[0].clientY)); }, { passive: false });
-  canvas.addEventListener('touchend', () => { dragging = false; });
 }
 
 // ── DRAW GUIDE ──
@@ -1143,65 +852,60 @@ function drawGuide(file, guide) {
         const isL = img.width > img.height;
 
         // Sideburn detection via pixel brightness scan
-        // Taper style → default Y position offsets (fraction of height)
-        const taperYBase = { low: 0.65, mid: 0.52, high: 0.40, skin: 0.34, buzz: 0.60 };
-        const taperGuardLabel = { low: '#1.5', mid: '#2', high: '#2', skin: '#0', buzz: '#3' };
-        const taperStyleLabel = { low: 'Low Taper', mid: 'Mid Taper', high: 'High Taper', skin: 'Skin Fade', buzz: 'Buzz' };
-
         let lineY, startX, endX;
         if (guide) {
           lineY = guide.tapperLineY * H;
           startX = guide.tapperLineStartX * W;
           endX = guide.tapperLineEndX * W;
         } else {
-          // Sideburn detection: find the vertical column with the most hair→skin contrast
-          // (the sideburn boundary has the highest brightness variance in a side-profile photo)
           const sc = document.createElement('canvas');
-          sc.width = Math.floor(W * 0.5); sc.height = Math.floor(H * 0.5);
+          sc.width = Math.floor(W * 0.3); sc.height = Math.floor(H * 0.3);
           const sx = sc.getContext('2d');
           sx.drawImage(canvas, 0, 0, sc.width, sc.height);
           const px = sx.getImageData(0, 0, sc.width, sc.height).data;
-
-          const scanYStart = Math.floor(sc.height * 0.22);
-          const scanYEnd   = Math.floor(sc.height * 0.78);
-          const cols = 12;
-          let bestCol = 4, bestVariance = 0, bestDropY = Math.floor(sc.height * 0.50);
-
-          for (let c = 1; c < cols - 1; c++) {
-            const cx = Math.floor((c / cols) * sc.width);
-            let sum = 0, sumSq = 0, count = 0;
-            let prev = null, maxDrop = 0, dropY = Math.floor(sc.height * 0.50);
-            for (let y = scanYStart; y < scanYEnd; y++) {
-              const idx = (y * sc.width + cx) * 4;
-              const b = px[idx]*0.299 + px[idx+1]*0.587 + px[idx+2]*0.114;
-              sum += b; sumSq += b * b; count++;
-              if (prev !== null && prev - b > maxDrop) { maxDrop = prev - b; dropY = y; }
-              prev = b;
-            }
-            const variance = (sumSq / count) - Math.pow(sum / count, 2);
-            if (variance > bestVariance) { bestVariance = variance; bestCol = c; bestDropY = dropY; }
+          const scanX = Math.floor(sc.width * 0.38);
+          let prev = null, maxDrop = 0, dropY = Math.floor(sc.height * 0.48);
+          for (let y = Math.floor(sc.height * 0.25); y < Math.floor(sc.height * 0.75); y++) {
+            const i = (y * sc.width + scanX) * 4;
+            const b = px[i]*0.299 + px[i+1]*0.587 + px[i+2]*0.114;
+            if (prev !== null && prev - b > maxDrop) { maxDrop = prev - b; dropY = y; }
+            prev = b;
           }
-
-          // sideburn center X in full canvas coords
-          const sbX = (bestCol / cols) * W;
-          const rawY = bestDropY / sc.height;
-
-          // Blend detected Y with taper-style target Y
-          const styleTargetY = taperYBase[state.taperStyle] || 0.55;
-          lineY = Math.min(0.78, Math.max(0.28, rawY * 0.55 + styleTargetY * 0.45 + 0.03)) * H;
-
-          // Short line — 28% of image width centered on the sideburn column
-          const half = W * 0.14;
-          startX = Math.max(0.01 * W, sbX - half);
-          endX   = Math.min(0.99 * W, sbX + half);
+          const rawY = dropY / sc.height;
+          lineY = Math.min(0.72, Math.max(0.35, rawY + 0.05)) * H;
+          startX = (isL ? 0.12 : 0.08) * W;
+          endX = (isL ? 0.80 : 0.87) * W;
         }
 
-        const fadeH = (guide ? guide.fadeZoneHeight : 0.10) * H;
-        const guardLbl = taperGuardLabel[state.taperStyle] || '#1.5';
-        const styleLbl = taperStyleLabel[state.taperStyle] || 'Taper';
+        const fadeH = (guide ? guide.fadeZoneHeight : 0.11) * H;
 
-        drawGuideOverlay(ctx, W, H, lineY, startX, endX, fadeH, guardLbl, styleLbl);
-        makeGuideDraggable(canvas, img, lineY, startX, endX, fadeH, guardLbl, styleLbl);
+        // Fade zone
+        ctx.save(); ctx.globalAlpha = 0.15; ctx.fillStyle = 'white';
+        ctx.fillRect(startX, lineY, endX - startX, fadeH); ctx.restore();
+
+        // Grid
+        ctx.save(); ctx.globalAlpha = 0.22; ctx.strokeStyle = 'white'; ctx.lineWidth = 0.8;
+        for (let x = startX; x <= endX; x += 14) { ctx.beginPath(); ctx.moveTo(x, lineY); ctx.lineTo(x, lineY + fadeH); ctx.stroke(); }
+        for (let y = lineY; y <= lineY + fadeH; y += 14) { ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(endX, y); ctx.stroke(); }
+        ctx.restore();
+
+        // Guide line
+        ctx.save(); ctx.shadowColor = 'rgba(255,255,255,0.9)'; ctx.shadowBlur = 10;
+        ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(startX, lineY); ctx.lineTo(endX, lineY); ctx.stroke(); ctx.restore();
+
+        // Dots
+        [startX, endX].forEach(x => {
+          ctx.save(); ctx.shadowColor = 'white'; ctx.shadowBlur = 12;
+          ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(x, lineY, 4.5, 0, Math.PI*2); ctx.fill(); ctx.restore();
+        });
+
+        // Label
+        ctx.save(); ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.92)';
+        ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 8;
+        const lbl = '▲ fade up to here';
+        ctx.fillText(lbl, startX + (endX-startX)/2 - ctx.measureText(lbl).width/2, lineY - 10);
+        ctx.restore();
 
         resolve(canvas);
       };
@@ -1216,58 +920,6 @@ function drawGuide(file, guide) {
 // ── UPGRADE ──
 function showUpgrade() {
   addUpgradeMessage('<p>Upgrade to <strong>SelfHaircut Pro</strong> for Claude AI personalized guidance on your exact head shape, unlimited analyses, and mid-cut progress feedback.</p>');
-}
-
-// ── STEP-BY-STEP GUIDE ──
-function addGuideSteps() {
-  const style = state.taperStyle || 'low';
-  const styleLabel = { low: 'Low Taper', mid: 'Mid Taper', high: 'High Taper', skin: 'Skin Fade', buzz: 'Buzz Cut' }[style] || 'Taper';
-  const steps = {
-    low: [
-      { t: 'Clip the sides', d: 'Use a <strong>#2 guard</strong>, working upward from the neck to the guide line. Keep the clipper flat.' },
-      { t: 'Blend at the line', d: 'Switch to a <strong>#1.5</strong>, position just below the line, use a flicking wrist motion upward.' },
-      { t: 'Fade the bottom', d: 'Use <strong>#0.5 or open blade</strong> on the bottom 2cm. Press flat at the bottom, rotate away as you lift.' },
-      { t: 'Edge up', d: 'Detail trimmer on the hairline, sideburns, and neckline. Check symmetry by lining up both sides at once.' },
-    ],
-    mid: [
-      { t: 'Clip above the line', d: 'Use a <strong>#3 guard</strong> on the upper sides above the guide line.' },
-      { t: 'Work the mid zone', d: '<strong>#2</strong> from the guide line down, blending upward with short flicking strokes.' },
-      { t: 'Fade the lower sides', d: '<strong>#1</strong> on the lower sides, then <strong>#0.5</strong> at the very bottom near the neck.' },
-      { t: 'Check and blend', d: 'Run your hand against the grain. Any hard lines? Blend with the higher guard using a flicking motion.' },
-      { t: 'Edge up', d: 'Outline the hairline and sideburn corners with a detail trimmer.' },
-    ],
-    high: [
-      { t: 'Top-to-line pass', d: '<strong>#4 guard</strong> from the top of the head down to the guide line.' },
-      { t: 'Transition zone', d: '<strong>#2</strong> from the guide line down — blend with upward flicks at the border.' },
-      { t: 'Lower sides', d: '<strong>#1</strong> then <strong>#0.5</strong> as you approach the temple and below.' },
-      { t: 'Skin at the base', d: 'Open blade or balding clipper on the bottom inch near the neck.' },
-      { t: 'Edge up', d: 'Detail trim the hairline and sideburns sharp.' },
-    ],
-    skin: [
-      { t: 'Remove bulk', d: '<strong>#2 guard</strong> across the entire sides and back.' },
-      { t: 'Drop to #1', d: 'Re-run with <strong>#1</strong>, stopping a few inches above the neck.' },
-      { t: 'Open blade fade', d: '<strong>Guards off</strong> on the bottom, flicking away from the head as you lift.' },
-      { t: 'Blend the skin line', d: 'Lever half-open to smooth the transition between bare skin and the #1 zone.' },
-      { t: 'Edge sharp', d: 'The skin fade lives or dies by clean edges — detail trimmer on the hairline and neckline.' },
-    ],
-    buzz: [
-      { t: 'Pick your guard', d: '<strong>#3</strong> (10mm) for a short buzz, <strong>#4</strong> (13mm) for a relaxed look.' },
-      { t: 'With the grain', d: 'Front-to-back across the whole head, overlapping passes by 50%.' },
-      { t: 'Against the grain', d: 'Back-to-front pass for a cleaner, more even finish — catches strays the first pass missed.' },
-      { t: 'Edge up', d: 'Hairline, sideburns, neckline. Square neckline = sharper; rounded = more natural.' },
-    ],
-  };
-  const list = steps[style] || steps.low;
-  const stepsHtml = list.map((s, i) =>
-    `<div class="step-item">
-      <div class="step-num">${i + 1}</div>
-      <div class="step-content">
-        <div class="step-title">${s.t}</div>
-        <div class="step-desc">${s.d}</div>
-      </div>
-    </div>`
-  ).join('');
-  addAIMessage(`<div class="steps-panel"><div class="steps-title">✂ ${styleLabel} — step by step</div>${stepsHtml}</div>`, null);
 }
 
 // ── USAGE ──
@@ -1285,14 +937,7 @@ function isPro() {
 }
 
 // ── FILE UPLOAD ──
-function triggerUpload() {
-  if (!state.shownPhotoTip) {
-    state.shownPhotoTip = true;
-    showMessages();
-    addAIMessage('<p>For the best guide line: take a <strong>side profile</strong> with your ear fully visible, hair dry, decent lighting. The cleaner the photo, the more accurate the placement.</p>', null);
-  }
-  document.getElementById('fileInput').click();
-}
+function triggerUpload() { document.getElementById('fileInput').click(); }
 
 function handleFiles(e) {
   Array.from(e.target.files).forEach(f => {
@@ -1321,39 +966,20 @@ function handleFiles(e) {
 
 // ── MISC ──
 function chipClick(text) {
-  chatInput.value = text;
-  sendBtn.disabled = false;
-  autoGrow(chatInput);
-  sendMessage();
+  chatInput.value = text; sendBtn.disabled = false; chatInput.focus(); autoGrow(chatInput);
 }
 
 function optionClick(btn, value) {
   btn.closest('.opt-row').querySelectorAll('.opt-btn').forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
-  btn.closest('.opt-row').querySelectorAll('.opt-btn').forEach(b => { b.disabled = true; b.style.opacity = '0.6'; });
-
-  if (value === 'Upload my photo') {
-    setTimeout(() => {
-      addUserMessage('Upload my photo', null);
-      triggerUpload();
-    }, 150);
-    return;
-  }
-
   setTimeout(() => {
-    addUserMessage(value, null);
-    addTyping();
-    setTimeout(() => {
-      removeTyping();
-      const r = getResponse(value);
-      addAIMessage(r.html, r.options);
-    }, 800);
+    addUserMessage(value, null); addTyping();
+    setTimeout(() => { removeTyping(); const r = getResponse(value); addAIMessage(r.html, r.options); }, 800);
   }, 150);
 }
 
 function resetChat() {
-  started = false; pendingFiles = [];
-  state.taperStyle = null; state.tools = null; state.phase = 'intro'; state.shownPhotoTip = false;
+  started = false; flowStep = 0; pendingFiles = [];
   messagesWrap.innerHTML = ''; messagesWrap.classList.remove('visible');
   hero.style.display = ''; uploadPreview.innerHTML = '';
   uploadPreview.classList.remove('has-files');
