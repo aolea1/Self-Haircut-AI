@@ -805,43 +805,54 @@ async function sendMessage() {
 
 // ── STYLE REFERENCE DIAGRAM ──
 function styleReferenceSvg(style) {
+  // lineY = guide line height; x1/x2 = side-of-head endpoints (stops at ear, not the face)
   const configs = {
-    low:  { lineY: 156, label: 'Low Taper',  sub: 'bottom of ear',      dotX: [30, 140] },
-    mid:  { lineY: 136, label: 'Mid Taper',  sub: 'middle of ear',      dotX: [18, 140] },
-    high: { lineY: 108, label: 'High Taper', sub: 'above ear / temple', dotX: [16, 140] },
-    skin: { lineY: 172, label: 'Skin Fade',  sub: 'below ear / jaw',    dotX: [42, 128] },
+    high: { lineY:  90, label: 'High Taper', sub: 'above ear / temple', x1: 14, x2: 127 },
+    mid:  { lineY: 124, label: 'Mid Taper',  sub: 'middle of ear',      x1: 14, x2: 127 },
+    low:  { lineY: 148, label: 'Low Taper',  sub: 'bottom of ear',      x1: 22, x2: 127 },
+    skin: { lineY: 163, label: 'Skin Fade',  sub: 'below ear / jaw',    x1: 30, x2: 130 },
   };
   const cfg = configs[style];
   if (!cfg) return '';
-  const { lineY, label, sub, dotX: [x1, x2] } = cfg;
+  const { lineY, label, sub, x1, x2 } = cfg;
 
-  // Human side-profile path (facing right — back of head on left, face on right)
-  const headPath = 'M82,20 C52,14 22,40 14,80 C8,114 15,150 40,172 L46,196 C56,210 72,216 88,216 C104,216 118,210 124,200 L127,186 C134,172 140,156 140,140 C140,122 136,105 130,88 C122,66 106,38 82,20 Z';
+  // Side-profile path facing RIGHT
+  // Skull curves left; nose / chin bumps appear right; ear drawn separately
+  const hp = 'M85,22 C52,16 20,44 12,85 C6,118 14,154 38,174 L44,196 C54,210 72,218 90,218 C108,218 120,210 127,200 C132,190 136,180 134,170 C132,160 130,150 134,140 C138,132 140,124 138,116 C136,108 140,102 144,95 C148,88 152,80 148,70 C145,62 140,55 142,46 C144,37 148,28 142,20 C134,14 110,14 85,22 Z';
   const uid = `hc-${style}`;
+  const lx  = Math.round((x1 + x2) / 2);
 
   return `<div style="margin:12px 0 6px;display:inline-block;">
-<svg viewBox="0 0 185 228" width="155" height="191" style="display:block;border-radius:12px;background:#1a1a1a;border:1px solid rgba(255,255,255,0.1);">
-  <defs><clipPath id="${uid}"><path d="${headPath}"/></clipPath></defs>
-  <!-- Head base -->
-  <path d="${headPath}" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.40)" stroke-width="1.5"/>
-  <!-- Hair region (above guide line, clipped to head silhouette) -->
-  <rect x="0" y="0" width="185" height="${lineY}" fill="rgba(150,115,75,0.32)" clip-path="url(#${uid})"/>
-  <!-- Guide line (clipped to head) -->
-  <line x1="0" y1="${lineY}" x2="185" y2="${lineY}" stroke="#e8d5a3" stroke-width="2.5" stroke-dasharray="8,4" clip-path="url(#${uid})"/>
-  <!-- Ear (C-shape protruding from right side at y 116–156) -->
-  <path d="M140,116 C156,116 164,126 164,136 C164,146 156,156 140,156" fill="rgba(255,220,180,0.07)" stroke="rgba(255,255,255,0.40)" stroke-width="1.5"/>
-  <!-- Ear inner detail -->
-  <ellipse cx="146" cy="136" rx="5" ry="9" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
+<svg viewBox="0 0 200 255" width="155" height="198" style="display:block;border-radius:12px;background:#1a1a1a;border:1px solid rgba(255,255,255,0.1);">
+  <defs><clipPath id="${uid}"><path d="${hp}"/></clipPath></defs>
+
+  <!-- Head silhouette with facial profile (nose/chin bumps) -->
+  <path d="${hp}" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.45)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+
+  <!-- Hair fill above guide line, clipped to head shape -->
+  <rect x="0" y="0" width="200" height="${lineY}" fill="rgba(140,108,68,0.32)" clip-path="url(#${uid})"/>
+
+  <!-- Guide line — from back of head to ear attachment only (not the face side) -->
+  <line x1="${x1}" y1="${lineY}" x2="${x2}" y2="${lineY}" stroke="#e8d5a3" stroke-width="2.5" stroke-dasharray="8,4"/>
+
+  <!-- Ear: C-shape protrudes from side of head at y 100–148 -->
+  <path d="M127,100 C144,100 153,111 153,124 C153,137 144,148 127,148" fill="rgba(255,220,170,0.06)" stroke="rgba(255,255,255,0.45)" stroke-width="2" stroke-linecap="round"/>
+  <!-- Ear inner cartilage -->
+  <path d="M130,110 C139,110 144,117 144,124 C144,131 139,138 130,138" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="1.3" stroke-linecap="round"/>
+
   <!-- Ear label -->
-  <text x="166" y="140" fill="rgba(255,255,255,0.32)" font-size="8" font-family="sans-serif">ear</text>
+  <text x="155" y="128" fill="rgba(255,255,255,0.35)" font-size="8" font-family="sans-serif">ear</text>
+
   <!-- Faint mid-ear reference -->
-  <line x1="16" y1="136" x2="140" y2="136" stroke="rgba(255,255,255,0.1)" stroke-width="0.8" stroke-dasharray="3,4"/>
+  <line x1="14" y1="124" x2="127" y2="124" stroke="rgba(255,255,255,0.1)" stroke-width="0.8" stroke-dasharray="3,4"/>
+
   <!-- Endpoint dots -->
   <circle cx="${x1}" cy="${lineY}" r="3.5" fill="#e8d5a3"/>
   <circle cx="${x2}" cy="${lineY}" r="3.5" fill="#e8d5a3"/>
-  <!-- Label above line -->
-  <text x="78" y="${lineY - 22}" text-anchor="middle" fill="rgba(232,213,163,0.6)" font-size="8" font-family="sans-serif">(${sub})</text>
-  <text x="78" y="${lineY - 10}" text-anchor="middle" fill="#e8d5a3" font-size="10" font-weight="bold" font-family="sans-serif">↓ ${label} line</text>
+
+  <!-- Label above the guide line -->
+  <text x="${lx}" y="${lineY - 22}" text-anchor="middle" fill="rgba(232,213,163,0.6)" font-size="8"  font-family="sans-serif">(${sub})</text>
+  <text x="${lx}" y="${lineY - 10}" text-anchor="middle" fill="#e8d5a3"               font-size="10" font-weight="bold" font-family="sans-serif">↓ ${label} line</text>
 </svg>
 </div>`;
 }
