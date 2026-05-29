@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0d0d0d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SelfHaircut">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>SelfHaircut.ai — Cut Your Own Hair, Perfectly</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -228,6 +233,8 @@ body {
   padding: 6px 12px 8px; border-top: 1px solid var(--border);
 }
 
+.camera-btn { display:none; }
+@media (pointer:coarse) { .camera-btn { display:inline-flex; } }
 .attach-btn {
   display: flex; align-items: center; gap: 6px;
   padding: 5px 10px; border-radius: 7px;
@@ -613,6 +620,10 @@ body {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
           Upload photo
         </button>
+        <button class="attach-btn camera-btn" onclick="triggerCamera()" title="Take photo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          Take photo
+        </button>
         <span style="flex:1"></span>
         <span style="font-size:11px;color:var(--text3);">↵ send</span>
       </div>
@@ -620,6 +631,7 @@ body {
     <p class="input-hint">SelfHaircut.ai can make mistakes. Always check your lines twice.</p>
       <div class="usage-bar" id="usageBar"></div>
     <input type="file" id="fileInput" accept="image/*" multiple style="display:none" onchange="handleFiles(event)">
+  <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleFiles(event)">
   </div>
 </main>
 
@@ -640,7 +652,8 @@ const FREE_CLAUDE_LIMIT = 2; // first N free analyses use real Claude
 const state = {
   taperStyle: null,   // 'low'|'mid'|'high'|'skin'|'buzz'
   tools: null,        // 'clippers'|'trimmer'|'both'
-  phase: 'intro',     // 'intro'|'style-chosen'|'tools-known'|'photo-prompted'|'guide-shown'
+  hairType: null,     // 'straight'|'wavy'|'curly'|'coily'
+  phase: 'intro',     // 'intro'|'style-chosen'|'hair-known'|'tools-known'|'guide-shown'
   shownPhotoTip: false,
 };
 
@@ -768,7 +781,10 @@ function addUpgradeMessage(html) {
           ✓ Mid-cut progress photo feedback<br>
           ✓ Personalized clipper guard recommendations
         </div>
-        <button class="upgrade-btn" onclick="window.open('https://buy.stripe.com/fZu28k5Li4QYfyT2Ilco000','_blank')">Upgrade to Pro →</button>
+        <div style="display:flex;gap:8px;flex-direction:column;">
+          <button class="upgrade-btn" onclick="window.open('https://buy.stripe.com/fZu28k5Li4QYfyT2Ilco000','_blank')">Monthly — $12/mo →</button>
+          <button class="upgrade-btn" style="background:rgba(232,213,163,0.15);color:var(--accent2);border:1px solid var(--accent2);" onclick="window.open('REPLACE_WITH_ANNUAL_STRIPE_LINK','_blank')">Annual — $79/yr <span style="font-size:10px;opacity:0.8;">save 45%</span> →</button>
+        </div>
       </div>
     </div></div>`;
   messagesWrap.appendChild(msg);
@@ -904,6 +920,21 @@ function getResponse(text) {
     return { html: '<p>Ready! Hit the <strong>Upload photo</strong> button below and send me a clear side-profile shot with your ear fully visible.</p>', options: null };
   }
 
+
+  // Hair type selection
+  if (/^straight$/i.test(lower)) {
+    state.hairType = 'straight'; state.phase = 'hair-known';
+    return { html: '<p>Got it — straight hair. Your guard numbers will be on point. What are you cutting with?</p>', options: ['Clippers only', 'Clippers + trimmer', 'Just a trimmer'] };
+  }
+  if (/^wavy$/i.test(lower)) {
+    state.hairType = 'wavy'; state.phase = 'hair-known';
+    return { html: '<p>Wavy hair blends beautifully — you may want to go one guard size up from straight hair recommendations to account for the texture. What are you cutting with?</p>', options: ['Clippers only', 'Clippers + trimmer', 'Just a trimmer'] };
+  }
+  if (/curly|coily/i.test(lower) && state.phase === 'style-chosen') {
+    state.hairType = 'curly'; state.phase = 'hair-known';
+    return { html: '<p>Curly / coily hair springs back after cutting — go <strong>one guard size longer</strong> than the guide suggests, then trim down if needed. What are you cutting with?</p>', options: ['Clippers only', 'Clippers + trimmer', 'Just a trimmer'] };
+  }
+
   // Guard number questions
   if (/\bguard\b|which (guard|number|clipper)|\bwhat guard\b|#\d/.test(lower)) {
     const guards = {
@@ -988,8 +1019,8 @@ function getResponse(text) {
         skin: 'Drag the guide line to <strong>just below your ear</strong>, near the jaw.',
       };
       return {
-        html: `<p><strong>${label}</strong> — ${tips[key]}</p>${styleReferenceSvg(key)}<p style="font-size:13px;color:var(--text2);margin-top:8px;">${placement[key]} The diagram shows the exact position on a typical head.</p>`,
-        options: ['Upload my photo', 'Which guard sizes?'],
+        html: `<p><strong>${label}</strong> — ${tips[key]}</p>${styleReferenceSvg(key)}<p style="font-size:13px;color:var(--text2);margin-top:8px;">${placement[key]} The diagram shows the exact position on a typical head.</p><p style="font-size:13px;color:var(--text2);margin-top:10px;">Quick question — what's your hair texture? This affects your guard numbers.</p>`,
+        options: ['Straight', 'Wavy', 'Curly / Coily'],
       };
     }
   }
@@ -1315,16 +1346,76 @@ function addGuideSteps() {
     ],
   };
   const list = steps[style] || steps.low;
-  const stepsHtml = list.map((s, i) =>
-    `<div class="step-item">
+
+  // Video links per technique
+  const videos = {
+    'Clip the sides':    'https://www.youtube.com/results?search_query=how+to+clip+sides+fade+clipper+tutorial',
+    'Blend at the line': 'https://www.youtube.com/results?search_query=how+to+blend+fade+line+hair',
+    'Fade the bottom':   'https://www.youtube.com/results?search_query=how+to+fade+bottom+skin+fade+tutorial',
+    'Edge up':           'https://www.youtube.com/results?search_query=how+to+edge+up+hairline+barber',
+    'Blend above the line': 'https://www.youtube.com/results?search_query=how+to+blend+high+taper',
+    'Work the mid zone': 'https://www.youtube.com/results?search_query=how+to+blend+mid+fade',
+    'Check and blend':   'https://www.youtube.com/results?search_query=how+to+check+blend+fade+no+lines',
+    'Top-to-line pass':  'https://www.youtube.com/results?search_query=high+taper+fade+tutorial',
+    'Transition zone':   'https://www.youtube.com/results?search_query=fade+transition+zone+tutorial',
+    'Lower sides':       'https://www.youtube.com/results?search_query=lower+sides+fade+taper',
+    'Skin at the base':  'https://www.youtube.com/results?search_query=skin+fade+base+open+blade',
+    'Remove bulk':       'https://www.youtube.com/results?search_query=how+to+remove+bulk+sides+clipper',
+    'Drop to #1':        'https://www.youtube.com/results?search_query=how+to+use+1+guard+fade',
+    'Open blade fade':   'https://www.youtube.com/results?search_query=open+blade+skin+fade+tutorial',
+    'Blend the skin line':'https://www.youtube.com/results?search_query=blend+skin+line+fade+lever',
+    'Edge sharp':        'https://www.youtube.com/results?search_query=how+to+edge+up+sharp+hairline',
+    'Pick your guard':   'https://www.youtube.com/results?search_query=buzz+cut+guard+size+guide',
+    'With the grain':    'https://www.youtube.com/results?search_query=buzz+cut+with+grain+technique',
+    'Against the grain': 'https://www.youtube.com/results?search_query=buzz+cut+against+grain+finish',
+    'Clip above the line':'https://www.youtube.com/results?search_query=how+to+clip+above+taper+line',
+    'Fade the lower sides':'https://www.youtube.com/results?search_query=fade+lower+sides+hair+tutorial',
+  };
+
+  const stepsHtml = list.map((s, i) => {
+    const vid = videos[s.t];
+    const vidLink = vid ? `<a href="${vid}" target="_blank" rel="noopener" style="font-size:10px;color:var(--accent2);text-decoration:none;margin-top:4px;display:inline-block;">▶ Watch technique</a>` : '';
+    return `<div class="step-item">
       <div class="step-num">${i + 1}</div>
       <div class="step-content">
         <div class="step-title">${s.t}</div>
         <div class="step-desc">${s.d}</div>
+        ${vidLink}
       </div>
-    </div>`
+    </div>`;
+  }).join('');
+
+  // Affiliate tool recommendations by style
+  const tools = {
+    low:  [{ name: 'Wahl Magic Clip', tag: 'Best for low tapers', url: 'https://www.amazon.com/s?k=Wahl+Magic+Clip+cordless' }, { name: 'Wahl Detailer', tag: 'For edge cleanup', url: 'https://www.amazon.com/s?k=Wahl+Detailer+trimmer' }],
+    mid:  [{ name: 'Andis Master', tag: 'Pro-grade mid fades', url: 'https://www.amazon.com/s?k=Andis+Master+clipper' }, { name: 'Wahl Detailer', tag: 'For edge cleanup', url: 'https://www.amazon.com/s?k=Wahl+Detailer+trimmer' }],
+    high: [{ name: 'Andis Fade Combo', tag: 'Best for high fades', url: 'https://www.amazon.com/s?k=Andis+fade+combo+clipper' }, { name: 'Andis Slimline', tag: 'For hairline edges', url: 'https://www.amazon.com/s?k=Andis+Slimline+Pro+trimmer' }],
+    skin: [{ name: 'Andis Fade Combo', tag: 'Essential for skin fades', url: 'https://www.amazon.com/s?k=Andis+fade+combo+clipper' }, { name: 'Babyliss ProFX', tag: 'Zero-gap skin line finish', url: 'https://www.amazon.com/s?k=Babyliss+ProFX+trimmer' }],
+    buzz: [{ name: 'Wahl Clipper Kit', tag: 'All-in-one buzz set', url: 'https://www.amazon.com/s?k=Wahl+clipper+kit+buzz+cut' }],
+  };
+  const toolList = tools[style] || tools.low;
+  const toolsHtml = toolList.map(t =>
+    `<a href="${t.url}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--surface2);border-radius:8px;text-decoration:none;gap:8px;">
+      <span><span style="font-size:12px;font-weight:600;color:var(--text);">${t.name}</span><br><span style="font-size:11px;color:var(--text3);">${t.tag}</span></span>
+      <span style="font-size:11px;color:var(--accent2);white-space:nowrap;">Amazon →</span>
+    </a>`
   ).join('');
-  addAIMessage(`<div class="steps-panel"><div class="steps-title">✂ ${styleLabel} — step by step</div>${stepsHtml}</div>`, null);
+
+  const shareBtn = `<div style="display:flex;gap:8px;margin-top:10px;">
+    <button class="opt-btn" onclick="saveGuideImage(this)" style="flex:1;">💾 Save guide</button>
+    <button class="opt-btn" onclick="shareGuide(this)" style="flex:1;">↗ Share</button>
+  </div>`;
+
+  addAIMessage(`<div class="steps-panel">
+    <div class="steps-title">✂ ${styleLabel} — step by step</div>
+    ${stepsHtml}
+    <div style="margin-top:12px;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;">🛒 Recommended tools</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">${toolsHtml}</div>
+    ${shareBtn}
+  </div>`, null);
+
+  // Email capture after first guide
+  showEmailCapture();
 }
 
 // ── USAGE ──
@@ -1342,6 +1433,45 @@ function isPro() {
   return localStorage.getItem('shc_paid') === 'true' || localStorage.getItem('shc_admin') === 'true';
 }
 
+
+// ── EMAIL CAPTURE ──
+function showEmailCapture() {
+  if (localStorage.getItem('shc_email_captured') || isPro()) return;
+  setTimeout(() => {
+    const msg = document.createElement('div');
+    msg.className = 'msg';
+    msg.innerHTML = `${aiAvatar()}<div class="msg-body"><div class="msg-name">SelfHaircut.ai</div>
+      <div class="msg-text">
+        <p style="font-size:13px;">📬 <strong>Want this guide saved to your inbox?</strong> Enter your email and we'll send it over — plus tips for your next cut.</p>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+          <input id="emailCaptureInput" type="email" placeholder="your@email.com" style="flex:1;min-width:160px;padding:8px 12px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:13px;outline:none;">
+          <button onclick="submitEmailCapture()" style="padding:8px 14px;border-radius:8px;background:var(--accent2);color:#000;font-weight:700;font-size:13px;border:none;cursor:pointer;">Send it</button>
+        </div>
+        <p style="font-size:11px;color:var(--text3);margin-top:6px;">No spam. Unsubscribe any time.</p>
+      </div>
+    </div>`;
+    messagesWrap.appendChild(msg);
+    scrollBottom();
+  }, 2000);
+}
+
+async function submitEmailCapture() {
+  const input = document.getElementById('emailCaptureInput');
+  const email = input ? input.value.trim() : '';
+  if (!email || !email.includes('@')) { input && (input.style.borderColor = 'red'); return; }
+  localStorage.setItem('shc_email_captured', email);
+  // POST to Formspree — replace FORMSPREE_ID with your form ID from formspree.io
+  try {
+    await fetch('https://formspree.io/f/FORMSPREE_ID', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, style: state.taperStyle, _subject: 'New SelfHaircut subscriber' })
+    });
+  } catch(e) {}
+  input.closest('.msg-text').innerHTML = '<p>✅ Got it! Check your inbox — guide incoming.</p>';
+  scrollBottom();
+}
+
 // ── USAGE BAR ──
 function updateUsageBar() {
   const bar = document.getElementById('usageBar');
@@ -1356,6 +1486,27 @@ function updateUsageBar() {
   }
 }
 
+// ── SHARE GUIDE ──
+async function shareGuide(btn) {
+  const wrap = btn.closest('.msg-text').querySelector('.guide-img-wrap');
+  const canvas = wrap ? wrap.querySelector('canvas') : null;
+  if (!canvas) return;
+  try {
+    canvas.toBlob(async blob => {
+      const file = new File([blob], 'selfhaircut-guide.png', { type: 'image/png' });
+      if (navigator.share && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'My SelfHaircut Guide', text: 'Check out my AI hair guide from SelfHaircut.ai!' });
+      } else {
+        // fallback: download
+        const link = document.createElement('a');
+        link.download = 'selfhaircut-guide.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      }
+    }, 'image/png');
+  } catch(e) { console.log('Share cancelled'); }
+}
+
 // ── SAVE GUIDE IMAGE ──
 function saveGuideImage(btn) {
   const wrap = btn.closest('.msg-text').querySelector('.guide-img-wrap');
@@ -1368,6 +1519,10 @@ function saveGuideImage(btn) {
 }
 
 // ── FILE UPLOAD ──
+function triggerCamera() {
+  document.getElementById('cameraInput').click();
+}
+
 function triggerUpload() {
   if (!state.shownPhotoTip) {
     state.shownPhotoTip = true;
@@ -1455,6 +1610,11 @@ function closeSidebar() {
 
 // Init
 updateUsageBar();
+
+// Register service worker (PWA)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
 </script>
 </body>
 </html>
