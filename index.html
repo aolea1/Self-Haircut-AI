@@ -1448,12 +1448,13 @@ async function submitEmailCapture() {
   const email = input ? input.value.trim() : '';
   if (!email || !email.includes('@')) { input && (input.style.borderColor = 'red'); return; }
   localStorage.setItem('shc_email_captured', email);
-  // POST to Web3Forms — replace YOUR_ACCESS_KEY with your key from web3forms.com
+  // POST to Google Apps Script — replace APPS_SCRIPT_URL with your deployed web app URL
   try {
-    await fetch('https://api.web3forms.com/submit', {
+    await fetch('APPS_SCRIPT_URL', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ access_key: 'YOUR_ACCESS_KEY', email, subject: 'New SelfHaircut.ai signup', style: state.taperStyle })
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ email, style: state.taperStyle || '' })
     });
   } catch(e) {}
   input.closest('.msg-text').innerHTML = '<p>✅ Got it! Check your inbox — guide incoming.</p>';
