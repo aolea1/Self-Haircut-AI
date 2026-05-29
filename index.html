@@ -1448,13 +1448,12 @@ async function submitEmailCapture() {
   const email = input ? input.value.trim() : '';
   if (!email || !email.includes('@')) { input && (input.style.borderColor = 'red'); return; }
   localStorage.setItem('shc_email_captured', email);
-  // POST to Google Apps Script — replace APPS_SCRIPT_URL with your deployed web app URL
+  // POST to Buttondown — replace YOUR_BUTTONDOWN_API_KEY with your key from buttondown.com/settings/api
   try {
-    await fetch('APPS_SCRIPT_URL', {
+    await fetch('https://api.buttondown.email/v1/subscribers', {
       method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ email, style: state.taperStyle || '' })
+      headers: { 'Authorization': 'Token YOUR_BUTTONDOWN_API_KEY', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, tags: [state.taperStyle || 'unknown'] })
     });
   } catch(e) {}
   input.closest('.msg-text').innerHTML = '<p>✅ Got it! Check your inbox — guide incoming.</p>';
