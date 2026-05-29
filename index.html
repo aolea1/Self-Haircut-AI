@@ -652,8 +652,7 @@ const FREE_CLAUDE_LIMIT = 2; // first N free analyses use real Claude
 const state = {
   taperStyle: null,   // 'low'|'mid'|'high'|'skin'|'buzz'
   tools: null,        // 'clippers'|'trimmer'|'both'
-  hairType: null,     // 'straight'|'wavy'|'curly'|'coily'
-  phase: 'intro',     // 'intro'|'style-chosen'|'hair-known'|'tools-known'|'guide-shown'
+  phase: 'intro',     // 'intro'|'style-chosen'|'tools-known'|'guide-shown'
   shownPhotoTip: false,
 };
 
@@ -922,18 +921,7 @@ function getResponse(text) {
 
 
   // Hair type selection
-  if (/^straight$/i.test(lower)) {
-    state.hairType = 'straight'; state.phase = 'hair-known';
-    return { html: '<p>Got it — straight hair. Your guard numbers will be on point. What are you cutting with?</p>', options: ['Clippers only', 'Clippers + trimmer', 'Just a trimmer'] };
-  }
-  if (/^wavy$/i.test(lower)) {
-    state.hairType = 'wavy'; state.phase = 'hair-known';
-    return { html: '<p>Wavy hair blends beautifully — you may want to go one guard size up from straight hair recommendations to account for the texture. What are you cutting with?</p>', options: ['Clippers only', 'Clippers + trimmer', 'Just a trimmer'] };
-  }
-  if (/curly|coily/i.test(lower) && state.phase === 'style-chosen') {
-    state.hairType = 'curly'; state.phase = 'hair-known';
-    return { html: '<p>Curly / coily hair springs back after cutting — go <strong>one guard size longer</strong> than the guide suggests, then trim down if needed. What are you cutting with?</p>', options: ['Clippers only', 'Clippers + trimmer', 'Just a trimmer'] };
-  }
+
 
   // Guard number questions
   if (/\bguard\b|which (guard|number|clipper)|\bwhat guard\b|#\d/.test(lower)) {
@@ -1019,8 +1007,8 @@ function getResponse(text) {
         skin: 'Drag the guide line to <strong>just below your ear</strong>, near the jaw.',
       };
       return {
-        html: `<p><strong>${label}</strong> — ${tips[key]}</p>${styleReferenceSvg(key)}<p style="font-size:13px;color:var(--text2);margin-top:8px;">${placement[key]} The diagram shows the exact position on a typical head.</p><p style="font-size:13px;color:var(--text2);margin-top:10px;">Quick question — what's your hair texture? This affects your guard numbers.</p>`,
-        options: ['Straight', 'Wavy', 'Curly / Coily'],
+        html: `<p><strong>${label}</strong> — ${tips[key]}</p>${styleReferenceSvg(key)}<p style="font-size:13px;color:var(--text2);margin-top:8px;">${placement[key]} The diagram shows the exact position on a typical head.</p><p style="font-size:13px;color:var(--text2);margin-top:10px;">What are you cutting with?</p>`,
+        options: ['Clippers only', 'Clippers + trimmer', 'Just a trimmer'],
       };
     }
   }
