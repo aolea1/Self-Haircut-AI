@@ -1448,12 +1448,12 @@ async function submitEmailCapture() {
   const email = input ? input.value.trim() : '';
   if (!email || !email.includes('@')) { input && (input.style.borderColor = 'red'); return; }
   localStorage.setItem('shc_email_captured', email);
-  // POST to Formspree — replace FORMSPREE_ID with your form ID from formspree.io
+  // POST to Web3Forms — replace YOUR_ACCESS_KEY with your key from web3forms.com
   try {
-    await fetch('https://formspree.io/f/FORMSPREE_ID', {
+    await fetch('https://api.web3forms.com/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, style: state.taperStyle, _subject: 'New SelfHaircut subscriber' })
+      body: JSON.stringify({ access_key: 'YOUR_ACCESS_KEY', email, subject: 'New SelfHaircut.ai signup', style: state.taperStyle })
     });
   } catch(e) {}
   input.closest('.msg-text').innerHTML = '<p>✅ Got it! Check your inbox — guide incoming.</p>';
