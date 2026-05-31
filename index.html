@@ -260,6 +260,51 @@ body {
   color: #e8d5a3; padding: 5px 10px; border-radius: 8px;
   font-size: 12px; line-height: 1.4; white-space: nowrap; pointer-events: none;
 }
+#arFrameBox {
+  position: absolute;
+  /* Sits in the center of the frame, leaving room for top/bottom bars */
+  top: 10%; bottom: 12%; left: 5%; right: 5%;
+  border: 2px dashed rgba(232,213,163,0.55);
+  border-radius: 18px;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+#arFrameLabel {
+  background: rgba(0,0,0,0.6);
+  color: #e8d5a3;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 0 0 10px 10px;
+  letter-spacing: 0.3px;
+}
+#arEarMarker {
+  position: absolute;
+  /* Ear is roughly 55% from left and 45% from top of the box */
+  left: 55%; top: 42%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  pointer-events: none;
+}
+#arEarMarkerDot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: rgba(232,213,163,0.7);
+  box-shadow: 0 0 8px rgba(232,213,163,0.6);
+}
+#arEarMarkerLabel {
+  font-size: 10px;
+  color: rgba(232,213,163,0.8);
+  white-space: nowrap;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.9);
+}
+
 #arDragHint {
   position: absolute; left: 50%; transform: translateX(-50%); top: 8px;
   background: rgba(0,0,0,0.7); color: rgba(255,255,255,0.7);
@@ -1860,6 +1905,14 @@ if ('serviceWorker' in navigator) {
   <div id="arModal">
     <div id="arVideoWrap">
       <video id="arVideo" autoplay playsinline muted></video>
+      <!-- Head framing guide -->
+      <div id="arFrameBox">
+        <div id="arFrameLabel">Keep head in this region</div>
+        <div id="arEarMarker">
+          <div id="arEarMarkerDot"></div>
+          <div id="arEarMarkerLabel">← ear here</div>
+        </div>
+      </div>
       <div id="arGuide">
         <div id="arGuideLine"></div>
         <div id="arGuideLabel">Align with taper start</div>
