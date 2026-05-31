@@ -680,7 +680,7 @@ body {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
           Take photo
         </button>
-        <button class="attach-btn" onclick="openARCamera()" title="Live AR guide" style="gap:5px;">&#127909; Live guide</button>
+        <button onclick="openARCamera()" title="Live AR guide" style="gap:6px;display:inline-flex;align-items:center;padding:8px 14px;border-radius:10px;border:1.5px solid #e8d5a3;background:rgba(232,213,163,0.1);color:#e8d5a3;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s;">&#127909; Live guide</button>
         <span style="flex:1"></span>
         <span style="font-size:11px;color:var(--text3);">↵ send</span>
       </div>
@@ -1090,7 +1090,7 @@ function getResponse(text) {
         skin: 'Drag the guide line to <strong>just below your ear</strong>, near the jaw.',
       };
       return {
-        html: `<p><strong>${label}</strong> — ${tips[key]}</p>${styleReferenceSvg(key)}<p style="font-size:13px;color:var(--text2);margin-top:8px;">${placement[key]} The diagram shows the exact position on a typical head.</p><p style="font-size:13px;color:var(--text2);margin-top:10px;">What are you cutting with?</p>`,
+        html: `<p><strong>${label}</strong> — ${tips[key]}</p>${styleReferenceSvg(key)}<p style="font-size:13px;color:var(--text2);margin-top:8px;">${placement[key]} The diagram shows the exact position on a typical head.</p><p style="font-size:13px;color:var(--text2);margin-top:10px;">What are you cutting with?</p><div style=\"margin:10px 0 2px\"><button onclick=\"openARCamera()\" style=\"display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:10px;border:1.5px solid #e8d5a3;background:rgba(232,213,163,0.1);color:#e8d5a3;font-size:13px;font-weight:600;cursor:pointer;\">\U0001f3a5 Try it live first &rarr;</button></div>`,
         options: ['Clippers only', 'Clippers + trimmer', 'Just a trimmer'],
       };
     }
@@ -1317,52 +1317,49 @@ function drawGuide(file, guide) {
         const taperGuardLabel = { low: '#1.5', mid: '#2', high: '#2', skin: '#0', buzz: '#3' };
         const taperStyleLabel = { low: 'Low Taper', mid: 'Mid Taper', high: 'High Taper', skin: 'Skin Fade', buzz: 'Buzz' };
 
+        // ── Ear/sideburn detection (runs for both free & paid to anchor startX correctly) ──
+        // Style-specific Y search band (higher taper = search higher in image)
+        const yBands = { low:[0.52,0.80], mid:[0.38,0.66], high:[0.22,0.50], skin:[0.55,0.82], buzz:[0.28,0.58] };
+        const [yLo, yHi] = yBands[state.taperStyle] || [0.35, 0.72];
+
+        // Downscale for speed
+        const sc = document.createElement('canvas');
+        sc.width = Math.floor(W/3); sc.height = Math.floor(H/3);
+        const sx = sc.getContext('2d'); sx.drawImage(canvas, 0, 0, sc.width, sc.height);
+        const px = sx.getImageData(0, 0, sc.width, sc.height).data;
+        const sw = sc.width, sh = sc.height;
+        const sYMin = Math.floor(sh * yLo), sYMax = Math.floor(sh * yHi);
+
+        // Per-column scan: find ear X via max (variance × sharpest hair→skin drop)
+        let bestEarCol = Math.floor(sw * 0.45), bestScore = -1, bestDropY = Math.floor((sYMin+sYMax)/2);
+        for (let x = Math.floor(sw*0.18); x < Math.floor(sw*0.82); x++) {
+          let sum=0, sumSq=0, n=0, maxDrop=0, dropY=sYMin, prev=null;
+          for (let y = sYMin; y < sYMax; y++) {
+            const i=(y*sw+x)*4, b=px[i]*.299+px[i+1]*.587+px[i+2]*.114;
+            sum+=b; sumSq+=b*b; n++;
+            if (prev!==null && prev-b > maxDrop) { maxDrop=prev-b; dropY=y; }
+            prev=b;
+          }
+          const v = n ? sumSq/n-(sum/n)**2 : 0;
+          const score = v*.6 + maxDrop*.4;
+          if (score > bestScore) { bestScore=score; bestEarCol=x; bestDropY=dropY; }
+        }
+
+        // Scale back & clamp
+        const earX   = (bestEarCol/sw)*W;
+        const detectedY = Math.max(yLo*H, Math.min(yHi*H, (bestDropY/sh)*H));
+
+        // Guide line: starts AT sideburn (right in front of ear), extends toward nape
         let lineY, startX, endX;
         if (guide) {
-          lineY = guide.tapperLineY * H;
-          startX = guide.tapperLineStartX * W;
-          endX = guide.tapperLineEndX * W;
+          // Trust backend Y (Claude Vision), but anchor startX to detected sideburn
+          lineY  = guide.tapperLineY * H;
+          startX = Math.max(0.01*W, earX - W*0.03); // sideburn = just in front of ear
+          endX   = Math.min(0.99*W, startX + W*0.34);
         } else {
-          // Sideburn detection: find the vertical column with the most hair→skin contrast
-          // (the sideburn boundary has the highest brightness variance in a side-profile photo)
-          const sc = document.createElement('canvas');
-          sc.width = Math.floor(W * 0.5); sc.height = Math.floor(H * 0.5);
-          const sx = sc.getContext('2d');
-          sx.drawImage(canvas, 0, 0, sc.width, sc.height);
-          const px = sx.getImageData(0, 0, sc.width, sc.height).data;
-
-          const scanYStart = Math.floor(sc.height * 0.22);
-          const scanYEnd   = Math.floor(sc.height * 0.78);
-          const cols = 12;
-          let bestCol = 4, bestVariance = 0, bestDropY = Math.floor(sc.height * 0.50);
-
-          for (let c = 1; c < cols - 1; c++) {
-            const cx = Math.floor((c / cols) * sc.width);
-            let sum = 0, sumSq = 0, count = 0;
-            let prev = null, maxDrop = 0, dropY = Math.floor(sc.height * 0.50);
-            for (let y = scanYStart; y < scanYEnd; y++) {
-              const idx = (y * sc.width + cx) * 4;
-              const b = px[idx]*0.299 + px[idx+1]*0.587 + px[idx+2]*0.114;
-              sum += b; sumSq += b * b; count++;
-              if (prev !== null && prev - b > maxDrop) { maxDrop = prev - b; dropY = y; }
-              prev = b;
-            }
-            const variance = (sumSq / count) - Math.pow(sum / count, 2);
-            if (variance > bestVariance) { bestVariance = variance; bestCol = c; bestDropY = dropY; }
-          }
-
-          // sideburn center X in full canvas coords
-          const sbX = (bestCol / cols) * W;
-          const rawY = bestDropY / sc.height;
-
-          // Blend detected Y with taper-style target Y
-          const styleTargetY = taperYBase[state.taperStyle] || 0.55;
-          lineY = Math.min(0.78, Math.max(0.28, rawY * 0.55 + styleTargetY * 0.45 + 0.03)) * H;
-
-          // Short line — 28% of image width centered on the sideburn column
-          const half = W * 0.14;
-          startX = Math.max(0.01 * W, sbX - half);
-          endX   = Math.min(0.99 * W, sbX + half);
+          lineY  = detectedY;
+          startX = Math.max(0.01*W, earX - W*0.03);
+          endX   = Math.min(0.99*W, startX + W*0.34);
         }
 
         const fadeH = (guide ? guide.fadeZoneHeight : 0.10) * H;
@@ -1646,6 +1643,75 @@ function startARStream() {
     });
 }
 
+
+// ── TIKTOK RECORDING ──
+let arRecorder = null, arRecordChunks = [], arAnimFrameId = null, arRecording = false;
+
+function toggleARRecording() {
+  arRecording ? stopARRecording() : startARRecording();
+}
+
+function startARRecording() {
+  const video = document.getElementById('arVideo');
+  if (!video.srcObject) return;
+
+  // Composite canvas = video frame + guide line drawn each frame
+  const rc = document.createElement('canvas');
+  rc.width = video.videoWidth || 640; rc.height = video.videoHeight || 480;
+  const rctx = rc.getContext('2d');
+  const guide = document.getElementById('arGuide');
+
+  const loop = () => {
+    rctx.save();
+    if (arFacingMode === 'user') { rctx.translate(rc.width, 0); rctx.scale(-1,1); }
+    rctx.drawImage(video, 0, 0, rc.width, rc.height);
+    rctx.restore();
+    // Guide line overlay
+    const pct = parseFloat(guide.style.top||'40') / 100;
+    const lY = pct * rc.height;
+    rctx.save();
+    rctx.strokeStyle = 'rgba(232,213,163,0.92)'; rctx.lineWidth = 3;
+    rctx.shadowColor = 'rgba(232,213,163,0.7)'; rctx.shadowBlur = 12;
+    rctx.beginPath(); rctx.moveTo(0, lY); rctx.lineTo(rc.width, lY); rctx.stroke();
+    // Label
+    rctx.font = 'bold 18px sans-serif'; rctx.fillStyle = 'rgba(232,213,163,0.9)';
+    rctx.shadowBlur = 8; rctx.shadowColor = 'rgba(0,0,0,0.9)';
+    const txt = 'Start the bald line here';
+    rctx.fillText(txt, rc.width/2 - rctx.measureText(txt).width/2, lY + 28);
+    rctx.restore();
+    arAnimFrameId = requestAnimationFrame(loop);
+  };
+  loop();
+
+  const mimeType = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
+  arRecordChunks = [];
+  arRecorder = new MediaRecorder(rc.captureStream(30), { mimeType });
+  arRecorder.ondataavailable = e => { if (e.data.size > 0) arRecordChunks.push(e.data); };
+  arRecorder.onstop = () => {
+    cancelAnimationFrame(arAnimFrameId);
+    const blob = new Blob(arRecordChunks, { type: mimeType });
+    const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+    // Try Web Share first (mobile), fallback to download
+    if (navigator.canShare && navigator.canShare({ files: [new File([blob], 'selfhaircut.' + ext, { type: mimeType })] })) {
+      navigator.share({ files: [new File([blob], 'selfhaircut.' + ext, { type: mimeType })], title: 'My SelfHaircut Guide' }).catch(()=>{});
+    } else {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      a.download = 'selfhaircut-guide.' + ext; a.click();
+    }
+    const btn = document.getElementById('arRecordBtn');
+    if (btn) { btn.textContent = '⏺ Record'; btn.style.background = 'rgba(255,255,255,0.12)'; btn.style.borderColor = 'rgba(255,255,255,0.3)'; btn.style.color = '#fff'; }
+    arRecording = false;
+  };
+  arRecorder.start(200); // collect chunks every 200ms
+  arRecording = true;
+  const btn = document.getElementById('arRecordBtn');
+  if (btn) { btn.textContent = '⏹ Stop & Share'; btn.style.background = '#e74c3c'; btn.style.borderColor = '#e74c3c'; btn.style.color = '#fff'; }
+}
+
+function stopARRecording() {
+  if (arRecorder && arRecorder.state !== 'inactive') arRecorder.stop();
+}
+
 function closeARCamera() {
   if (arStream) { arStream.getTracks().forEach(t => t.stop()); arStream = null; }
   document.getElementById('arModal').style.display = 'none';
@@ -1805,7 +1871,8 @@ if ('serviceWorker' in navigator) {
         <button class="ar-ctrl-btn" onclick="flipARCamera()">⟳ Flip</button>
       </div>
     </div>
-    <div id="arBottomBar">
+    <div id="arBottomBar" style="display:flex;gap:14px;align-items:center;justify-content:center;">
+      <button id="arRecordBtn" onclick="toggleARRecording()" style="background:rgba(255,255,255,0.12);color:#fff;border:1.5px solid rgba(255,255,255,0.3);padding:13px 18px;border-radius:50px;font-size:14px;font-weight:600;cursor:pointer;">⏺ Record</button>
       <button id="arCaptureBtn" onclick="captureARFrame()">📸 Capture &amp; Analyze</button>
     </div>
   </div>
