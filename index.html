@@ -676,7 +676,6 @@ body {
     <div class="hero" id="hero">
       <h1 class="hero-headline">Cut your own hair.<br>Get it right.</h1>
       <p class="hero-sub">Upload a side profile photo — AI places your exact taper line, then walks you through every step.</p>
-      <p style="font-size:12px;color:var(--text3);margin:-6px 0 4px;"><span id="socialProofCount">14,900</span> haircuts guided ✓</p>
 
 
       <div class="how-steps">
@@ -1640,16 +1639,6 @@ function incUsage() {
   const today = new Date().toDateString();
   localStorage.setItem('shc_usage', JSON.stringify({date: today, count: getUsage()+1}));
   updateUsageBar();
-
-// ── SOCIAL PROOF ──
-(function() {
-  const base = 14900, key = 'shc_sp';
-  const n = parseInt(localStorage.getItem(key) || base);
-  const next = n + Math.floor(Math.random() * 3 + 1);
-  localStorage.setItem(key, next);
-  const el = document.getElementById('socialProofCount');
-  if (el) el.textContent = next.toLocaleString();
-})();
 
 
 // ── REMEMBER STYLE ──
