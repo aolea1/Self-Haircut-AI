@@ -404,299 +404,164 @@ body {
 
 /* ── LANDING PAGE ── */
 .hero {
-  width: 100%; margin: 0 auto;
-  display: flex; flex-direction: column; align-items: center;
-  animation: heroIn .5s ease both;
-  overflow: hidden;
+  width: 100%; display: flex; flex-direction: column; align-items: center;
+  animation: heroIn .45s ease both;
 }
 @keyframes heroIn {
-  from { opacity:0; transform:translateY(16px); }
+  from { opacity:0; transform:translateY(14px); }
   to   { opacity:1; transform:translateY(0); }
 }
 
-/* ── LP: HERO SECTION ── */
+/* HERO */
 .lp-hero {
-  width: 100%; max-width: 640px;
-  padding: 56px 24px 48px;
+  width: 100%; max-width: 600px;
+  padding: 52px 24px 44px;
   display: flex; flex-direction: column; align-items: center;
   text-align: center;
 }
 .lp-badge {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: rgba(232,213,163,0.1);
-  border: 1px solid rgba(232,213,163,0.25);
-  color: var(--accent2); font-size: 11px; font-weight: 700;
-  letter-spacing: 0.1em; text-transform: uppercase;
-  padding: 5px 12px; border-radius: 99px; margin-bottom: 28px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--accent2);
+  margin-bottom: 22px;
+  display: flex; align-items: center; gap: 8px;
 }
-.lp-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent2); flex-shrink:0; }
+.lp-badge::before,.lp-badge::after {
+  content:''; width:28px; height:1px; background:rgba(232,213,163,0.3);
+}
 .lp-h1 {
   font-family: 'Syne', sans-serif;
-  font-size: clamp(38px, 8vw, 64px);
-  font-weight: 800; line-height: 1.05;
+  font-size: clamp(34px, 7.5vw, 56px);
+  font-weight: 800; line-height: 1.08;
   letter-spacing: -1.5px; color: #fff;
-  margin-bottom: 6px;
-}
-.lp-h1 em {
-  font-style: normal;
-  background: linear-gradient(90deg, #e8d5a3 0%, #c9aa72 100%);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-.lp-h1-line2 {
-  font-family: 'Syne', sans-serif;
-  font-size: clamp(38px, 8vw, 64px);
-  font-weight: 800; line-height: 1.05;
-  letter-spacing: -1.5px; color: rgba(255,255,255,0.35);
-  margin-bottom: 24px;
+  margin-bottom: 18px;
 }
 .lp-sub {
-  font-size: 17px; line-height: 1.65;
-  color: rgba(255,255,255,0.5);
-  max-width: 480px; margin-bottom: 36px;
+  font-size: 16px; line-height: 1.6;
+  color: rgba(255,255,255,0.45);
+  max-width: 420px; margin-bottom: 32px;
 }
 .lp-cta {
   display: inline-flex; align-items: center; gap: 10px;
   background: #e8d5a3; color: #0d0d0d;
   font-family: 'Syne', sans-serif;
   font-size: 15px; font-weight: 700;
-  padding: 16px 32px; border-radius: 12px; border: none;
-  cursor: pointer; letter-spacing: 0.02em;
+  padding: 15px 28px; border-radius: 12px; border: none;
+  cursor: pointer; letter-spacing: 0.01em;
+  box-shadow: 0 4px 24px rgba(232,213,163,0.22);
   transition: transform .15s, box-shadow .15s;
-  box-shadow: 0 4px 24px rgba(232,213,163,0.25);
-  margin-bottom: 20px;
+  margin-bottom: 14px;
 }
-.lp-cta:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(232,213,163,0.35); }
+.lp-cta:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(232,213,163,0.32); }
 .lp-cta:active { transform: translateY(0); }
-.lp-trust-pills {
-  display: flex; flex-wrap: wrap; gap: 16px; justify-content: center;
-}
-.lp-trust-pill {
-  font-size: 12px; color: rgba(255,255,255,0.38);
-  display: flex; align-items: center; gap: 5px;
-}
-.lp-trust-pill::before { content: '✓'; color: var(--accent2); font-weight: 700; }
-
-/* ── LP: DIVIDER ── */
-.lp-rule {
-  width: 100%; max-width: 640px;
-  border: none; border-top: 1px solid rgba(255,255,255,0.06);
-  margin: 0;
+.lp-cta-note {
+  font-size: 12px; color: rgba(255,255,255,0.28);
 }
 
-/* ── LP: SECTIONS ── */
+/* TAPER CARD PREVIEW */
+.lp-preview {
+  width: 100%; max-width: 600px;
+  padding: 0 24px 48px;
+  display: flex; flex-direction: column; align-items: center;
+}
+.lp-preview-card {
+  width: 100%; max-width: 360px;
+  border-radius: 16px; overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.08);
+  position: relative; cursor: pointer;
+  transition: transform .2s, border-color .2s;
+}
+.lp-preview-card:hover { transform: translateY(-2px); border-color: rgba(232,213,163,0.35); }
+.lp-preview-card img { width: 100%; display: block; border-radius: 16px; }
+.lp-preview-overlay {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 32px 16px 16px;
+  background: linear-gradient(to top, rgba(0,0,0,0.88) 0%, transparent 100%);
+  display: flex; align-items: flex-end; justify-content: space-between;
+}
+.lp-preview-label {
+  font-size: 15px; font-weight: 700; color: #fff;
+  font-family: 'Syne', sans-serif;
+}
+.lp-tap-hint {
+  background: #e8d5a3; color: #0d0d0d;
+  font-size: 11px; font-weight: 800;
+  padding: 5px 10px; border-radius: 99px;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  animation: tapPulse 2s ease-in-out infinite;
+  cursor: pointer; border: none;
+}
+
+/* SECTION STRUCTURE */
+.lp-rule { width: 100%; border: none; border-top: 1px solid rgba(255,255,255,0.06); }
 .lp-section {
-  width: 100%; max-width: 640px;
-  padding: 56px 24px;
+  width: 100%; max-width: 600px;
+  padding: 48px 24px;
 }
-.lp-section-label {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
-  text-transform: uppercase; color: var(--accent2);
-  margin-bottom: 12px;
+.lp-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--accent2); margin-bottom: 10px;
 }
 .lp-section-title {
   font-family: 'Syne', sans-serif;
-  font-size: clamp(24px, 4vw, 36px);
+  font-size: clamp(22px, 4vw, 32px);
   font-weight: 700; color: #fff;
-  line-height: 1.2; letter-spacing: -0.5px;
-  margin-bottom: 8px;
-}
-.lp-section-sub {
-  font-size: 15px; color: rgba(255,255,255,0.42);
-  line-height: 1.6; margin-bottom: 40px;
-  max-width: 440px;
+  line-height: 1.2; letter-spacing: -0.4px;
+  margin-bottom: 36px;
 }
 
-/* ── LP: HOW IT WORKS ── */
-.lp-steps {
-  display: flex; flex-direction: column; gap: 0;
-}
+/* HOW IT WORKS */
+.lp-steps { display: flex; flex-direction: column; }
 .lp-step {
-  display: grid; grid-template-columns: 48px 1fr;
-  gap: 0 20px; align-items: start;
-  padding: 24px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex; align-items: flex-start; gap: 20px;
+  padding: 18px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 .lp-step:last-child { border-bottom: none; }
-.lp-step-num {
-  font-family: 'Syne', sans-serif;
-  font-size: 13px; font-weight: 700;
-  color: var(--accent2); opacity: 0.7;
-  padding-top: 3px;
+.lp-step-n {
+  font-family: 'Syne', sans-serif; font-size: 11px;
+  font-weight: 700; color: rgba(232,213,163,0.5);
+  padding-top: 2px; flex-shrink: 0; width: 28px;
 }
-.lp-step-title {
-  font-size: 16px; font-weight: 700; color: #fff;
-  margin-bottom: 5px;
-}
-.lp-step-desc {
-  font-size: 14px; color: rgba(255,255,255,0.42); line-height: 1.6;
-}
+.lp-step-title { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 3px; }
+.lp-step-desc { font-size: 13px; color: rgba(255,255,255,0.38); line-height: 1.5; }
 
-/* ── LP: FOR WHO ── */
-.lp-forlist {
-  display: flex; flex-direction: column; gap: 12px;
-}
-.lp-foritem {
-  display: flex; align-items: flex-start; gap: 12px;
-  padding: 16px; background: var(--surface2);
-  border-radius: 10px; border: 1px solid rgba(255,255,255,0.05);
-}
-.lp-foritem-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
-.lp-foritem-text { font-size: 14px; color: rgba(255,255,255,0.65); line-height: 1.5; }
-.lp-foritem-text strong { color: #fff; display: block; margin-bottom: 2px; font-size: 14px; }
-
-/* ── LP: TRUST CARDS ── */
-.lp-trust-grid {
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-.lp-trust-card {
-  background: var(--surface2);
+/* TRUST */
+.lp-trust-list { display: flex; flex-direction: column; gap: 14px; }
+.lp-trust-item {
+  display: flex; align-items: center; gap: 14px;
+  font-size: 14px; color: rgba(255,255,255,0.7);
+  padding: 14px 16px;
+  background: var(--surface2); border-radius: 10px;
   border: 1px solid rgba(255,255,255,0.05);
-  border-radius: 12px; padding: 20px;
 }
-.lp-trust-card-icon {
-  font-size: 22px; margin-bottom: 10px;
-}
-.lp-trust-card-title {
-  font-size: 14px; font-weight: 700; color: #fff;
-  margin-bottom: 6px;
-}
-.lp-trust-card-desc {
-  font-size: 13px; color: rgba(255,255,255,0.42);
-  line-height: 1.55;
+.lp-trust-item::before {
+  content: '✓'; color: var(--accent2);
+  font-weight: 700; font-size: 13px; flex-shrink: 0;
 }
 
-/* ── LP: FAQ ── */
-.lp-faq { display: flex; flex-direction: column; gap: 1px; }
-.lp-faq-q {
-  padding: 20px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
-}
-.lp-faq-question {
-  font-size: 15px; font-weight: 700; color: #fff;
-  margin-bottom: 10px; line-height: 1.4;
-}
-.lp-faq-answer {
-  font-size: 14px; color: rgba(255,255,255,0.45);
-  line-height: 1.65;
-}
+/* FAQ */
+.lp-faq { display: flex; flex-direction: column; }
+.lp-faq-q { padding: 20px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.lp-faq-q:last-child { border-bottom: none; }
+.lp-faq-question { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+.lp-faq-answer { font-size: 13px; color: rgba(255,255,255,0.42); line-height: 1.6; }
 
-/* ── LP: FINAL CTA ── */
+/* FINAL CTA */
 .lp-final {
-  width: 100%; max-width: 640px;
-  padding: 56px 24px 72px;
-  text-align: center;
-  display: flex; flex-direction: column; align-items: center;
+  width: 100%; max-width: 600px;
+  padding: 48px 24px 72px;
+  text-align: center; display: flex; flex-direction: column; align-items: center;
 }
 .lp-final-title {
   font-family: 'Syne', sans-serif;
-  font-size: clamp(26px, 5vw, 40px);
-  font-weight: 800; color: #fff;
-  line-height: 1.15; letter-spacing: -0.5px;
-  margin-bottom: 12px;
-}
-.lp-final-sub {
-  font-size: 15px; color: rgba(255,255,255,0.4);
-  margin-bottom: 32px; line-height: 1.6;
+  font-size: clamp(24px, 5vw, 38px);
+  font-weight: 800; color: #fff; letter-spacing: -0.5px;
+  line-height: 1.15; margin-bottom: 28px;
 }
 
-/* ── LP: MOBILE ── */
-@media (max-width: 540px) {
+@media (max-width: 500px) {
   .lp-hero { padding: 40px 20px 36px; }
-  .lp-section { padding: 44px 20px; }
-  .lp-trust-grid { grid-template-columns: 1fr; }
-  .lp-h1, .lp-h1-line2 { font-size: 42px; letter-spacing: -1px; }
-  .lp-final { padding: 44px 20px 60px; }
-}
-.hero-eyebrow {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
-  text-transform: uppercase; color: var(--accent2);
-  margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
-}
-.hero-eyebrow::before,.hero-eyebrow::after {
-  content:''; flex:1; max-width:36px; height:1px; background:rgba(232,213,163,0.35);
-}
-.hero-headline {
-  font-family: 'Syne', sans-serif;
-  font-size: clamp(24px, 3.8vw, 34px);
-  font-weight: 700; text-align: center; max-width: 320px;
-  letter-spacing: -0.5px; color: #fff;
-  margin-bottom: 6px; line-height: 1.2;
-}
-.hero-headline em {
-  font-style: normal;
-  background: linear-gradient(90deg, #e8d5a3, #c9aa72);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-.hero-sub {
-  font-size: 14px; color: rgba(255,255,255,0.48);
-  text-align: center; margin-bottom: 32px; font-weight: 400;
-  max-width: 340px; line-height: 1.6;
-}
-/* Style selector cards (replaces small chips) */
-.style-cards {
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 10px; width: 100%; max-width: 440px;
-  margin-bottom: 32px;
-}
-.style-card {
-  background: var(--surface2);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 16px; padding: 18px 14px;
-  cursor: pointer; text-align: left;
-  transition: border-color .2s, background .2s, transform .15s;
-  display: flex; flex-direction: column; gap: 4px;
-}
-.style-card:hover {
-  border-color: rgba(232,213,163,0.45);
-  background: rgba(232,213,163,0.06);
-  transform: translateY(-2px);
-}
-.style-card:active { transform: translateY(0); }
-.style-card-icon { font-size: 22px; margin-bottom: 4px; }
-.style-card-title {
-  font-size: 15px; font-weight: 700; color: #fff;
-}
-.style-card-sub {
-  font-size: 11px; color: rgba(255,255,255,0.4);
-  margin-bottom: 10px;
-}
-.style-card-cta {
-  font-size: 12px; font-weight: 600; color: var(--accent2);
-  display: flex; align-items: center; gap: 4px;
-}
-/* How-it-works */
-.how-steps {
-  display: flex; align-items: flex-start; justify-content: center;
-  gap: 0; margin: 0 0 28px; width: 100%; max-width: 440px;
-}
-.how-step {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 6px; flex: 1;
-}
-.how-num {
-  width: 30px; height: 30px; border-radius: 50%;
-  border: 1.5px solid rgba(232,213,163,0.4);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 700; color: var(--accent2);
-  background: rgba(232,213,163,0.07);
-}
-.how-icon { font-size: 18px; }
-.how-label {
-  font-size: 11px; color: rgba(255,255,255,0.45);
-  text-align: center; max-width: 80px; line-height: 1.3;
-}
-.how-arrow { color: rgba(255,255,255,0.18); font-size: 14px; margin-top: 14px; flex-shrink:0; }
-/* Divider label */
-.hero-divider {
-  font-size: 11px; color: rgba(255,255,255,0.25); letter-spacing:.08em;
-  text-transform:uppercase; margin-bottom: 14px; width:100%; text-align:center;
-  display:flex; align-items:center; gap:10px; max-width:440px;
-}
-.hero-divider::before,.hero-divider::after {
-  content:''; flex:1; height:1px; background:rgba(255,255,255,0.08);
+  .lp-section,.lp-final,.lp-preview { padding-left: 20px; padding-right: 20px; }
+  .lp-h1 { font-size: 36px; letter-spacing: -1px; }
 }
 
 /* ── INSPO CARDS ── */
@@ -1030,49 +895,55 @@ body {
 
     <div class="hero" id="hero">
 
-      <!-- ──────────────── HERO ──────────────── -->
+      <!-- HERO -->
       <div class="lp-hero">
-        <div class="lp-badge">Low Taper Fade &middot; AI-Powered</div>
-        <h1 class="lp-h1">Stop Guessing<br><em>Where to Fade.</em></h1>
-        <p class="lp-sub">Upload a side profile photo. AI places your exact low taper fade line — then walks you through every cut, guard by guard. Get a clean fade at home for free.</p>
+        <div class="lp-badge">Low Taper Fade</div>
+        <h1 class="lp-h1">Stop Paying $50<br>For A Cleanup.</h1>
+        <p class="lp-sub">Upload a side photo and get a personalized low taper fade guide — AI-powered line placement, step-by-step barber instructions.</p>
         <button class="lp-cta" onclick="startGuide()">
-          Get My Fade Guide &mdash; Free
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          Try My First Fade Guide Free
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
         </button>
-        <div class="lp-trust-pills">
-          <span class="lp-trust-pill">No signup required</span>
-          <span class="lp-trust-pill">Built by a barber</span>
-          <span class="lp-trust-pill">Works on any phone</span>
+        <div class="lp-cta-note">No signup &nbsp;·&nbsp; Free to start &nbsp;·&nbsp; Works on any phone</div>
+      </div>
+
+      <!-- TAPER CARD -->
+      <div class="lp-preview">
+        <div class="lp-preview-card" onclick="startGuide()">
+          <img src="Low_taper_silhouette.webp" alt="Low taper fade example" loading="lazy">
+          <div class="lp-preview-overlay">
+            <div class="lp-preview-label">Low Taper Fade</div>
+            <button class="lp-tap-hint" onclick="startGuide(); event.stopPropagation();">Try It</button>
+          </div>
         </div>
       </div>
 
       <hr class="lp-rule">
 
-      <!-- ──────────────── HOW IT WORKS ──────────────── -->
+      <!-- HOW IT WORKS -->
       <div class="lp-section">
-        <div class="lp-section-label">How it works</div>
-        <h2 class="lp-section-title">Three steps.<br>Zero guesswork.</h2>
-        <p class="lp-section-sub">No experience needed. If you can follow instructions, you can do this.</p>
+        <div class="lp-label">How it works</div>
+        <div class="lp-section-title">Three steps.</div>
         <div class="lp-steps">
           <div class="lp-step">
-            <div class="lp-step-num">01</div>
+            <div class="lp-step-n">01</div>
             <div>
-              <div class="lp-step-title">Upload a side profile photo</div>
-              <div class="lp-step-desc">Side profile, ear fully visible. Takes 10 seconds. The cleaner the photo, the more accurate the line.</div>
+              <div class="lp-step-title">Upload a side photo</div>
+              <div class="lp-step-desc">Side profile, ear visible. Takes 10 seconds.</div>
             </div>
           </div>
           <div class="lp-step">
-            <div class="lp-step-num">02</div>
+            <div class="lp-step-n">02</div>
             <div>
-              <div class="lp-step-title">AI places your exact fade line</div>
-              <div class="lp-step-desc">The AI analyzes your actual photo and marks the precise low taper line for your head shape. Drag to fine-tune before you start.</div>
+              <div class="lp-step-title">AI maps your fade line</div>
+              <div class="lp-step-desc">Your exact taper line, placed on your actual photo. Drag to adjust before you cut anything.</div>
             </div>
           </div>
           <div class="lp-step">
-            <div class="lp-step-num">03</div>
+            <div class="lp-step-n">03</div>
             <div>
-              <div class="lp-step-title">Follow the step-by-step guide</div>
-              <div class="lp-step-desc">Exact guard numbers. Specific instructions. The AI tells you precisely what to do at each section — no guessing, no improvising.</div>
+              <div class="lp-step-title">Follow barber guidance</div>
+              <div class="lp-step-desc">Exact guard numbers. Exact technique. Step by step.</div>
             </div>
           </div>
         </div>
@@ -1080,112 +951,51 @@ body {
 
       <hr class="lp-rule">
 
-      <!-- ──────────────── WHO IS THIS FOR ──────────────── -->
+      <!-- TRUST -->
       <div class="lp-section">
-        <div class="lp-section-label">Who this is for</div>
-        <h2 class="lp-section-title">If any of this is you,<br>this was built for you.</h2>
-        <div class="lp-forlist">
-          <div class="lp-foritem">
-            <div class="lp-foritem-icon">💸</div>
-            <div class="lp-foritem-text">
-              <strong>You&rsquo;re spending $35&ndash;50 per cut, every 3 weeks</strong>
-              That&rsquo;s $600&ndash;800 a year just to maintain a low fade. This gives you the same result at home, for free.
-            </div>
-          </div>
-          <div class="lp-foritem">
-            <div class="lp-foritem-icon">😬</div>
-            <div class="lp-foritem-text">
-              <strong>You&rsquo;ve tried cutting your own hair and messed it up</strong>
-              Because you were guessing where to start the fade. The AI removes that guesswork entirely.
-            </div>
-          </div>
-          <div class="lp-foritem">
-            <div class="lp-foritem-icon">📅</div>
-            <div class="lp-foritem-text">
-              <strong>You can&rsquo;t always get a barbershop appointment when you need one</strong>
-              Now you don&rsquo;t have to. Clean up your fade whenever you want.
-            </div>
-          </div>
-          <div class="lp-foritem">
-            <div class="lp-foritem-icon">✂️</div>
-            <div class="lp-foritem-text">
-              <strong>You want to learn to maintain your own fade properly</strong>
-              Not just wing it — actually understand what you&rsquo;re doing and why.
-            </div>
-          </div>
+        <div class="lp-label">Why it works</div>
+        <div class="lp-section-title">Built by a barber.<br>Designed to prevent mistakes.</div>
+        <div class="lp-trust-list">
+          <div class="lp-trust-item">Personalized to your head shape — not a generic diagram</div>
+          <div class="lp-trust-item">Conservative fade placement — designed to stop you cutting too high</div>
+          <div class="lp-trust-item">Drag the line before you cut — you stay in control</div>
+          <div class="lp-trust-item">Exact guard numbers for every section</div>
         </div>
       </div>
 
       <hr class="lp-rule">
 
-      <!-- ──────────────── TRUST ──────────────── -->
+      <!-- FAQ -->
       <div class="lp-section">
-        <div class="lp-section-label">Why it works</div>
-        <h2 class="lp-section-title">Built to earn<br>your trust.</h2>
-        <p class="lp-section-sub">The biggest fear with DIY haircuts is messing up. Every feature in this product is built around eliminating that fear.</p>
-        <div class="lp-trust-grid">
-          <div class="lp-trust-card">
-            <div class="lp-trust-card-icon">✂️</div>
-            <div class="lp-trust-card-title">Built by a barber</div>
-            <div class="lp-trust-card-desc">Not a generic AI project. The guide logic was built by someone who actually cuts hair professionally.</div>
-          </div>
-          <div class="lp-trust-card">
-            <div class="lp-trust-card-icon">🎯</div>
-            <div class="lp-trust-card-title">Personalized to your head</div>
-            <div class="lp-trust-card-desc">The AI analyzes your actual photo. The line is placed on you — not on a stock mannequin head.</div>
-          </div>
-          <div class="lp-trust-card">
-            <div class="lp-trust-card-icon">👆</div>
-            <div class="lp-trust-card-title">Adjust before you cut</div>
-            <div class="lp-trust-card-desc">Drag the line to fine-tune it before a single clipper touches your head. You stay in control.</div>
-          </div>
-          <div class="lp-trust-card">
-            <div class="lp-trust-card-icon">🔢</div>
-            <div class="lp-trust-card-title">Exact guard numbers</div>
-            <div class="lp-trust-card-desc">Not "blend it out." Exact guard sizes for each section of your fade. No experience required.</div>
-          </div>
-        </div>
-      </div>
-
-      <hr class="lp-rule">
-
-      <!-- ──────────────── FAQ ──────────────── -->
-      <div class="lp-section">
-        <div class="lp-section-label">Common concerns</div>
-        <h2 class="lp-section-title">The questions<br>holding you back.</h2>
+        <div class="lp-label">Common questions</div>
+        <div class="lp-section-title">Quick answers.</div>
         <div class="lp-faq">
           <div class="lp-faq-q">
-            <div class="lp-faq-question">&ldquo;What if I mess up my fade?&rdquo;</div>
-            <div class="lp-faq-answer">The AI shows you exactly where to start. The most common DIY mistake is starting the fade in the wrong place — this eliminates that. You also see the line on your own photo before you cut anything. If it looks wrong, drag it. Nothing happens until you say go.</div>
+            <div class="lp-faq-question">What if I mess up?</div>
+            <div class="lp-faq-answer">The AI places a conservative line — it defaults to safer, not higher. You see it on your photo before touching anything. Don&rsquo;t like it? Drag it.</div>
           </div>
           <div class="lp-faq-q">
-            <div class="lp-faq-question">&ldquo;Do I need experience with clippers?&rdquo;</div>
-            <div class="lp-faq-answer">No. The guide is written specifically for people who have never done this before. It tells you which guard, which direction, and how to blend — step by step. If you can follow instructions, you can do this.</div>
+            <div class="lp-faq-question">Does this work for beginners?</div>
+            <div class="lp-faq-answer">Yes. The guide is written for people who have never held clippers. If you can follow instructions, you can do this.</div>
           </div>
           <div class="lp-faq-q">
-            <div class="lp-faq-question">&ldquo;What if the AI puts the line in the wrong spot?&rdquo;</div>
-            <div class="lp-faq-answer">You can drag the line before you cut. The AI gives you a starting point based on your actual photo — you have full control to move it. You are always the last check before anything happens.</div>
-          </div>
-          <div class="lp-faq-q">
-            <div class="lp-faq-question">&ldquo;Is this actually free?&rdquo;</div>
-            <div class="lp-faq-answer">Yes. The first few analyses are completely free. No credit card, no account needed. Try it, see the result on your own photo, and decide from there.</div>
+            <div class="lp-faq-question">Why only low taper fades?</div>
+            <div class="lp-faq-answer">We do one thing really well instead of everything poorly. The low taper is the most requested, most messed-up style. We&rsquo;re starting here.</div>
           </div>
         </div>
       </div>
 
       <hr class="lp-rule">
 
-      <!-- ──────────────── FINAL CTA ──────────────── -->
+      <!-- FINAL CTA -->
       <div class="lp-final">
-        <div class="lp-section-label">Ready?</div>
-        <div class="lp-final-title">Your clean low taper fade<br>starts right here.</div>
-        <div class="lp-final-sub">Free to try. No barber required. Takes 2 minutes.</div>
+        <div class="lp-final-title">Your cleanest fade<br>starts now.</div>
         <button class="lp-cta" onclick="startGuide()">
-          Get My Fade Guide &mdash; Free
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          Try My First Fade Guide Free
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
         </button>
+        <div class="lp-cta-note" style="margin-top:12px;">Free to try &nbsp;·&nbsp; No barber required</div>
       </div>
-    </div>
 
     <div class="messages-wrap" id="messagesWrap"></div>
 
