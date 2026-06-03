@@ -1685,12 +1685,42 @@ function makeGuideDraggable(canvas, img, initialLineY, startX, endX, fadeH, guar
 }
 
 // ── DRAW GUIDE ──
+
+// ── EAR LANDMARK DETECTION (MediaPipe still-image) ──
+// Runs MediaPipe on an uploaded photo — same model already used for live camera.
+function detectEarLandmark(imgElement) {
+  return new Promise(resolve => {
+    if (!_mpFaceMesh || !_mpLoaded) { resolve(null); return; }
+    let done = false;
+    const bail = setTimeout(() => { if (!done) { done = true; resolve(null); } }, 2500);
+    _mpFaceMesh.onResults(results => {
+      if (done) return;
+      done = true; clearTimeout(bail);
+      // Restore live-guide callback
+      _mpFaceMesh.onResults(_onFaceResults);
+      if (!results.multiFaceLandmarks?.length) { resolve(null); return; }
+      const lm = results.multiFaceLandmarks[0];
+      const nose = lm[4]; // nose tip determines facing direction
+      const facingRight = nose.x < 0.48;
+      // tragion = ear canal landmark (234 left, 454 right)
+      const tragion  = facingRight ? lm[234] : lm[454];
+      // temporal = just above ear (127 left, 356 right)
+      const temporal = facingRight ? lm[127] : lm[356];
+      resolve({ earX: tragion.x, earY: tragion.y,
+                temporalY: temporal.y, facingRight });
+    });
+    _mpFaceMesh.send({ image: imgElement }).catch(() => {
+      if (!done) { done = true; resolve(null); }
+    });
+  });
+}
+
 function drawGuide(file, guide) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = e => {
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
         const maxW = 540;
         const scale = Math.min(1, maxW / img.width);
         const canvas = document.createElement('canvas');
@@ -1707,106 +1737,88 @@ function drawGuide(file, guide) {
         const taperStyleLabel = { low: 'Low Taper', mid: 'Mid Taper', high: 'High Taper', skin: 'Skin Fade', buzz: 'Buzz' };
 
         // ════════════════════════════════════════════════════════
-        // BARBER RULE SYSTEM — Conservative, Repeatable, Reliable
+        // BARBER RULE SYSTEM v2 — Ear midpoint is the ONLY anchor
         //
-        // Philosophy: precision over creativity. Never guess high.
-        // Primary rule: LOW TAPER line = middle of ear.
+        // PRIMARY RULE: LOW TAPER line = middle of ear.
+        // BIAS: always err lower, never higher.
+        // LINE: short, sideburn-width only.
         // ════════════════════════════════════════════════════════
 
-        // RULE TABLE per style (all fractions of image height)
-        const BARBER_RULES = {
-          //         default  hardCapHigh  hardCapLow  conservOffset
-          low:   { def: 0.63, capHi: 0.52, capLo: 0.74, bias: 0.025 },
-          mid:   { def: 0.50, capHi: 0.38, capLo: 0.62, bias: 0.020 },
-          high:  { def: 0.36, capHi: 0.25, capLo: 0.48, bias: 0.015 },
-          skin:  { def: 0.68, capHi: 0.58, capLo: 0.78, bias: 0.030 },
-          buzz:  { def: 0.42, capHi: 0.30, capLo: 0.55, bias: 0.020 },
-        };
-        const RULE = BARBER_RULES[state.taperStyle] || BARBER_RULES.low;
+        // Hard rule table — all fractions of image height
+        // def = safe default if detection fails
+        // capHi = absolute ceiling (if line goes above this → too high, override)
+        // capLo = absolute floor
+        // bias = downward offset applied always (conservative)
+        const RULE = ({
+          low:  { def: 0.63, capHi: 0.54, capLo: 0.73, bias: 0.03 },
+          mid:  { def: 0.50, capHi: 0.40, capLo: 0.62, bias: 0.02 },
+          high: { def: 0.37, capHi: 0.27, capLo: 0.48, bias: 0.015 },
+          skin: { def: 0.67, capHi: 0.58, capLo: 0.77, bias: 0.03 },
+          buzz: { def: 0.42, capHi: 0.32, capLo: 0.55, bias: 0.02 },
+        })[state.taperStyle] || { def: 0.63, capHi: 0.54, capLo: 0.73, bias: 0.03 };
 
-        // ── STEP 1: Ear detection — find ear position in pixel data ──
-        // Work at 1/3 resolution for speed
-        const sc = document.createElement('canvas');
-        sc.width = Math.floor(W/3); sc.height = Math.floor(H/3);
-        const sx = sc.getContext('2d');
-        sx.drawImage(canvas, 0, 0, sc.width, sc.height);
-        const px = sx.getImageData(0, 0, sc.width, sc.height).data;
-        const sw = sc.width, sh = sc.height;
+        // ── DETECTION PATH 1: MediaPipe face landmarks (most reliable) ──
+        let earXfrac = 0.50, rawYfrac = RULE.def, detectedByMP = false;
+        const mpEar = await detectEarLandmark(img).catch(() => null);
+        if (mpEar) {
+          // tragion (ear canal) is the anatomical anchor
+          rawYfrac   = mpEar.earY + RULE.bias;    // tragion Y + conservative offset
+          earXfrac   = mpEar.earX;
+          detectedByMP = true;
+        } else {
+          // ── DETECTION PATH 2: Pixel scan fallback ──
+          // Strategy: scan for the skin-tone column in the ear zone,
+          // keep adjustment range TIGHT (±5%) around the safe default.
+          const sc = document.createElement('canvas');
+          sc.width = Math.floor(W/4); sc.height = Math.floor(H/4);
+          const sx = sc.getContext('2d');
+          sx.drawImage(canvas, 0, 0, sc.width, sc.height);
+          const px = sx.getImageData(0, 0, sc.width, sc.height).data;
+          const sw = sc.width, sh = sc.height;
 
-        // Scan region: ear is typically in the middle 30-80% horizontally
-        // and at 35-80% vertically in a properly framed side profile
-        const xMin = Math.floor(sw * 0.25), xMax = Math.floor(sw * 0.80);
-        const yMin = Math.floor(sh * 0.30), yMax = Math.floor(sh * 0.82);
+          // Ear zone: horizontal 25-78%, vertical = RULE default ± 15%
+          const xLo = Math.floor(sw * 0.25), xHi = Math.floor(sw * 0.78);
+          const yLo = Math.floor(sh * Math.max(0.30, RULE.def - 0.18));
+          const yHi = Math.floor(sh * Math.min(0.85, RULE.def + 0.18));
 
-        // Per-column: score = (brightness variance) × (max brightness in ear zone)
-        // The ear column has a light skin-tone patch surrounded by darker hair
-        let bestEarCol = Math.floor(sw * 0.50), bestEarScore = -1;
-        let earTopY = Math.floor(sh * RULE.capHi);
-        let earBotY = Math.floor(sh * RULE.capLo);
-
-        for (let x = xMin; x < xMax; x++) {
-          // Get brightness profile for this column
-          const col = [];
-          for (let y = yMin; y < yMax; y++) {
-            const i = (y * sw + x) * 4;
-            col.push(px[i]*.299 + px[i+1]*.587 + px[i+2]*.114);
+          let bestCol = Math.floor(sw * 0.50), bestScore = 0;
+          for (let x = xLo; x < xHi; x++) {
+            // Skin-tone score: pixels that are warm and lighter than neighbors
+            let score = 0;
+            for (let y = yLo; y < yHi; y++) {
+              const i = (y * sw + x) * 4;
+              const r = px[i], g = px[i+1], b = px[i+2];
+              const bright = r*.299 + g*.587 + b*.114;
+              // Skin: warm tone (r>g>b), reasonably bright, not saturated
+              if (r > g && g > b && bright > 60 && bright < 230 && r - b < 100) {
+                score += bright * 0.01;
+              }
+            }
+            if (score > bestScore) { bestScore = score; bestCol = x; }
           }
-          // Find peak brightness (ear = light skin surrounded by hair)
-          let peakB = 0, peakIdx = 0;
-          for (let k = 0; k < col.length; k++) {
-            if (col[k] > peakB) { peakB = col[k]; peakIdx = k; }
-          }
-          // Score: peak brightness × how light the peak is relative to surroundings
-          const localMin = Math.min(...col.slice(Math.max(0,peakIdx-5), peakIdx+6));
-          const contrast = peakB - localMin;
-          const score = peakB * 0.4 + contrast * 0.6;
-          if (score > bestEarScore) {
-            bestEarScore = score;
-            bestEarCol = x;
-            // Find ear extent (top/bottom) by looking for where brightness drops from peak
-            let eTop = peakIdx, eBot = peakIdx;
-            const threshold = peakB * 0.65;
-            while (eTop > 0 && col[eTop] > threshold) eTop--;
-            while (eBot < col.length-1 && col[eBot] > threshold) eBot++;
-            earTopY = yMin + eTop;
-            earBotY = yMin + eBot;
+          earXfrac = bestCol / sw;
+
+          // Y: use safe barber default — pixel scan Y is NOT reliable enough
+          // Allow backend Y only if it's solidly inside the safe zone
+          if (guide && guide.tapperLineY >= RULE.capHi + 0.02 && guide.tapperLineY <= RULE.capLo - 0.02) {
+            rawYfrac = guide.tapperLineY + RULE.bias;
+          } else {
+            rawYfrac = RULE.def; // conservative barber default
           }
         }
 
-        // Ear midpoint Y (in small canvas coordinates)
-        const earMidY_sc = (earTopY + earBotY) / 2;
+        // ── APPLY HARD CAPS — non-negotiable ──
+        const clampedFrac = Math.max(RULE.capHi, Math.min(RULE.capLo, rawYfrac));
+        const lineY = clampedFrac * H;
+        const earX  = earXfrac * W;
 
-        // Scale back to full canvas
-        const earX = (bestEarCol / sw) * W;
-        const earMidY_full = (earMidY_sc / sh) * H;
+        // ── LINE: short, matches sideburn width only ──
+        // Sideburn = just in front of ear to just past ear canal
+        // ~5% of image width in front, ~9% past = 14% total (narrow, precise)
+        const startX = Math.max(0.01 * W, earX - W * 0.05);
+        const endX   = Math.min(0.99 * W, earX + W * 0.09);
 
-        // ── STEP 2: Apply Barber Rules ──
-        // Primary anchor: ear midpoint Y
-        let rawLineY = earMidY_full;
-
-        // If backend gave us a Y coordinate, use it as a signal but validate it
-        if (guide && guide.tapperLineY) {
-          const backendY = guide.tapperLineY * H;
-          const backendFrac = guide.tapperLineY;
-          // Only trust backend if it's within the safe zone
-          if (backendFrac >= RULE.capHi && backendFrac <= RULE.capLo) {
-            // Blend: 40% backend, 60% barber rule (ear midpoint wins)
-            rawLineY = earMidY_full * 0.60 + backendY * 0.40;
-          }
-          // If backend is outside safe zone, ignore it — use ear midpoint only
-        }
-
-        // Apply conservative downward bias (safer to go slightly low)
-        rawLineY = rawLineY + (RULE.bias * H);
-
-        // Hard caps — BARBER RULE: never outside safe zone
-        const lineY = Math.max(RULE.capHi * H, Math.min(RULE.capLo * H, rawLineY));
-
-        // Sideburn startX: just in front of the ear (3% left of ear center)
-        const startX = Math.max(0.01*W, earX - W*0.04);
-        const endX   = Math.min(0.98*W, startX + W*0.36);
-
-        const fadeH = 0.10 * H; // fade zone above the line (10% of image height)
+        const fadeH = 0.09 * H;
         const guardLbl = taperGuardLabel[state.taperStyle] || '#1.5';
         const styleLbl = taperStyleLabel[state.taperStyle] || 'Taper';
 
