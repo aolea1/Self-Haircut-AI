@@ -267,6 +267,24 @@ body {
   color: #e8d5a3; padding: 5px 10px; border-radius: 8px;
   font-size: 12px; line-height: 1.4; white-space: nowrap; pointer-events: none;
 }
+
+/* Auto-capture countdown */
+#arCountdown {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 96px; font-weight: 800;
+  color: #e8d5a3; text-shadow: 0 0 30px rgba(232,213,163,0.7);
+  pointer-events: none; z-index: 20;
+  display: none; line-height: 1;
+}
+#arFrameBox.detecting { border-color: rgba(100,220,100,0.7); animation: none; }
+#arFrameBox.detecting #arFrameLabel { background: rgba(80,180,80,0.85); color:#fff; }
+#arAutoStatus {
+  position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+  font-size: 11px; color: rgba(255,255,255,0.55); pointer-events: none;
+  white-space: nowrap;
+}
+
 #arFrameBox {
   position: absolute;
   /* Sits in the center of the frame, leaving room for top/bottom bars */
@@ -494,11 +512,12 @@ body {
 }
 .inspo-card:hover { border-color: rgba(232,213,163,0.5); transform: translateY(-2px); }
 .card-tap-hint {
-  position: absolute; top: 10px; right: 10px;
-  background: rgba(232,213,163,0.15); border: 1px solid rgba(232,213,163,0.3);
-  color: #e8d5a3; font-size: 10px; font-weight: 600; padding: 3px 8px;
-  border-radius: 99px; letter-spacing: 0.05em;
-  animation: tapPulse 2.5s ease-in-out infinite;
+  position: absolute; bottom: 56px; left: 50%; transform: translateX(-50%);
+  background: rgba(232,213,163,0.92); color: #0d0d0d;
+  font-size: 12px; font-weight: 800; padding: 6px 16px;
+  border-radius: 99px; letter-spacing: 0.06em; white-space: nowrap;
+  animation: tapPulse 2s ease-in-out infinite;
+  box-shadow: 0 2px 12px rgba(232,213,163,0.4);
 }
 @keyframes tapPulse {
   0%,100% { opacity: 0.6; transform: scale(1); }
@@ -1499,24 +1518,27 @@ function drawGuideOverlay(ctx, W, H, lineY, startX, endX, fadeH, guardLbl, style
 // ── DRAGGABLE GUIDE ──
 function makeGuideDraggable(canvas, img, initialLineY, startX, endX, fadeH, guardLbl, styleLbl) {
   let lineY = initialLineY;
+  let curStartX = startX, curEndX = endX;
+  const lineW = endX - startX; // keep width constant while translating
   let dragging = false;
+  let dragOriginX = 0, dragOriginY = 0;
+  let snapLineY = initialLineY, snapStartX = startX;
   const W = canvas.width, H = canvas.height;
   const ctx = canvas.getContext('2d');
 
-  // Zoom inset canvas — 150×90px bottom-left corner
+  // Zoom inset
   const zc = document.createElement('canvas'); zc.width = 150; zc.height = 90;
   zc.style.cssText = 'position:absolute;bottom:8px;left:8px;border-radius:8px;border:1px solid rgba(232,213,163,0.4);pointer-events:none;opacity:0.92;';
   const zwrap = canvas.parentElement;
   if (zwrap) { zwrap.style.position = 'relative'; zwrap.appendChild(zc); }
   const zctx = zc.getContext('2d');
-  const drawZoom = (ly) => {
+  const drawZoom = (ly, sx, ex) => {
     const zH = 90, zW = 150, zoomScale = 2.5;
-    const srcH = zH / zoomScale, srcW = zW / zoomScale;
-    const srcY = ly - srcH/2, srcX = (startX+endX)/2 - srcW/2;
-    zctx.clearRect(0, 0, zW, zH);
+    const srcH = zH/zoomScale, srcW = zW/zoomScale;
+    const srcY = ly - srcH/2, srcX = (sx+ex)/2 - srcW/2;
+    zctx.clearRect(0,0,zW,zH);
     zctx.drawImage(canvas, srcX, srcY, srcW, srcH, 0, 0, zW, zH);
-    // Draw guide line on zoom
-    const zLineY = zH / 2;
+    const zLineY = zH/2;
     zctx.save(); zctx.strokeStyle='rgba(255,255,255,0.9)'; zctx.lineWidth=2;
     zctx.shadowColor='rgba(255,255,255,0.8)'; zctx.shadowBlur=6;
     zctx.beginPath(); zctx.moveTo(0,zLineY); zctx.lineTo(zW,zLineY); zctx.stroke(); zctx.restore();
@@ -1525,28 +1547,50 @@ function makeGuideDraggable(canvas, img, initialLineY, startX, endX, fadeH, guar
     zctx.fillText('2.5× zoom', 4, zH-5); zctx.restore();
   };
 
-  const clamp = y => Math.max(H * 0.1, Math.min(H * 0.9, y));
-  const clientToY = clientY => {
+  const toCanvas = (clientX, clientY) => {
     const r = canvas.getBoundingClientRect();
-    return clamp((clientY - r.top) * (H / r.height));
+    return {
+      x: (clientX - r.left) * (W / r.width),
+      y: (clientY - r.top)  * (H / r.height)
+    };
   };
-  const redraw = y => {
-    lineY = y;
-    ctx.clearRect(0, 0, W, H);
-    ctx.drawImage(img, 0, 0, W, H);
-    drawGuideOverlay(ctx, W, H, lineY, startX, endX, fadeH, guardLbl, styleLbl);
-    drawZoom(lineY);
-  };
-  // Initial zoom draw (slight delay so canvas is painted first)
-  setTimeout(() => drawZoom(lineY), 80);
+  const clampY = y => Math.max(H*0.05, Math.min(H*0.95, y));
+  const clampX = x => Math.max(0, Math.min(W - lineW, x));
 
-  canvas.addEventListener('mousedown', e => { dragging = true; redraw(clientToY(e.clientY)); });
-  canvas.addEventListener('mousemove', e => { if (dragging) redraw(clientToY(e.clientY)); });
-  canvas.addEventListener('mouseup', () => { dragging = false; });
-  canvas.addEventListener('mouseleave', () => { dragging = false; });
-  canvas.addEventListener('touchstart', e => { dragging = true; e.preventDefault(); redraw(clientToY(e.touches[0].clientY)); }, { passive: false });
-  canvas.addEventListener('touchmove', e => { if (!dragging) return; e.preventDefault(); redraw(clientToY(e.touches[0].clientY)); }, { passive: false });
-  canvas.addEventListener('touchend', () => { dragging = false; });
+  const redraw = (lY, sX, eX) => {
+    lineY = lY; curStartX = sX; curEndX = eX;
+    ctx.clearRect(0,0,W,H);
+    ctx.drawImage(img,0,0,W,H);
+    drawGuideOverlay(ctx,W,H,lineY,curStartX,curEndX,fadeH,guardLbl,styleLbl);
+    drawZoom(lineY,curStartX,curEndX);
+  };
+
+  const onStart = (clientX, clientY) => {
+    dragging = true;
+    const pt = toCanvas(clientX, clientY);
+    dragOriginX = pt.x; dragOriginY = pt.y;
+    snapLineY = lineY; snapStartX = curStartX;
+  };
+  const onMove = (clientX, clientY) => {
+    if (!dragging) return;
+    const pt = toCanvas(clientX, clientY);
+    const dx = pt.x - dragOriginX;
+    const dy = pt.y - dragOriginY;
+    const newY  = clampY(snapLineY  + dy);
+    const newSX = clampX(snapStartX + dx);
+    redraw(newY, newSX, newSX + lineW);
+  };
+  const onEnd = () => { dragging = false; };
+
+  canvas.addEventListener('mousedown',  e => { e.preventDefault(); onStart(e.clientX, e.clientY); });
+  canvas.addEventListener('mousemove',  e => { onMove(e.clientX, e.clientY); });
+  canvas.addEventListener('mouseup',    onEnd);
+  canvas.addEventListener('mouseleave', onEnd);
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); onStart(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+  canvas.addEventListener('touchmove',  e => { e.preventDefault(); onMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+  canvas.addEventListener('touchend',   onEnd);
+
+  setTimeout(() => drawZoom(lineY, curStartX, curEndX), 80);
 }
 
 // ── DRAW GUIDE ──
@@ -1947,6 +1991,7 @@ function openARCamera() {
 
   startARStream();
   setupARDrag();
+  setTimeout(startAutoDetect, 1200); // slight delay for camera to warm up
 }
 
 function startARStream() {
@@ -2035,6 +2080,7 @@ function stopARRecording() {
 }
 
 function closeARCamera() {
+  stopAutoDetect();
   if (arStream) { arStream.getTracks().forEach(t => t.stop()); arStream = null; }
   document.getElementById('arModal').style.display = 'none';
 }
@@ -2063,24 +2109,121 @@ function captureARFrame() {
   }, 'image/jpeg', 0.92);
 }
 
+
+// ── AUTO-CAPTURE DETECTION ──
+let _arDetectInterval = null, _arCountdownT = null, _arCountVal = 0, _arDetectStreak = 0;
+const AR_DETECT_STREAK = 3;   // consecutive hits before countdown starts
+const AR_COUNTDOWN_SEC = 3;
+
+function startAutoDetect() {
+  stopAutoDetect();
+  _arDetectStreak = 0;
+  _arDetectInterval = setInterval(_arSampleFrame, 350);
+}
+function stopAutoDetect() {
+  clearInterval(_arDetectInterval); _arDetectInterval = null;
+  _cancelARCountdown();
+}
+
+function _arSampleFrame() {
+  const video = document.getElementById('arVideo');
+  const wrap  = document.getElementById('arVideoWrap');
+  const box   = document.getElementById('arFrameBox');
+  if (!video || video.readyState < 2 || !wrap || !box) return;
+
+  // Map frame box position onto video coordinates
+  const vr = wrap.getBoundingClientRect();
+  const br = box.getBoundingClientRect();
+  const xF = (br.left - vr.left) / vr.width;
+  const yF = (br.top  - vr.top)  / vr.height;
+  const wF = br.width  / vr.width;
+  const hF = br.height / vr.height;
+
+  const c = document.createElement('canvas'); c.width = 64; c.height = 48;
+  const cx = c.getContext('2d');
+  cx.drawImage(video,
+    xF * video.videoWidth, yF * video.videoHeight,
+    wF * video.videoWidth, hF * video.videoHeight,
+    0, 0, 64, 48
+  );
+  const d = cx.getImageData(0, 0, 64, 48).data;
+  let sum = 0, sumSq = 0, n = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    const b = d[i]*.299 + d[i+1]*.587 + d[i+2]*.114;
+    sum += b; sumSq += b*b; n++;
+  }
+  const variance = n ? (sumSq/n) - (sum/n)**2 : 0;
+
+  const headInFrame = variance > 650;
+  box.classList.toggle('detecting', headInFrame);
+
+  if (headInFrame) {
+    _arDetectStreak++;
+    if (_arDetectStreak >= AR_DETECT_STREAK && !_arCountdownT) {
+      _startARCountdown();
+    }
+  } else {
+    _arDetectStreak = 0;
+    _cancelARCountdown();
+  }
+}
+
+function _startARCountdown() {
+  _arCountVal = AR_COUNTDOWN_SEC;
+  _showCountdown(_arCountVal);
+  _arCountdownT = setInterval(() => {
+    _arCountVal--;
+    if (_arCountVal > 0) {
+      _showCountdown(_arCountVal);
+    } else {
+      _cancelARCountdown();
+      stopAutoDetect();
+      captureARFrame();
+    }
+  }, 1000);
+}
+function _cancelARCountdown() {
+  clearInterval(_arCountdownT); _arCountdownT = null;
+  _showCountdown(null);
+}
+function _showCountdown(val) {
+  const el = document.getElementById('arCountdown');
+  if (!el) return;
+  if (val === null) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.textContent = val;
+}
+
 function setupARDrag() {
   const guide = document.getElementById('arGuide');
   const wrap  = document.getElementById('arVideoWrap');
+  let dragStartX = 0, dragStartY = 0, snapTop = 40, snapLeft = 0;
 
-  const move = (clientY) => {
+  const startDrag = (clientX, clientY) => {
+    arDragging = true;
+    dragStartX = clientX; dragStartY = clientY;
+    snapTop  = parseFloat(guide.style.top  || '40');
+    snapLeft = parseFloat(guide.style.left || '0');
+  };
+  const moveDrag = (clientX, clientY) => {
     if (!arDragging) return;
     const rect = wrap.getBoundingClientRect();
-    let pct = ((clientY - rect.top) / rect.height) * 100;
-    pct = Math.max(5, Math.min(90, pct));
-    guide.style.top = pct.toFixed(1) + '%';
+    const dyPct = ((clientY - dragStartY) / rect.height) * 100;
+    const dxPct = ((clientX - dragStartX) / rect.width)  * 100;
+    const newTop  = Math.max(5,   Math.min(90, snapTop  + dyPct));
+    const newLeft = Math.max(-30, Math.min(30, snapLeft + dxPct));
+    guide.style.top  = newTop.toFixed(1)  + '%';
+    guide.style.left = newLeft.toFixed(1) + '%';
+    guide.style.right = (-newLeft).toFixed(1) + '%';
   };
+  const endDrag = () => { arDragging = false; };
 
-  guide.addEventListener('mousedown',  () => { arDragging = true; });
-  guide.addEventListener('touchstart', () => { arDragging = true; }, { passive: true });
-  window.addEventListener('mousemove',  e => move(e.clientY));
-  window.addEventListener('touchmove',  e => move(e.touches[0].clientY), { passive: true });
-  window.addEventListener('mouseup',   () => { arDragging = false; });
-  window.addEventListener('touchend',  () => { arDragging = false; });
+  guide.addEventListener('mousedown',  e => { e.preventDefault(); startDrag(e.clientX, e.clientY); });
+  guide.addEventListener('touchstart', e => { startDrag(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+  window.addEventListener('mousemove',  e => moveDrag(e.clientX, e.clientY));
+  window.addEventListener('touchmove',  e => moveDrag(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+  window.addEventListener('mouseup',   endDrag);
+  window.addEventListener('touchend',  endDrag);
 }
 
 
@@ -2248,6 +2391,8 @@ if ('serviceWorker' in navigator) {
   <div id="arModal">
     <div id="arVideoWrap">
       <video id="arVideo" autoplay playsinline muted></video>
+      <div id="arCountdown"></div>
+      <div id="arAutoStatus">Hold still to auto-capture</div>
       <!-- Head framing guide -->
       <div id="arFrameBox">
         <div id="arFrameLabel">Keep head in this region</div>
