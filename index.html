@@ -1831,7 +1831,7 @@ function addGuideSteps() {
   // 8. How's it going check-in after 60s
   setTimeout(() => {
     if (state.phase === 'guide-shown') {
-      addAIMessage('<p>✂️ <strong>How's the cut going?</strong> Need help with any step — blending, edging, fixing a mistake?</p>', null);
+      addAIMessage("<p>✂️ <strong>How's the cut going?</strong> Need help with any step — blending, edging, fixing a mistake?</p>", null);
       scrollBottom();
     }
   }, 60000);
