@@ -404,7 +404,9 @@ body {
 
 /* ── LANDING PAGE ── */
 .hero {
-  width: 100%; display: flex; flex-direction: column; align-items: center;
+  width: 100%; max-width: 640px;
+  margin: 0 auto;
+  display: flex; flex-direction: column; align-items: center;
   animation: heroIn .45s ease both;
 }
 @keyframes heroIn {
@@ -414,7 +416,7 @@ body {
 
 /* HERO */
 .lp-hero {
-  width: 100%; max-width: 600px;
+  width: 100%; max-width: 100%;
   padding: 52px 24px 44px;
   display: flex; flex-direction: column; align-items: center;
   text-align: center;
@@ -430,15 +432,17 @@ body {
 }
 .lp-h1 {
   font-family: 'Syne', sans-serif;
-  font-size: clamp(34px, 7.5vw, 56px);
-  font-weight: 800; line-height: 1.08;
-  letter-spacing: -1.5px; color: #fff;
+  font-size: clamp(28px, 5.5vw, 44px);
+  font-weight: 800; line-height: 1.12;
+  letter-spacing: -0.8px; color: #fff;
   margin-bottom: 18px;
+  width: 100%;
 }
 .lp-sub {
-  font-size: 16px; line-height: 1.6;
+  font-size: 15px; line-height: 1.65;
   color: rgba(255,255,255,0.45);
-  max-width: 420px; margin-bottom: 32px;
+  max-width: 400px; width: 100%;
+  margin-bottom: 32px;
 }
 .lp-cta {
   display: inline-flex; align-items: center; gap: 10px;
@@ -459,7 +463,7 @@ body {
 
 /* TAPER CARD PREVIEW */
 .lp-preview {
-  width: 100%; max-width: 600px;
+  width: 100%; max-width: 100%;
   padding: 0 24px 48px;
   display: flex; flex-direction: column; align-items: center;
 }
@@ -494,7 +498,7 @@ body {
 /* SECTION STRUCTURE */
 .lp-rule { width: 100%; border: none; border-top: 1px solid rgba(255,255,255,0.06); }
 .lp-section {
-  width: 100%; max-width: 600px;
+  width: 100%; max-width: 100%;
   padding: 48px 24px;
 }
 .lp-label {
@@ -503,10 +507,10 @@ body {
 }
 .lp-section-title {
   font-family: 'Syne', sans-serif;
-  font-size: clamp(22px, 4vw, 32px);
+  font-size: clamp(20px, 3vw, 28px);
   font-weight: 700; color: #fff;
-  line-height: 1.2; letter-spacing: -0.4px;
-  margin-bottom: 36px;
+  line-height: 1.25; letter-spacing: -0.3px;
+  margin-bottom: 28px;
 }
 
 /* HOW IT WORKS */
@@ -547,21 +551,25 @@ body {
 
 /* FINAL CTA */
 .lp-final {
-  width: 100%; max-width: 600px;
+  width: 100%; max-width: 100%;
   padding: 48px 24px 72px;
   text-align: center; display: flex; flex-direction: column; align-items: center;
 }
 .lp-final-title {
   font-family: 'Syne', sans-serif;
-  font-size: clamp(24px, 5vw, 38px);
-  font-weight: 800; color: #fff; letter-spacing: -0.5px;
-  line-height: 1.15; margin-bottom: 28px;
+  font-size: clamp(22px, 4vw, 32px);
+  font-weight: 800; color: #fff; letter-spacing: -0.4px;
+  line-height: 1.18; margin-bottom: 28px;
 }
 
-@media (max-width: 500px) {
-  .lp-hero { padding: 40px 20px 36px; }
+@media (max-width: 480px) {
+  .lp-hero { padding: 36px 20px 32px; }
   .lp-section,.lp-final,.lp-preview { padding-left: 20px; padding-right: 20px; }
-  .lp-h1 { font-size: 36px; letter-spacing: -1px; }
+  .lp-h1 { font-size: 30px; letter-spacing: -0.5px; }
+  .lp-sub { font-size: 14px; }
+  .lp-step-title { font-size: 14px; }
+  .lp-trust-item { font-size: 13px; }
+  .lp-faq-question { font-size: 14px; }
 }
 
 /* ── INSPO CARDS ── */
