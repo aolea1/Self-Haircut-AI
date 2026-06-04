@@ -1757,15 +1757,27 @@ function drawGuide(file, guide) {
           buzz: { def: 0.42, capHi: 0.32, capLo: 0.55, bias: 0.02 },
         })[state.taperStyle] || { def: 0.63, capHi: 0.54, capLo: 0.73, bias: 0.03 };
 
-        // ── DETECTION PATH 1: MediaPipe face landmarks (most reliable) ──
+        // ── DETECTION PATH 0: Ear position saved from live guide (most reliable) ──
+        // If photo came from the AR camera, MediaPipe already found the ear precisely.
         let earXfrac = 0.50, rawYfrac = RULE.def, detectedByMP = false;
-        const mpEar = await detectEarLandmark(img).catch(() => null);
-        if (mpEar) {
-          // tragion (ear canal) is the anatomical anchor
-          rawYfrac   = mpEar.earY + RULE.bias;    // tragion Y + conservative offset
-          earXfrac   = mpEar.earX;
+        if (window._arCapturedEar) {
+          earXfrac   = window._arCapturedEar.xFrac;
+          rawYfrac   = window._arCapturedEar.yFrac + RULE.bias;
           detectedByMP = true;
-        } else {
+          window._arCapturedEar = null; // consume — one use only
+        }
+
+        // ── DETECTION PATH 1: MediaPipe on still image (uploaded photos) ──
+        if (!detectedByMP) {
+          const mpEar = await detectEarLandmark(img).catch(() => null);
+          if (mpEar) {
+            rawYfrac   = mpEar.earY + RULE.bias;
+            earXfrac   = mpEar.earX;
+            detectedByMP = true;
+          }
+        }
+
+        if (!detectedByMP) {
           // ── DETECTION PATH 2: Pixel scan fallback ──
           // Strategy: scan for the skin-tone column in the ear zone,
           // keep adjustment range TIGHT (±5%) around the safe default.
@@ -2466,21 +2478,65 @@ function flipARCamera() {
   }, { once: true });
 }
 
-function captureARFrame() {
+async function captureARFrame() {
   const video = document.getElementById('arVideo');
-  const canvas = document.createElement('canvas');
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  const ctx = canvas.getContext('2d');
-  if (arFacingMode === 'user') {
-    ctx.translate(canvas.width, 0);
-    ctx.scale(-1, 1);
+  if (!video || !video.videoWidth) return;
+
+  // ── 1. Save MediaPipe ear position BEFORE anything closes ──
+  if (_arSmooth && _arSmooth.frames > 4) {
+    window._arCapturedEar = { xFrac: _arSmooth.x, yFrac: _arSmooth.y };
   }
-  ctx.drawImage(video, 0, 0);
-  canvas.toBlob(blob => {
+
+  // ── 2. Draw captured still into the overlay canvas (freeze frame) ──
+  const W = video.videoWidth, H = video.videoHeight;
+  const oc = document.getElementById('arOverlay');
+  if (oc) {
+    oc.width = W; oc.height = H;
+    const octx = oc.getContext('2d');
+    // Draw the frozen video frame (accounting for mirror)
+    octx.save();
+    if (arFacingMode === 'user') { octx.translate(W, 0); octx.scale(-1, 1); }
+    octx.drawImage(video, 0, 0, W, H);
+    octx.restore();
+    // Immediately draw the gold guide line using known ear position
+    if (window._arCapturedEar) {
+      const lx = window._arCapturedEar.xFrac * W;
+      const ly = window._arCapturedEar.yFrac * H;
+      // Apply same conservative barber offset as drawGuide
+      const safeY = Math.max(0.54 * H, Math.min(0.73 * H, ly + 0.03 * H));
+      _drawMPLine(octx, W, H, lx, safeY, true);
+    }
+  }
+
+  // ── 3. Stop live stream — frozen frame + guide stays on screen ──
+  stopFaceMeshLoop();
+  if (arStream) { arStream.getTracks().forEach(t => t.stop()); arStream = null; }
+
+  // ── 4. Show confirmation state ──
+  const capBtn = document.getElementById('arCaptureBtn');
+  if (capBtn) { capBtn.textContent = '✓ Line placed — opening guide...'; capBtn.disabled = true; }
+  const detBadge = document.getElementById('arDetectedBadge');
+  if (detBadge) detBadge.textContent = '✓ GUIDE PLACED';
+
+  // ── 5. Capture the actual photo file ──
+  const captureCanvas = document.createElement('canvas');
+  captureCanvas.width = W; captureCanvas.height = H;
+  const ctx = captureCanvas.getContext('2d');
+  if (arFacingMode === 'user') { ctx.translate(W, 0); ctx.scale(-1, 1); }
+  ctx.drawImage(video, 0, 0, W, H);
+
+  // ── 6. Brief pause so user sees the placed line ──
+  await new Promise(r => setTimeout(r, 1100));
+
+  // ── 7. Close and send ──
+  captureCanvas.toBlob(blob => {
     const file = new File([blob], 'ar-capture.jpg', { type: 'image/jpeg' });
     pendingFiles.push(file);
-    closeARCamera();
+    // Full close (stream already stopped above)
+    _cancelARCountdown();
+    document.getElementById('arModal').style.display = 'none';
+    // Reset UI for next time
+    if (capBtn) { capBtn.textContent = '📸 Capture & Analyze'; capBtn.disabled = false; }
     sendMessage();
   }, 'image/jpeg', 0.92);
 }
