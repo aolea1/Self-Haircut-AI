@@ -261,89 +261,6 @@ body {
 #arVideo {
   width: 100%; height: 100%; object-fit: cover;
 }
-#arGuide {
-  position: absolute; left: 0; right: 0; top: 45%;
-  cursor: ns-resize; user-select: none; touch-action: none;
-}
-#arGuideLine {
-  height: 3px; background: rgba(232,213,163,0.9);
-  box-shadow: 0 0 8px rgba(232,213,163,0.6);
-}
-#arGuideLabel {
-  position: absolute; right: 12px; top: 6px;
-  background: rgba(0,0,0,0.85); border: 1px solid rgba(232,213,163,0.5);
-  color: #e8d5a3; padding: 5px 10px; border-radius: 8px;
-  font-size: 12px; line-height: 1.4; white-space: nowrap; pointer-events: none;
-}
-
-/* Auto-capture countdown */
-#arCountdown {
-  position: absolute; top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 96px; font-weight: 800;
-  color: #e8d5a3; text-shadow: 0 0 30px rgba(232,213,163,0.7);
-  pointer-events: none; z-index: 20;
-  display: none; line-height: 1;
-}
-#arFrameBox.detecting { border-color: rgba(100,220,100,0.7); animation: none; }
-#arFrameBox.detecting #arFrameLabel { background: rgba(80,180,80,0.85); color:#fff; }
-#arAutoStatus {
-  position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
-  font-size: 11px; color: rgba(255,255,255,0.55); pointer-events: none;
-  white-space: nowrap;
-}
-
-#arFrameBox {
-  position: absolute;
-  /* Sits in the center of the frame, leaving room for top/bottom bars */
-  top: 10%; bottom: 12%; left: 5%; right: 5%;
-  border: 2px dashed rgba(232,213,163,0.55);
-  border-radius: 18px;
-  pointer-events: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-}
-#arFrameLabel {
-  background: rgba(0,0,0,0.6);
-  color: #e8d5a3;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 4px 12px;
-  border-radius: 0 0 10px 10px;
-  letter-spacing: 0.3px;
-}
-#arEarMarker {
-  position: absolute;
-  /* Ear is roughly 55% from left and 45% from top of the box */
-  left: 55%; top: 42%;
-  transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  pointer-events: none;
-}
-#arEarMarkerDot {
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  background: rgba(232,213,163,0.7);
-  box-shadow: 0 0 8px rgba(232,213,163,0.6);
-}
-#arEarMarkerLabel {
-  font-size: 10px;
-  color: rgba(232,213,163,0.8);
-  white-space: nowrap;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.9);
-}
-
-#arDragHint {
-  position: absolute; left: 50%; transform: translateX(-50%); top: 8px;
-  background: rgba(0,0,0,0.7); color: rgba(255,255,255,0.7);
-  font-size: 11px; padding: 3px 8px; border-radius: 6px; pointer-events: none;
-  white-space: nowrap;
-}
 #arTopBar {
   position: absolute; top: 0; left: 0; right: 0;
   padding: 16px; display: flex; justify-content: space-between; align-items: center;
@@ -354,7 +271,8 @@ body {
   padding: 8px 14px; border-radius: 10px; font-size: 14px; cursor: pointer;
 }
 #arInstruction {
-  color: rgba(255,255,255,0.85); font-size: 13px; text-align: center;
+  color: rgba(255,255,255,0.85); font-size: 12px; text-align: center;
+  max-width: 200px; line-height: 1.3;
 }
 #arBottomBar {
   padding: 20px 24px 36px; display: flex; justify-content: center;
@@ -1516,19 +1434,6 @@ async function analyzePhoto(file) {
     return;
   }
 
-  const quality = await checkImageQuality(file);
-  if (!quality.ok) {
-    addAIMessage(
-      `<p>⚠️ This photo won't give a reliable placement:</p>
-       <div style="margin:6px 0;font-size:13px;color:var(--text2);line-height:1.6;">${quality.issues.map(i => '• ' + i).join('<br>')}</div>
-       <p style="margin-top:6px;">For a precise, barber-approved result:</p>
-       ${uploadGuideChecklist()}
-       <p style="margin-top:8px;font-size:12px;color:var(--text3);">Retake the photo and upload it again.</p>`,
-      null
-    );
-    return;
-  }
-
   const earMarks = await markEarPosition(file);
   if (!earMarks) {
     addAIMessage(
@@ -1749,47 +1654,7 @@ function makeGuideDraggable(canvas, img, initialLineY, startX, endX, fadeH, guar
   setTimeout(() => drawZoom(lineY, curStartX, curEndX), 80);
 }
 
-// ── IMAGE QUALITY GATE ──
-// Objective, measurable checks only (resolution, brightness). Pose/occlusion
-// problems (ear hidden, too frontal, hair in the way) can't be reliably
-// detected from pixels alone, so those are caught by the "can't find your
-// ear, retake photo" escape inside markEarPosition instead of guessed at.
-function checkImageQuality(file) {
-  const MIN_DIM = 350;
-  const MIN_BRIGHTNESS = 35;
-  return new Promise(resolve => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const img = new Image();
-      img.onload = () => {
-        const issues = [];
-        if (img.width < MIN_DIM || img.height < MIN_DIM) {
-          issues.push('Resolution is too low — use a photo at least 350×350px.');
-        }
-        const sc = document.createElement('canvas');
-        sc.width = 32; sc.height = 32;
-        const sx = sc.getContext('2d');
-        sx.drawImage(img, 0, 0, 32, 32);
-        const data = sx.getImageData(0, 0, 32, 32).data;
-        let sum = 0, n = 0;
-        for (let i = 0; i < data.length; i += 4) {
-          sum += data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114;
-          n++;
-        }
-        if (sum / n < MIN_BRIGHTNESS) {
-          issues.push('The photo is too dark — retake it in better lighting.');
-        }
-        resolve({ ok: issues.length === 0, issues });
-      };
-      img.onerror = () => resolve({ ok: false, issues: ['Could not read this image — try a different photo.'] });
-      img.src = e.target.result;
-    };
-    reader.onerror = () => resolve({ ok: false, issues: ['Could not read this image — try a different photo.'] });
-    reader.readAsDataURL(file);
-  });
-}
-
-// Shared checklist shown both in the upload tip and on a failed quality check.
+// Shared checklist shown both in the upload tip and on the "can't find ear" retake message.
 function uploadGuideChecklist() {
   return `<div style="margin-top:8px;font-size:13px;color:var(--text2);line-height:1.7;">
     ✓ Side profile only — turn 90° so your ear faces the camera<br>
@@ -1800,9 +1665,10 @@ function uploadGuideChecklist() {
 }
 
 // ── MANUAL EAR MARKING (deterministic anchor) ──
-// User drags two dots onto the top and bottom of their ear. The fade line
-// is placed at the vertical midpoint of these marks and is never allowed
-// above the "ear top" mark — barber rule: low taper starts at mid-ear.
+// Sequential 2-step flow: the user places one marker on the top of their
+// ear, then one on the bottom. The fade line is placed at the vertical
+// midpoint of these marks and is never allowed above the "ear top" mark —
+// barber rule: low taper starts at mid-ear, working upward.
 function markEarPosition(file) {
   const fallback = { earXfrac: 0.56, earTopFrac: 0.40, earBottomFrac: 0.52 };
   return new Promise(resolve => {
@@ -1820,23 +1686,15 @@ function markEarPosition(file) {
         canvas.style.width = '100%';
         canvas.style.display = 'block';
 
-        // Pre-seed from the live AR camera's ear detection if this photo came from there —
-        // the user still confirms/adjusts, but starts close to their actual ear.
-        let seedX = 0.56, seedY = 0.46;
-        if (window._arCapturedEar) {
-          seedX = window._arCapturedEar.xFrac;
-          seedY = window._arCapturedEar.yFrac;
-          window._arCapturedEar = null; // consume — one use only
-        }
-        const marks = { top: { x: seedX, y: Math.max(0.02, seedY - 0.06) }, bottom: { x: seedX, y: Math.min(0.98, seedY + 0.06) } };
+        const marks = { top: { x: 0.56, y: 0.40 }, bottom: { x: 0.56, y: 0.52 } };
 
         const msg = document.createElement('div');
         msg.className = 'msg';
         msg.innerHTML = `${aiAvatar()}<div class="msg-body"><div class="msg-name">SelfHaircut.ai</div>
           <div class="msg-text">
-            <p>Drag the two dots onto the <strong>top</strong> and <strong>bottom</strong> of your ear — your fade line starts at the midpoint between them.</p>
+            <p class="ear-mark-instruction"><strong>Step 1 of 2:</strong> Drag the marker onto the <strong>top of your ear</strong>.</p>
             <div class="ear-mark-wrap"></div>
-            <button class="opt-btn ear-mark-confirm" style="margin-top:8px;width:100%;">✓ Confirm ear position</button>
+            <button class="opt-btn ear-mark-next" style="margin-top:8px;width:100%;">Next: bottom of ear →</button>
             <button class="opt-btn ear-mark-retake" style="margin-top:6px;width:100%;background:transparent;border:1px solid rgba(255,255,255,0.15);color:var(--text2);">Can't find your ear? Retake photo</button>
           </div></div>`;
         messagesWrap.appendChild(msg);
@@ -1844,21 +1702,10 @@ function markEarPosition(file) {
         const wrap = msg.querySelector('.ear-mark-wrap');
         wrap.appendChild(canvas);
 
-        const topDot = document.createElement('div');
-        topDot.className = 'ear-mark-dot ear-mark-top';
-        topDot.innerHTML = '<span>Ear top</span>';
-        const botDot = document.createElement('div');
-        botDot.className = 'ear-mark-dot ear-mark-bottom';
-        botDot.innerHTML = '<span>Ear bottom</span>';
-        wrap.appendChild(topDot);
-        wrap.appendChild(botDot);
-
         const place = (dot, m) => {
           dot.style.left = (m.x * 100) + '%';
           dot.style.top  = (m.y * 100) + '%';
         };
-        place(topDot, marks.top);
-        place(botDot, marks.bottom);
 
         const makeDraggable = (dot, m) => {
           let dragging = false;
@@ -1889,13 +1736,22 @@ function markEarPosition(file) {
             window.removeEventListener('touchend', onUp);
           };
         };
+
+        const topDot = document.createElement('div');
+        topDot.className = 'ear-mark-dot ear-mark-top';
+        topDot.innerHTML = '<span>Ear top</span>';
+        wrap.appendChild(topDot);
+        place(topDot, marks.top);
         const cleanupTop = makeDraggable(topDot, marks.top);
-        const cleanupBot = makeDraggable(botDot, marks.bottom);
+        let cleanupBot = null;
+
+        const instr = msg.querySelector('.ear-mark-instruction');
+        const nextBtn = msg.querySelector('.ear-mark-next');
 
         scrollBottom();
 
-        msg.querySelector('.ear-mark-confirm').addEventListener('click', () => {
-          cleanupTop(); cleanupBot();
+        const finish = () => {
+          cleanupTop(); if (cleanupBot) cleanupBot();
           let earTopFrac    = Math.min(marks.top.y, marks.bottom.y);
           let earBottomFrac = Math.max(marks.top.y, marks.bottom.y);
           const earXfrac    = (marks.top.x + marks.bottom.x) / 2;
@@ -1918,10 +1774,24 @@ function markEarPosition(file) {
 
           msg.remove();
           resolve({ earXfrac, earTopFrac, earBottomFrac });
-        }, { once: true });
+        };
+
+        nextBtn.addEventListener('click', () => {
+          if (cleanupBot) { finish(); return; }
+          // Advance to step 2 — reveal the second marker for the bottom of the ear.
+          instr.innerHTML = '<strong>Step 2 of 2:</strong> Now drag the marker onto the <strong>bottom of your ear</strong>.';
+          nextBtn.textContent = '✓ Generate guide line';
+          const botDot = document.createElement('div');
+          botDot.className = 'ear-mark-dot ear-mark-bottom';
+          botDot.innerHTML = '<span>Ear bottom</span>';
+          wrap.appendChild(botDot);
+          place(botDot, marks.bottom);
+          cleanupBot = makeDraggable(botDot, marks.bottom);
+          scrollBottom();
+        });
 
         msg.querySelector('.ear-mark-retake').addEventListener('click', () => {
-          cleanupTop(); cleanupBot();
+          cleanupTop(); if (cleanupBot) cleanupBot();
           msg.remove();
           resolve(null);
         }, { once: true });
@@ -2309,239 +2179,15 @@ function triggerCamera() {
 }
 
 // ── LIVE AR CAMERA ──
+// Plain capture: live video preview, flip camera, capture a still photo.
+// Ear placement happens afterward via the manual 2-marker flow
+// (markEarPosition), so no live detection/overlay is needed here.
 let arFacingMode = 'user';
 let arStream = null;
-let arDragging = false;
-
-const arStyleConfig = {
-  low:  { pct: 45, label: 'Low Taper — align with middle of ear' },
-  mid:  { pct: 38, label: 'Mid Taper — align with middle of ear' },
-  high: { pct: 30, label: 'High Taper — align just above the ear' },
-  skin: { pct: 50, label: 'Skin Fade — align just below the ear' },
-  buzz: { pct: 35, label: 'Buzz Cut — align at the temple' },
-};
-
-
-// ══════════════════════════════════════════════════════════
-// REAL-TIME FACE LANDMARK OVERLAY (MediaPipe FaceMesh)
-// ══════════════════════════════════════════════════════════
-let _mpFaceMesh = null, _mpLoading = false, _mpLoaded = false;
-let _arDetectRAF = null;
-let _arSmooth = { y: 0.45, x: 0.38, frames: 0 };
-let _mpDetectActive = false;
-
-function _loadScript(src) {
-  return new Promise((res, rej) => {
-    if (document.querySelector(`script[src="${src}"]`)) return res();
-    const s = document.createElement('script');
-    s.src = src; s.crossOrigin = 'anonymous';
-    s.onload = res; s.onerror = rej;
-    document.head.appendChild(s);
-  });
-}
-
-async function initFaceMesh() {
-  if (_mpFaceMesh || _mpLoading) return;
-  _mpLoading = true;
-  const badge = document.getElementById('arLoadingBadge');
-  if (badge) badge.style.display = 'block';
-  try {
-    await _loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js');
-    _mpFaceMesh = new FaceMesh({
-      locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${f}`
-    });
-    _mpFaceMesh.setOptions({
-      maxNumFaces: 1,
-      refineLandmarks: false,
-      minDetectionConfidence: 0.42,
-      minTrackingConfidence: 0.42,
-      selfieMode: false
-    });
-    _mpFaceMesh.onResults(_onFaceResults);
-    await _mpFaceMesh.initialize();
-    _mpLoaded = true;
-    // Hide static guide div, show overlay canvas
-    const guide = document.getElementById('arGuide');
-    if (guide) guide.style.opacity = '0';
-    // Hide framing box (MediaPipe handles detection)
-    const fb = document.getElementById('arFrameBox');
-    if (fb) fb.style.display = 'none';
-    if (badge) badge.style.display = 'none';
-    startFaceMeshLoop();
-  } catch(e) {
-    console.warn('MediaPipe failed:', e);
-    _mpLoaded = false;
-    if (badge) badge.style.display = 'none';
-    // Fall back to static line + pixel variance
-    startAutoDetect();
-  }
-  _mpLoading = false;
-}
-
-function _onFaceResults(results) {
-  const oc = document.getElementById('arOverlay');
-  if (!oc || !arStream) return;
-  const W = oc.width, H = oc.height;
-  const ctx = oc.getContext('2d');
-  ctx.clearRect(0, 0, W, H);
-
-  const detected = !!(results.multiFaceLandmarks?.length);
-  const detBadge = document.getElementById('arDetectedBadge');
-
-  if (!detected) {
-    _arSmooth.frames = 0;
-    _drawMPLine(ctx, W, H, null, null, false);
-    if (detBadge) detBadge.style.opacity = '0';
-    _cancelARCountdown();
-    return;
-  }
-
-  const lm = results.multiFaceLandmarks[0];
-  // Nose tip landmark 4 — if x<0.5 face looks right, left ear visible
-  const nose = lm[4];
-  const isFacingRight = nose.x < 0.48;
-  const tragion  = isFacingRight ? lm[234] : lm[454]; // ear canal area
-  const temporal = isFacingRight ? lm[127] : lm[356]; // above ear
-
-  // X: sideburn is just in front of the tragion
-  const rawX = tragion.x;
-  const rawY = tragion.y;
-
-  // Style Y offset: how far above the tragion the taper line sits
-  const yOff = { low: 0.00, mid: -0.04, high: -0.10, skin: 0.02, buzz: -0.06 };
-  const tY = Math.max(0.1, Math.min(0.9, rawY + (yOff[state.taperStyle] || 0)));
-  const tX = rawX;
-
-  // EMA smoothing — fast init, then slow follow
-  const alpha = _arSmooth.frames < 8 ? 0.55 : 0.18;
-  _arSmooth.y = _arSmooth.y * (1-alpha) + tY * alpha;
-  _arSmooth.x = _arSmooth.x * (1-alpha) + tX * alpha;
-  _arSmooth.frames++;
-
-  _drawMPLine(ctx, W, H, _arSmooth.x * W, _arSmooth.y * H, true);
-  if (detBadge) detBadge.style.opacity = '1';
-
-  // Auto-capture: trigger countdown if stable (low jitter) for 6+ frames
-  if (_arSmooth.frames > 10 && !_arCountdownT) {
-    _startARCountdown();
-  }
-}
-
-function _drawMPLine(ctx, W, H, earPx, lineY, detected) {
-  if (lineY === null) lineY = H * 0.44;
-  const sx = earPx !== null ? Math.max(2, earPx - W*0.04) : W*0.06;
-  const ex = Math.min(W-2, sx + W*0.52);
-
-  // Grid fade zone above the line
-  ctx.save();
-  ctx.globalAlpha = detected ? 0.10 : 0.04;
-  ctx.fillStyle = 'white';
-  ctx.fillRect(sx, Math.max(0, lineY - H*0.12), ex-sx, H*0.12);
-  ctx.globalAlpha = detected ? 0.12 : 0.04;
-  ctx.strokeStyle = 'white'; ctx.lineWidth = 0.7;
-  for (let x=sx; x<=ex; x+=14) { ctx.beginPath(); ctx.moveTo(x,Math.max(0,lineY-H*.12)); ctx.lineTo(x,lineY); ctx.stroke(); }
-  for (let y=Math.max(0,lineY-H*.12); y<=lineY; y+=14) { ctx.beginPath(); ctx.moveTo(sx,y); ctx.lineTo(ex,y); ctx.stroke(); }
-  ctx.restore();
-
-  // Fade zone label
-  if (detected) {
-    ctx.save();
-    ctx.font = 'bold 11px sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 6; ctx.textAlign = 'center';
-    ctx.fillText('↑ fade up to here', (sx+ex)/2, lineY - H*0.06);
-    ctx.restore();
-  }
-
-  // Main guide line
-  ctx.save();
-  ctx.strokeStyle = detected ? 'rgba(232,213,163,0.95)' : 'rgba(232,213,163,0.35)';
-  ctx.lineWidth = 3; ctx.lineCap = 'round';
-  ctx.shadowColor = 'rgba(232,213,163,0.7)'; ctx.shadowBlur = detected ? 14 : 5;
-  ctx.beginPath(); ctx.moveTo(sx, lineY); ctx.lineTo(ex, lineY); ctx.stroke(); ctx.restore();
-
-  // Endpoint dots
-  [sx, ex].forEach(px => {
-    ctx.save();
-    ctx.fillStyle = detected ? 'rgba(232,213,163,0.95)' : 'rgba(232,213,163,0.3)';
-    ctx.shadowColor = 'rgba(232,213,163,0.6)'; ctx.shadowBlur = 10;
-    ctx.beginPath(); ctx.arc(px, lineY, 5, 0, Math.PI*2); ctx.fill(); ctx.restore();
-  });
-
-  // Labels
-  const midX = (sx+ex)/2;
-  ctx.save(); ctx.textAlign = 'center';
-  ctx.shadowColor = 'rgba(0,0,0,0.95)'; ctx.shadowBlur = 8;
-  if (detected) {
-    ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.fillText('Start the bald line here', midX, lineY + 18);
-  } else {
-    ctx.font = '12px sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.fillText('Face 45° sideways — AI finds your ear', midX, lineY + 18);
-  }
-  ctx.restore();
-}
-
-function startFaceMeshLoop() {
-  if (!_mpFaceMesh) return;
-  const video = document.getElementById('arVideo');
-  _mpDetectActive = true;
-  const loop = async () => {
-    if (!arStream || !_mpDetectActive) return;
-    try {
-      if (video && video.readyState >= 2) {
-        await _mpFaceMesh.send({ image: video });
-      }
-    } catch(e) {}
-    _arDetectRAF = requestAnimationFrame(loop);
-  };
-  _arDetectRAF = requestAnimationFrame(loop);
-}
-
-function stopFaceMeshLoop() {
-  _mpDetectActive = false;
-  if (_arDetectRAF) { cancelAnimationFrame(_arDetectRAF); _arDetectRAF = null; }
-  // Clear overlay
-  const oc = document.getElementById('arOverlay');
-  if (oc) { const ctx = oc.getContext('2d'); ctx.clearRect(0, 0, oc.width, oc.height); }
-  // Restore static guide
-  const guide = document.getElementById('arGuide');
-  if (guide) guide.style.opacity = '1';
-  const fb = document.getElementById('arFrameBox');
-  if (fb) fb.style.display = '';
-  // Reset detection badge
-  const db = document.getElementById('arDetectedBadge');
-  if (db) db.style.opacity = '0';
-  _arSmooth = { y: 0.45, x: 0.38, frames: 0 };
-}
 
 function openARCamera() {
-  const modal = document.getElementById('arModal');
-  modal.style.display = 'flex';
-
-  // Pre-position static fallback line
-  const cfg = arStyleConfig[state.taperStyle] || { pct: 42, label: 'Align with taper start' };
-  document.getElementById('arGuide').style.top = cfg.pct + '%';
-  document.getElementById('arGuideLabel').textContent = cfg.label;
-
+  document.getElementById('arModal').style.display = 'flex';
   startARStream();
-  setupARDrag();
-
-  // After video metadata loads, size the overlay canvas and start MediaPipe
-  const vid = document.getElementById('arVideo');
-  const _onMeta = () => {
-    const oc = document.getElementById('arOverlay');
-    if (oc) {
-      oc.width  = vid.videoWidth  || 640;
-      oc.height = vid.videoHeight || 480;
-      // Mirror overlay to match video CSS transform
-      oc.style.transform = arFacingMode === 'user' ? 'scaleX(-1)' : 'none';
-    }
-    _arSmooth = { y: cfg.pct / 100, x: 0.38, frames: 0 };
-    initFaceMesh(); // loads MediaPipe async, falls back to pixel variance if it fails
-  };
-  vid.addEventListener('loadedmetadata', _onMeta, { once: true });
-  // If video already loaded
-  if (vid.readyState >= 1) _onMeta();
 }
 
 function startARStream() {
@@ -2551,7 +2197,7 @@ function startARStream() {
       arStream = stream;
       const vid = document.getElementById('arVideo');
       vid.srcObject = stream;
-      // Mirror front cam naturally; don't mirror rear cam
+      // Mirror the front camera for a natural selfie view; don't mirror the rear camera.
       vid.style.transform = arFacingMode === 'user' ? 'scaleX(-1)' : 'none';
     })
     .catch(() => {
@@ -2560,276 +2206,48 @@ function startARStream() {
     });
 }
 
-
-// ── TIKTOK RECORDING ──
-let arRecorder = null, arRecordChunks = [], arAnimFrameId = null, arRecording = false;
-
-function toggleARRecording() {
-  arRecording ? stopARRecording() : startARRecording();
-}
-
-function startARRecording() {
-  const video = document.getElementById('arVideo');
-  if (!video.srcObject) return;
-
-  // Composite canvas = video frame + guide line drawn each frame
-  const rc = document.createElement('canvas');
-  rc.width = video.videoWidth || 640; rc.height = video.videoHeight || 480;
-  const rctx = rc.getContext('2d');
-  const guide = document.getElementById('arGuide');
-
-  const loop = () => {
-    rctx.save();
-    if (arFacingMode === 'user') { rctx.translate(rc.width, 0); rctx.scale(-1,1); }
-    rctx.drawImage(video, 0, 0, rc.width, rc.height);
-    rctx.restore();
-    // Guide line overlay
-    const pct = parseFloat(guide.style.top||'40') / 100;
-    const lY = pct * rc.height;
-    rctx.save();
-    rctx.strokeStyle = 'rgba(232,213,163,0.92)'; rctx.lineWidth = 3;
-    rctx.shadowColor = 'rgba(232,213,163,0.7)'; rctx.shadowBlur = 12;
-    rctx.beginPath(); rctx.moveTo(0, lY); rctx.lineTo(rc.width, lY); rctx.stroke();
-    // Label
-    rctx.font = 'bold 18px sans-serif'; rctx.fillStyle = 'rgba(232,213,163,0.9)';
-    rctx.shadowBlur = 8; rctx.shadowColor = 'rgba(0,0,0,0.9)';
-    const txt = 'Start the bald line here';
-    rctx.fillText(txt, rc.width/2 - rctx.measureText(txt).width/2, lY + 28);
-    rctx.restore();
-    arAnimFrameId = requestAnimationFrame(loop);
-  };
-  loop();
-
-  const mimeType = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
-  arRecordChunks = [];
-  arRecorder = new MediaRecorder(rc.captureStream(30), { mimeType });
-  arRecorder.ondataavailable = e => { if (e.data.size > 0) arRecordChunks.push(e.data); };
-  arRecorder.onstop = () => {
-    cancelAnimationFrame(arAnimFrameId);
-    const blob = new Blob(arRecordChunks, { type: mimeType });
-    const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
-    // Try Web Share first (mobile), fallback to download
-    if (navigator.canShare && navigator.canShare({ files: [new File([blob], 'selfhaircut.' + ext, { type: mimeType })] })) {
-      navigator.share({ files: [new File([blob], 'selfhaircut.' + ext, { type: mimeType })], title: 'My SelfHaircut Guide' }).catch(()=>{});
-    } else {
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-      a.download = 'selfhaircut-guide.' + ext; a.click();
-    }
-    const btn = document.getElementById('arRecordBtn');
-    if (btn) { btn.textContent = '⏺ Record'; btn.style.background = 'rgba(255,255,255,0.12)'; btn.style.borderColor = 'rgba(255,255,255,0.3)'; btn.style.color = '#fff'; }
-    arRecording = false;
-  };
-  arRecorder.start(200); // collect chunks every 200ms
-  arRecording = true;
-  const btn = document.getElementById('arRecordBtn');
-  if (btn) { btn.textContent = '⏹ Stop & Share'; btn.style.background = '#e74c3c'; btn.style.borderColor = '#e74c3c'; btn.style.color = '#fff'; }
-}
-
-function stopARRecording() {
-  if (arRecorder && arRecorder.state !== 'inactive') arRecorder.stop();
-}
-
 function closeARCamera() {
-  stopFaceMeshLoop();
-  stopAutoDetect();
-  _cancelARCountdown();
   if (arStream) { arStream.getTracks().forEach(t => t.stop()); arStream = null; }
   document.getElementById('arModal').style.display = 'none';
 }
 
 function flipARCamera() {
   arFacingMode = arFacingMode === 'user' ? 'environment' : 'user';
-  stopFaceMeshLoop();
   startARStream();
-  const vid = document.getElementById('arVideo');
-  const oc  = document.getElementById('arOverlay');
-  if (oc) oc.style.transform = arFacingMode === 'user' ? 'scaleX(-1)' : 'none';
-  _arSmooth = { y: 0.45, x: 0.38, frames: 0 };
-  vid.addEventListener('loadedmetadata', () => {
-    if (oc) { oc.width = vid.videoWidth || 640; oc.height = vid.videoHeight || 480; }
-    if (_mpLoaded) startFaceMeshLoop();
-  }, { once: true });
 }
 
 async function captureARFrame() {
   const video = document.getElementById('arVideo');
   if (!video || !video.videoWidth) return;
 
-  // ── 1. Save MediaPipe ear position BEFORE anything closes ──
-  if (_arSmooth && _arSmooth.frames > 4) {
-    window._arCapturedEar = { xFrac: _arSmooth.x, yFrac: _arSmooth.y };
-  }
-
-  // ── 2. Draw captured still into the overlay canvas (freeze frame) ──
   const W = video.videoWidth, H = video.videoHeight;
-  const oc = document.getElementById('arOverlay');
-  if (oc) {
-    oc.width = W; oc.height = H;
-    const octx = oc.getContext('2d');
-    // Draw the frozen video frame (accounting for mirror)
-    octx.save();
-    if (arFacingMode === 'user') { octx.translate(W, 0); octx.scale(-1, 1); }
-    octx.drawImage(video, 0, 0, W, H);
-    octx.restore();
-    // Immediately draw the gold guide line using known ear position
-    if (window._arCapturedEar) {
-      const lx = window._arCapturedEar.xFrac * W;
-      const ly = window._arCapturedEar.yFrac * H;
-      // Apply same conservative barber offset as drawGuide
-      const safeY = Math.max(0.54 * H, Math.min(0.73 * H, ly + 0.03 * H));
-      _drawMPLine(octx, W, H, lx, safeY, true);
-    }
-  }
+  // Capture in the same orientation the user sees on screen — for the front
+  // camera that's mirrored, so the saved photo matches the live preview and
+  // never looks backwards.
+  const mirrorX = arFacingMode === 'user';
 
-  // ── 3. Stop live stream — frozen frame + guide stays on screen ──
-  stopFaceMeshLoop();
-  if (arStream) { arStream.getTracks().forEach(t => t.stop()); arStream = null; }
-
-  // ── 4. Show confirmation state ──
-  const capBtn = document.getElementById('arCaptureBtn');
-  if (capBtn) { capBtn.textContent = '✓ Line placed — opening guide...'; capBtn.disabled = true; }
-  const detBadge = document.getElementById('arDetectedBadge');
-  if (detBadge) detBadge.textContent = '✓ GUIDE PLACED';
-
-  // ── 5. Capture the actual photo file ──
+  // Draw from the still-live video BEFORE stopping the stream — drawing from
+  // a <video> whose track has already been stopped produces a black frame.
   const captureCanvas = document.createElement('canvas');
   captureCanvas.width = W; captureCanvas.height = H;
   const ctx = captureCanvas.getContext('2d');
-  if (arFacingMode === 'user') { ctx.translate(W, 0); ctx.scale(-1, 1); }
+  if (mirrorX) { ctx.translate(W, 0); ctx.scale(-1, 1); }
   ctx.drawImage(video, 0, 0, W, H);
 
-  // ── 6. Brief pause so user sees the placed line ──
-  await new Promise(r => setTimeout(r, 1100));
+  if (arStream) { arStream.getTracks().forEach(t => t.stop()); arStream = null; }
 
-  // ── 7. Close and send ──
+  const capBtn = document.getElementById('arCaptureBtn');
+  if (capBtn) { capBtn.textContent = '✓ Captured'; capBtn.disabled = true; }
+
   captureCanvas.toBlob(blob => {
     const file = new File([blob], 'ar-capture.jpg', { type: 'image/jpeg' });
     pendingFiles.push(file);
-    // Full close (stream already stopped above)
-    _cancelARCountdown();
     document.getElementById('arModal').style.display = 'none';
-    // Reset UI for next time
-    if (capBtn) { capBtn.textContent = '📸 Capture & Analyze'; capBtn.disabled = false; }
+    if (capBtn) { capBtn.textContent = '📸 Capture Photo'; capBtn.disabled = false; }
     sendMessage();
   }, 'image/jpeg', 0.92);
 }
 
-
-// ── AUTO-CAPTURE DETECTION ──
-let _arDetectInterval = null, _arCountdownT = null, _arCountVal = 0, _arDetectStreak = 0;
-const AR_DETECT_STREAK = 3;   // consecutive hits before countdown starts
-const AR_COUNTDOWN_SEC = 3;
-
-function startAutoDetect() {
-  stopAutoDetect();
-  _arDetectStreak = 0;
-  _arDetectInterval = setInterval(_arSampleFrame, 350);
-}
-function stopAutoDetect() {
-  clearInterval(_arDetectInterval); _arDetectInterval = null;
-  _cancelARCountdown();
-}
-
-function _arSampleFrame() {
-  const video = document.getElementById('arVideo');
-  const wrap  = document.getElementById('arVideoWrap');
-  const box   = document.getElementById('arFrameBox');
-  if (!video || video.readyState < 2 || !wrap || !box) return;
-
-  // Map frame box position onto video coordinates
-  const vr = wrap.getBoundingClientRect();
-  const br = box.getBoundingClientRect();
-  const xF = (br.left - vr.left) / vr.width;
-  const yF = (br.top  - vr.top)  / vr.height;
-  const wF = br.width  / vr.width;
-  const hF = br.height / vr.height;
-
-  const c = document.createElement('canvas'); c.width = 64; c.height = 48;
-  const cx = c.getContext('2d');
-  cx.drawImage(video,
-    xF * video.videoWidth, yF * video.videoHeight,
-    wF * video.videoWidth, hF * video.videoHeight,
-    0, 0, 64, 48
-  );
-  const d = cx.getImageData(0, 0, 64, 48).data;
-  let sum = 0, sumSq = 0, n = 0;
-  for (let i = 0; i < d.length; i += 4) {
-    const b = d[i]*.299 + d[i+1]*.587 + d[i+2]*.114;
-    sum += b; sumSq += b*b; n++;
-  }
-  const variance = n ? (sumSq/n) - (sum/n)**2 : 0;
-
-  const headInFrame = variance > 650;
-  box.classList.toggle('detecting', headInFrame);
-
-  if (headInFrame) {
-    _arDetectStreak++;
-    if (_arDetectStreak >= AR_DETECT_STREAK && !_arCountdownT) {
-      _startARCountdown();
-    }
-  } else {
-    _arDetectStreak = 0;
-    _cancelARCountdown();
-  }
-}
-
-function _startARCountdown() {
-  _arCountVal = AR_COUNTDOWN_SEC;
-  _showCountdown(_arCountVal);
-  _arCountdownT = setInterval(() => {
-    _arCountVal--;
-    if (_arCountVal > 0) {
-      _showCountdown(_arCountVal);
-    } else {
-      _cancelARCountdown();
-      stopAutoDetect();
-      captureARFrame();
-    }
-  }, 1000);
-}
-function _cancelARCountdown() {
-  clearInterval(_arCountdownT); _arCountdownT = null;
-  _showCountdown(null);
-}
-function _showCountdown(val) {
-  const el = document.getElementById('arCountdown');
-  if (!el) return;
-  if (val === null) { el.style.display = 'none'; return; }
-  el.style.display = 'block';
-  el.textContent = val;
-}
-
-function setupARDrag() {
-  const guide = document.getElementById('arGuide');
-  const wrap  = document.getElementById('arVideoWrap');
-  let dragStartX = 0, dragStartY = 0, snapTop = 40, snapLeft = 0;
-
-  const startDrag = (clientX, clientY) => {
-    arDragging = true;
-    dragStartX = clientX; dragStartY = clientY;
-    snapTop  = parseFloat(guide.style.top  || '40');
-    snapLeft = parseFloat(guide.style.left || '0');
-  };
-  const moveDrag = (clientX, clientY) => {
-    if (!arDragging) return;
-    const rect = wrap.getBoundingClientRect();
-    const dyPct = ((clientY - dragStartY) / rect.height) * 100;
-    const dxPct = ((clientX - dragStartX) / rect.width)  * 100;
-    const newTop  = Math.max(5,   Math.min(90, snapTop  + dyPct));
-    const newLeft = Math.max(-30, Math.min(30, snapLeft + dxPct));
-    guide.style.top  = newTop.toFixed(1)  + '%';
-    guide.style.left = newLeft.toFixed(1) + '%';
-    guide.style.right = (-newLeft).toFixed(1) + '%';
-  };
-  const endDrag = () => { arDragging = false; };
-
-  guide.addEventListener('mousedown',  e => { e.preventDefault(); startDrag(e.clientX, e.clientY); });
-  guide.addEventListener('touchstart', e => { startDrag(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
-  window.addEventListener('mousemove',  e => moveDrag(e.clientX, e.clientY));
-  window.addEventListener('touchmove',  e => moveDrag(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
-  window.addEventListener('mouseup',   endDrag);
-  window.addEventListener('touchend',  endDrag);
-}
 
 
 function triggerUpload() {
@@ -3004,36 +2422,14 @@ if ('serviceWorker' in navigator) {
   <div id="arModal">
     <div id="arVideoWrap">
       <video id="arVideo" autoplay playsinline muted></video>
-      <!-- Real-time face landmark overlay -->
-      <canvas id="arOverlay" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5;"></canvas>
-      <!-- Loading badge -->
-      <div id="arLoadingBadge" style="position:absolute;top:16px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.7);color:rgba(255,255,255,0.6);font-size:11px;padding:4px 12px;border-radius:99px;z-index:15;display:none;">Loading AI…</div>
-      <!-- Detection status badge -->
-      <div id="arDetectedBadge" style="position:absolute;top:16px;left:50%;transform:translateX(-50%);background:rgba(60,180,80,0.85);color:#fff;font-size:11px;font-weight:700;padding:4px 14px;border-radius:99px;z-index:15;opacity:0;transition:opacity .3s;letter-spacing:.04em;">✓ EAR DETECTED</div>
-      <div id="arCountdown"></div>
-      <div id="arAutoStatus" style="display:none;"></div>
-      <!-- Head framing guide -->
-      <div id="arFrameBox">
-        <div id="arFrameLabel">Keep head in this region</div>
-        <div id="arEarMarker">
-          <div id="arEarMarkerDot"></div>
-          <div id="arEarMarkerLabel">← ear here</div>
-        </div>
-      </div>
-      <div id="arGuide">
-        <div id="arGuideLine"></div>
-        <div id="arGuideLabel">Align with taper start</div>
-        <div id="arDragHint">↕ drag to adjust</div>
-      </div>
       <div id="arTopBar">
         <button class="ar-ctrl-btn" onclick="closeARCamera()">✕ Close</button>
-        <div id="arInstruction" style="font-size:12px;color:rgba(255,255,255,0.7);text-align:center;max-width:200px;line-height:1.3;">Face 45° sideways — AI will find your ear</div>
+        <div id="arInstruction">Turn to a side profile so your ear is clearly visible</div>
         <button class="ar-ctrl-btn" onclick="flipARCamera()">⟳ Flip</button>
       </div>
     </div>
-    <div id="arBottomBar" style="display:flex;gap:14px;align-items:center;justify-content:center;">
-      <button id="arRecordBtn" onclick="toggleARRecording()" style="background:rgba(255,255,255,0.12);color:#fff;border:1.5px solid rgba(255,255,255,0.3);padding:13px 18px;border-radius:50px;font-size:14px;font-weight:600;cursor:pointer;">⏺ Record</button>
-      <button id="arCaptureBtn" onclick="captureARFrame()">📸 Capture &amp; Analyze</button>
+    <div id="arBottomBar">
+      <button id="arCaptureBtn" onclick="captureARFrame()">📸 Capture Photo</button>
     </div>
   </div>
 
