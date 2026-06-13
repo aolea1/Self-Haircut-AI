@@ -752,8 +752,18 @@ body {
   color: #fff; background: rgba(0,0,0,0.7);
   padding: 2px 6px; border-radius: 5px; pointer-events: none;
 }
-.ear-mark-top    { background: rgba(232,213,163,0.95); }
-.ear-mark-bottom { background: rgba(120,200,255,0.95); }
+.ear-mark-top    { background: rgba(232,213,163,0.95); animation: ear-mark-pop 0.35s ease-out; }
+.ear-mark-bottom { background: rgba(120,200,255,0.95); animation: ear-mark-pop 0.35s ease-out; }
+@keyframes ear-mark-pop {
+  from { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
+  to   { transform: translate(-50%, -50%) scale(1);   opacity: 1; }
+}
+.generating-spinner {
+  display: inline-block; width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid rgba(232,213,163,0.25); border-top-color: rgba(232,213,163,0.95);
+  animation: generating-spin 0.7s linear infinite; flex-shrink: 0;
+}
+@keyframes generating-spin { to { transform: rotate(360deg); } }
 
 /* ── STEPS PANEL ── */
 .steps-panel {
@@ -1521,48 +1531,70 @@ async function claudeAnalysis(file, earMarks, isFreePreview = false) {
 
 // ── GUIDE OVERLAY (shared by draw + drag redraw) ──
 function drawGuideOverlay(ctx, W, H, lineY, startX, endX, fadeH, guardLbl, styleLbl) {
-  // Grid ABOVE the line — the fade zone
-  ctx.save(); ctx.globalAlpha = 0.13; ctx.fillStyle = 'white';
-  ctx.fillRect(startX, lineY - fadeH, endX - startX, fadeH); ctx.restore();
+  const lineW = endX - startX;
+  // Barber taper lines aren't flat — they originate near the sideburn,
+  // hug the curve around/below the ear, then sweep smoothly upward
+  // toward the back of the head.
+  const startY = lineY;
+  const dip  = lineW * 0.22;
+  const rise = lineW * 0.45;
+  const endY = lineY - rise;
+  const c1x = startX + lineW * 0.35, c1y = startY + dip;
+  const c2x = startX + lineW * 0.78, c2y = endY - dip * 0.3;
 
-  ctx.save(); ctx.globalAlpha = 0.18; ctx.strokeStyle = 'white'; ctx.lineWidth = 0.7;
-  for (let x = startX; x <= endX; x += 14) { ctx.beginPath(); ctx.moveTo(x, lineY - fadeH); ctx.lineTo(x, lineY); ctx.stroke(); }
-  for (let y = lineY - fadeH; y <= lineY; y += 14) { ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(endX, y); ctx.stroke(); }
+  // Fade zone — the same curve, offset upward by fadeH, filled between.
+  const fadeRegion = new Path2D();
+  fadeRegion.moveTo(startX, startY);
+  fadeRegion.bezierCurveTo(c1x, c1y, c2x, c2y, endX, endY);
+  fadeRegion.lineTo(endX, endY - fadeH);
+  fadeRegion.bezierCurveTo(c2x, c2y - fadeH, c1x, c1y - fadeH, startX, startY - fadeH);
+  fadeRegion.closePath();
+
+  ctx.save(); ctx.globalAlpha = 0.13; ctx.fillStyle = 'white';
+  ctx.fill(fadeRegion); ctx.restore();
+
+  ctx.save();
+  ctx.clip(fadeRegion);
+  ctx.globalAlpha = 0.18; ctx.strokeStyle = 'white'; ctx.lineWidth = 0.7;
+  for (let x = startX; x <= endX; x += 14) { ctx.beginPath(); ctx.moveTo(x, startY); ctx.lineTo(x, endY - fadeH); ctx.stroke(); }
+  for (let y = endY - fadeH; y <= startY; y += 14) { ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(endX, y); ctx.stroke(); }
   ctx.restore();
 
   // "fade up to here" label inside the grid zone
   ctx.save(); ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = 'rgba(232,213,163,0.7)';
   ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 6;
   const fadeUpLbl = '\u2191 fade up to here';
-  ctx.fillText(fadeUpLbl, startX + (endX - startX) / 2 - ctx.measureText(fadeUpLbl).width / 2, lineY - fadeH / 2 + 5);
+  const labelCx = (startX + endX) / 2, labelCy = (startY + (endY - fadeH)) / 2;
+  ctx.fillText(fadeUpLbl, labelCx - ctx.measureText(fadeUpLbl).width / 2, labelCy);
   ctx.restore();
 
-  // Gold line — matches Live Guide color. Curved, not straight: follows the
-  // natural contour of the ear/hairline rather than cutting a hard edge.
-  const midX = (startX + endX) / 2;
-  const curveDepth = Math.max(3, (endX - startX) * 0.12);
+  // Main guide line — gold, curved: hugs the ear then rises toward the back of the head
   ctx.save(); ctx.shadowColor = 'rgba(232,213,163,0.7)'; ctx.shadowBlur = 12;
   ctx.strokeStyle = 'rgba(232,213,163,0.95)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(startX, lineY);
-  ctx.quadraticCurveTo(midX, lineY + curveDepth, endX, lineY);
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  ctx.bezierCurveTo(c1x, c1y, c2x, c2y, endX, endY);
   ctx.stroke(); ctx.restore();
 
-  [startX, endX].forEach(x => {
+  // Endpoint markers — sideburn anchor and back-of-head terminus
+  [[startX, startY], [endX, endY]].forEach(([x, y]) => {
     ctx.save(); ctx.shadowColor = 'rgba(232,213,163,0.8)'; ctx.shadowBlur = 12;
-    ctx.fillStyle = 'rgba(232,213,163,0.95)'; ctx.beginPath(); ctx.arc(x, lineY, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.fillStyle = 'rgba(232,213,163,0.95)'; ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.restore();
   });
 
-  // "Start the bald line here" label below the line
+  // "Start the bald line here" label, centered below the curve
   ctx.save(); ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = 'rgba(232,213,163,0.95)';
   ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 8;
   const lbl = 'Start the bald line here';
-  ctx.fillText(lbl, startX + (endX - startX) / 2 - ctx.measureText(lbl).width / 2, lineY + curveDepth + 18);
+  const lblW = ctx.measureText(lbl).width;
+  const midX = (startX + endX) / 2;
+  ctx.fillText(lbl, Math.max(2, Math.min(W - lblW - 2, midX - lblW / 2)), startY + dip + 40);
   ctx.restore();
 
   const badgeText = `${styleLbl}  ${guardLbl}`;
   ctx.save(); ctx.font = 'bold 12px sans-serif';
   const bw = ctx.measureText(badgeText).width + 16;
-  const bx = endX - bw - 6, by = lineY + fadeH + 6;
+  const bx = endX - bw, by = startY + 8;
   ctx.fillStyle = 'rgba(0,0,0,0.65)';
   ctx.beginPath(); ctx.roundRect(bx, by, bw, 22, 5); ctx.fill();
   ctx.fillStyle = 'rgba(232,213,163,0.95)';
@@ -1692,9 +1724,9 @@ function markEarPosition(file) {
         msg.className = 'msg';
         msg.innerHTML = `${aiAvatar()}<div class="msg-body"><div class="msg-name">SelfHaircut.ai</div>
           <div class="msg-text">
-            <p class="ear-mark-instruction"><strong>Step 1 of 2:</strong> Drag the marker onto the <strong>top of your ear</strong>.</p>
+            <p class="ear-mark-instruction"><strong>Mark the top of your ear</strong><br><span style="font-size:12px;color:var(--text3);">Drag the gold marker into place, then continue.</span></p>
             <div class="ear-mark-wrap"></div>
-            <button class="opt-btn ear-mark-next" style="margin-top:8px;width:100%;">Next: bottom of ear →</button>
+            <button class="opt-btn ear-mark-next" style="margin-top:8px;width:100%;">Continue →</button>
             <button class="opt-btn ear-mark-retake" style="margin-top:6px;width:100%;background:transparent;border:1px solid rgba(255,255,255,0.15);color:var(--text2);">Can't find your ear? Retake photo</button>
           </div></div>`;
         messagesWrap.appendChild(msg);
@@ -1772,14 +1804,19 @@ function markEarPosition(file) {
           earTopFrac    = Math.min(0.95, earTopFrac + CONSERVATIVE_BIAS);
           earBottomFrac = Math.min(0.98, earBottomFrac + CONSERVATIVE_BIAS);
 
-          msg.remove();
-          resolve({ earXfrac, earTopFrac, earBottomFrac });
+          // Premium "Generating your guide…" transition before handing off.
+          msg.querySelector('.msg-text').innerHTML =
+            `<p style="display:flex;align-items:center;gap:8px;margin:4px 0;"><span class="generating-spinner"></span> Generating your guide…</p>`;
+          setTimeout(() => {
+            msg.remove();
+            resolve({ earXfrac, earTopFrac, earBottomFrac });
+          }, 600);
         };
 
         nextBtn.addEventListener('click', () => {
           if (cleanupBot) { finish(); return; }
           // Advance to step 2 — reveal the second marker for the bottom of the ear.
-          instr.innerHTML = '<strong>Step 2 of 2:</strong> Now drag the marker onto the <strong>bottom of your ear</strong>.';
+          instr.innerHTML = '<strong>Mark the bottom of your ear</strong><br><span style="font-size:12px;color:var(--text3);">This sets the exact midpoint for your guide line.</span>';
           nextBtn.textContent = '✓ Generate guide line';
           const botDot = document.createElement('div');
           botDot.className = 'ear-mark-dot ear-mark-bottom';
