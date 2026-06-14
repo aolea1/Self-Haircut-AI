@@ -8,14 +8,14 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="SelfHaircut">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>SelfHaircut.ai — Your Barber Line, Placed by AI</title>
-<meta name="description" content="Upload a side profile photo. AI places your exact taper or fade line and walks you through every cut — guard by guard. Free to try.">
-<meta property="og:title" content="SelfHaircut.ai — Your Barber Line, Placed by AI">
-<meta property="og:description" content="AI places your exact taper line on your photo. Step-by-step guard guide. Cut your own hair like a pro.">
+<title>SelfHaircut.ai — Barber-Calibrated Taper Guide</title>
+<meta name="description" content="Upload a side profile photo, mark the top and bottom of your ear, and get a barber-calibrated taper line placed at the exact midpoint — guard by guard. Free to try.">
+<meta property="og:title" content="SelfHaircut.ai — Barber-Calibrated Taper Guide">
+<meta property="og:description" content="Mark your ear, get your exact taper line. Step-by-step guard guide. Cut your own hair like a pro.">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="SelfHaircut.ai — Your Barber Line, Placed by AI">
-<meta name="twitter:description" content="AI places your exact taper line. Step-by-step guard guide. Cut your own hair like a pro.">
+<meta name="twitter:title" content="SelfHaircut.ai — Barber-Calibrated Taper Guide">
+<meta name="twitter:description" content="Mark your ear, get your exact taper line. Step-by-step guard guide. Cut your own hair like a pro.">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -248,9 +248,11 @@ body {
   padding: 6px 12px 8px; border-top: 1px solid var(--border);
 }
 
-.camera-btn { display:none; }
+.attach-btn.camera-btn { display:none; }
+.attach-btn.camera-desktop-btn { display:inline-flex; }
+@media (pointer:coarse) { .attach-btn.camera-desktop-btn { display:none; } }
 
-/* ── AR CAMERA MODAL ── */
+/* ── CAMERA CAPTURE MODAL ── */
 #arModal {
   position: fixed; inset: 0; z-index: 9999;
   background: #000; display: none; flex-direction: column;
@@ -286,7 +288,7 @@ body {
   box-shadow: 0 4px 20px rgba(232,213,163,0.4);
 }
 
-@media (pointer:coarse) { .camera-btn { display:inline-flex; } }
+@media (pointer:coarse) { .attach-btn.camera-btn { display:inline-flex; } }
 .attach-btn {
   display: flex; align-items: center; gap: 6px;
   padding: 5px 10px; border-radius: 7px;
@@ -789,6 +791,21 @@ body {
 .step-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
 .step-desc { font-size: 12.5px; color: var(--text2); line-height: 1.5; }
 
+/* ── FADE STEP PANEL ── */
+.fade-step-panel {
+  margin-top: 4px; padding: 16px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.fade-step-row {
+  display: flex; gap: 10px; align-items: flex-start;
+  font-size: 12.5px; color: var(--text2); line-height: 1.5;
+  margin-bottom: 8px;
+}
+.fade-step-row:last-of-type { margin-bottom: 0; }
+.fade-step-row strong { color: var(--text); }
+.fade-step-icon { flex-shrink: 0; font-size: 14px; line-height: 1.5; }
+
 /* ── SIDEBAR OVERLAY ── */
 .sidebar-overlay {
   display: none; position: fixed; inset: 0;
@@ -869,10 +886,10 @@ body {
       <!-- HERO -->
       <div class="lp-hero">
         <div class="lp-badge">Low Taper Fade</div>
-        <h1 class="lp-h1">Cut Your Own Low Taper Fade With AI</h1>
-        <p class="lp-sub">Upload a side photo and get a personalized low taper fade guide — AI-powered line placement, step-by-step barber instructions.</p>
+        <h1 class="lp-h1">Cut Your Own Low Taper Fade With Barber-Level Precision</h1>
+        <p class="lp-sub">Upload a side photo and mark the top and bottom of your ear — we calculate the exact midpoint and place your taper line there, barber-calibrated and ready to follow.</p>
         <button class="lp-cta" onclick="startGuide()">
-          Try My First Fade Guide Free
+          Get My Precision Fade Guide
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
         </button>
         <div class="lp-cta-note">No signup &nbsp;·&nbsp; Free to start &nbsp;·&nbsp; Works on any phone</div>
@@ -906,8 +923,8 @@ body {
           <div class="lp-step">
             <div class="lp-step-n">02</div>
             <div>
-              <div class="lp-step-title">AI maps your fade line</div>
-              <div class="lp-step-desc">Your exact taper line, placed on your actual photo. Drag to adjust before you cut anything.</div>
+              <div class="lp-step-title">Mark your ear, get your line</div>
+              <div class="lp-step-desc">Place two markers — top and bottom of your ear. We calculate the exact midpoint and draw your taper line there instantly. Drag to adjust before you cut anything.</div>
             </div>
           </div>
           <div class="lp-step">
@@ -924,9 +941,9 @@ body {
 
       <!-- FINAL CTA -->
       <div class="lp-final">
-        <div class="lp-final-title">Your cleanest fade<br>starts now.</div>
+        <div class="lp-final-title">Your most precise fade<br>starts now.</div>
         <button class="lp-cta" onclick="startGuide()">
-          Try My First Fade Guide Free
+          Get My Precision Fade Guide
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
         </button>
         <div class="lp-cta-note" style="margin-top:12px;">Free to try &nbsp;·&nbsp; No barber required</div>
@@ -960,7 +977,10 @@ body {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
           Take photo
         </button>
-        <button onclick="openARCamera()" title="Live AR guide" style="gap:6px;display:inline-flex;align-items:center;padding:8px 14px;border-radius:10px;border:1.5px solid #e8d5a3;background:rgba(232,213,163,0.1);color:#e8d5a3;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s;">📷 Live Guide</button>
+        <button class="attach-btn camera-desktop-btn" onclick="openARCamera()" title="Take a photo with your camera">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          Take photo
+        </button>
         <span style="flex:1"></span>
         <span style="font-size:11px;color:var(--text3);">↵ send</span>
       </div>
@@ -992,6 +1012,10 @@ const state = {
   phase: 'intro',     // 'intro'|'style-chosen'|'tools-known'|'guide-shown'
   shownPhotoTip: false,
   guideLine: null,    // { lineYFrac, startXFrac, endXFrac, earTopFrac, earMidFrac } — final confirmed line
+  fadePlan: null,        // array of step objects for the current style
+  currentStep: 0,        // index into fadePlan
+  lastPhotoFile: null,   // most recent File, used to re-render step overlays
+  nextFileHandler: null, // if set, the next uploaded file routes here instead of analyzePhoto
 };
 
 const BACKEND_URL = 'https://selfhaircut-backend.onrender.com';
@@ -1174,7 +1198,13 @@ async function sendMessage() {
   uploadPreview.classList.remove('has-files');
 
   if (files.length > 0) {
-    await analyzePhoto(files[0]);
+    if (state.nextFileHandler) {
+      const handler = state.nextFileHandler;
+      state.nextFileHandler = null;
+      await handler(files[0]);
+    } else {
+      await analyzePhoto(files[0]);
+    }
     return;
   }
 
@@ -1477,7 +1507,10 @@ async function freeAnalysis(file, earMarks) {
        <p style="color:var(--text3);font-size:12px;">Heuristic analysis ${used}/${FREE_LIMIT} · <span style="color:var(--accent2);cursor:pointer;text-decoration:underline;" onclick="showUpgrade()">Upgrade to Pro</span> for Claude AI placement</p>`,
       canvas
     );
-    addGuideSteps();
+    state.lastPhotoFile = file;
+    buildFadePlan();
+    state.currentStep = 0;
+    presentFadePlanStep(0);
   } catch(e) {
     removeTyping();
     addAIMessage('<p>Something went wrong. Please try again with a clear side profile photo.</p>', null);
@@ -1526,75 +1559,51 @@ async function claudeAnalysis(file, earMarks, isFreePreview = false) {
     : '';
   addAIMessageWithCanvas(`<p>⭐ <strong>${isFreePreview ? 'AI Analysis' : 'Pro Analysis'} — ${label}:</strong> ${guide.advice}</p>
     <p style="color:var(--text2);font-size:12px;margin-top:6px;">📍 ${barberPlacementNote(state.taperStyle)}</p>${footer}`, canvas);
-  addGuideSteps();
+  state.lastPhotoFile = file;
+  buildFadePlan();
+  state.currentStep = 0;
+  presentFadePlanStep(0);
 }
 
 // ── GUIDE OVERLAY (shared by draw + drag redraw) ──
 function drawGuideOverlay(ctx, W, H, lineY, startX, endX, fadeH, guardLbl, styleLbl) {
-  const lineW = endX - startX;
-  // Barber taper lines aren't flat — they originate near the sideburn,
-  // hug the curve around/below the ear, then sweep smoothly upward
-  // toward the back of the head.
-  const startY = lineY;
-  const dip  = lineW * 0.22;
-  const rise = lineW * 0.45;
-  const endY = lineY - rise;
-  const c1x = startX + lineW * 0.35, c1y = startY + dip;
-  const c2x = startX + lineW * 0.78, c2y = endY - dip * 0.3;
-
-  // Fade zone — the same curve, offset upward by fadeH, filled between.
-  const fadeRegion = new Path2D();
-  fadeRegion.moveTo(startX, startY);
-  fadeRegion.bezierCurveTo(c1x, c1y, c2x, c2y, endX, endY);
-  fadeRegion.lineTo(endX, endY - fadeH);
-  fadeRegion.bezierCurveTo(c2x, c2y - fadeH, c1x, c1y - fadeH, startX, startY - fadeH);
-  fadeRegion.closePath();
-
+  // Grid ABOVE the line — the fade zone
   ctx.save(); ctx.globalAlpha = 0.13; ctx.fillStyle = 'white';
-  ctx.fill(fadeRegion); ctx.restore();
+  ctx.fillRect(startX, lineY - fadeH, endX - startX, fadeH); ctx.restore();
 
-  ctx.save();
-  ctx.clip(fadeRegion);
-  ctx.globalAlpha = 0.18; ctx.strokeStyle = 'white'; ctx.lineWidth = 0.7;
-  for (let x = startX; x <= endX; x += 14) { ctx.beginPath(); ctx.moveTo(x, startY); ctx.lineTo(x, endY - fadeH); ctx.stroke(); }
-  for (let y = endY - fadeH; y <= startY; y += 14) { ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(endX, y); ctx.stroke(); }
+  ctx.save(); ctx.globalAlpha = 0.18; ctx.strokeStyle = 'white'; ctx.lineWidth = 0.7;
+  for (let x = startX; x <= endX; x += 14) { ctx.beginPath(); ctx.moveTo(x, lineY - fadeH); ctx.lineTo(x, lineY); ctx.stroke(); }
+  for (let y = lineY - fadeH; y <= lineY; y += 14) { ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(endX, y); ctx.stroke(); }
   ctx.restore();
 
   // "fade up to here" label inside the grid zone
   ctx.save(); ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = 'rgba(232,213,163,0.7)';
   ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 6;
   const fadeUpLbl = '\u2191 fade up to here';
-  const labelCx = (startX + endX) / 2, labelCy = (startY + (endY - fadeH)) / 2;
-  ctx.fillText(fadeUpLbl, labelCx - ctx.measureText(fadeUpLbl).width / 2, labelCy);
+  ctx.fillText(fadeUpLbl, startX + (endX - startX) / 2 - ctx.measureText(fadeUpLbl).width / 2, lineY - fadeH / 2 + 5);
   ctx.restore();
 
-  // Main guide line — gold, curved: hugs the ear then rises toward the back of the head
+  // Main guide line — straight, precise, barber-calibrated anchor
   ctx.save(); ctx.shadowColor = 'rgba(232,213,163,0.7)'; ctx.shadowBlur = 12;
   ctx.strokeStyle = 'rgba(232,213,163,0.95)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(startX, startY);
-  ctx.bezierCurveTo(c1x, c1y, c2x, c2y, endX, endY);
-  ctx.stroke(); ctx.restore();
+  ctx.beginPath(); ctx.moveTo(startX, lineY); ctx.lineTo(endX, lineY); ctx.stroke(); ctx.restore();
 
-  // Endpoint markers — sideburn anchor and back-of-head terminus
-  [[startX, startY], [endX, endY]].forEach(([x, y]) => {
+  [startX, endX].forEach(x => {
     ctx.save(); ctx.shadowColor = 'rgba(232,213,163,0.8)'; ctx.shadowBlur = 12;
-    ctx.fillStyle = 'rgba(232,213,163,0.95)'; ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.fillStyle = 'rgba(232,213,163,0.95)'; ctx.beginPath(); ctx.arc(x, lineY, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.restore();
   });
 
-  // "Start the bald line here" label, centered below the curve
+  // "Start the bald line here" label below the line
   ctx.save(); ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = 'rgba(232,213,163,0.95)';
   ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 8;
   const lbl = 'Start the bald line here';
-  const lblW = ctx.measureText(lbl).width;
-  const midX = (startX + endX) / 2;
-  ctx.fillText(lbl, Math.max(2, Math.min(W - lblW - 2, midX - lblW / 2)), startY + dip + 40);
+  ctx.fillText(lbl, startX + (endX - startX) / 2 - ctx.measureText(lbl).width / 2, lineY + 18);
   ctx.restore();
 
   const badgeText = `${styleLbl}  ${guardLbl}`;
   ctx.save(); ctx.font = 'bold 12px sans-serif';
   const bw = ctx.measureText(badgeText).width + 16;
-  const bx = endX - bw, by = startY + 8;
+  const bx = endX - bw - 6, by = lineY + fadeH + 6;
   ctx.fillStyle = 'rgba(0,0,0,0.65)';
   ctx.beginPath(); ctx.roundRect(bx, by, bw, 22, 5); ctx.fill();
   ctx.fillStyle = 'rgba(232,213,163,0.95)';
@@ -1842,7 +1851,8 @@ function markEarPosition(file) {
 }
 
 // ── DRAW GUIDE ──
-function drawGuide(file, guide, earMarks) {
+// ── LOAD A FILE INTO A SCALED CANVAS (shared by drawGuide + step overlays) ──
+function loadScaledCanvas(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = e => {
@@ -1855,57 +1865,66 @@ function drawGuide(file, guide, earMarks) {
         canvas.height = img.height * scale;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-        const W = canvas.width, H = canvas.height;
-
-        // ── LABELS ──
-        const taperGuardLabel = { low: '#1.5', mid: '#2', high: '#2', skin: '#0', buzz: '#3' };
-        const taperStyleLabel = { low: 'Low Taper', mid: 'Mid Taper', high: 'High Taper', skin: 'Skin Fade', buzz: 'Buzz' };
-
-        // ════════════════════════════════════════════════════════
-        // DETERMINISTIC PLACEMENT — anchored to the user-marked ear
-        //
-        // PRIMARY RULE: the fade line sits at the vertical MIDPOINT
-        // of the marked ear.
-        // HARD LIMIT: the line is never placed above the marked
-        // top of the ear.
-        // LINE: short, sideburn-width only.
-        // ════════════════════════════════════════════════════════
-        const em = earMarks || { earXfrac: 0.56, earTopFrac: 0.40, earBottomFrac: 0.52 };
-        const earTopY = em.earTopFrac * H;
-        const earMidFrac = (em.earTopFrac + em.earBottomFrac) / 2;
-        // Conservative bias: settle slightly BELOW the literal midpoint, never above it.
-        const CONSERVATIVE_BIAS = 0.015;
-        const lineY = Math.max(earTopY, (earMidFrac + CONSERVATIVE_BIAS) * H);
-        const earX  = em.earXfrac * W;
-
-        // ── LINE: short, matches sideburn width only ──
-        // Sideburn = just in front of ear to just past ear canal
-        // ~5% of image width in front, ~9% past = 14% total (narrow, precise)
-        const startX = Math.max(0.01 * W, earX - W * 0.05);
-        const endX   = Math.min(0.99 * W, earX + W * 0.09);
-
-        const fadeH = 0.09 * H;
-        const guardLbl = taperGuardLabel[state.taperStyle] || '#1.5';
-        const styleLbl = taperStyleLabel[state.taperStyle] || 'Taper';
-
-        // ── STORE final line position for the step-by-step guide ──
-        state.guideLine = {
-          lineYFrac: lineY / H, startXFrac: startX / W, endXFrac: endX / W,
-          earTopFrac: em.earTopFrac, earMidFrac,
-        };
-
-        drawGuideOverlay(ctx, W, H, lineY, startX, endX, fadeH, guardLbl, styleLbl);
-        makeGuideDraggable(canvas, img, lineY, startX, endX, fadeH, guardLbl, styleLbl, earTopY);
-
-        if (navigator.vibrate) navigator.vibrate(60);
-        resolve(canvas);
+        resolve({ img, canvas, ctx, W: canvas.width, H: canvas.height });
       };
       img.onerror = reject;
       img.src = e.target.result;
     };
     reader.onerror = reject;
     reader.readAsDataURL(file);
+  });
+}
+
+// ════════════════════════════════════════════════════════
+// DETERMINISTIC PLACEMENT — anchored to the user-marked ear
+//
+// PRIMARY RULE: the fade line sits at the vertical MIDPOINT
+// of the marked ear.
+// HARD LIMIT: the line is never placed above the marked
+// top of the ear.
+// LINE: short, sideburn-width only.
+// ════════════════════════════════════════════════════════
+function computeGuideLine(em, W, H) {
+  const earTopY = em.earTopFrac * H;
+  const earMidFrac = (em.earTopFrac + em.earBottomFrac) / 2;
+  // Conservative bias: settle slightly BELOW the literal midpoint, never above it.
+  const CONSERVATIVE_BIAS = 0.015;
+  const lineY = Math.max(earTopY, (earMidFrac + CONSERVATIVE_BIAS) * H);
+  const earX  = em.earXfrac * W;
+
+  // ── LINE: short, matches sideburn width only ──
+  // Sideburn = just in front of ear to just past ear canal
+  // ~5% of image width in front, ~9% past = 14% total (narrow, precise)
+  const startX = Math.max(0.01 * W, earX - W * 0.05);
+  const endX   = Math.min(0.99 * W, earX + W * 0.09);
+  const fadeH  = 0.09 * H;
+
+  return { lineY, startX, endX, fadeH, earTopY, earMidFrac };
+}
+
+function drawGuide(file, guide, earMarks) {
+  return loadScaledCanvas(file).then(({ img, canvas, ctx, W, H }) => {
+    // ── LABELS ──
+    const taperGuardLabel = { low: '#1.5', mid: '#2', high: '#2', skin: '#0', buzz: '#3' };
+    const taperStyleLabel = { low: 'Low Taper', mid: 'Mid Taper', high: 'High Taper', skin: 'Skin Fade', buzz: 'Buzz' };
+
+    const em = earMarks || { earXfrac: 0.56, earTopFrac: 0.40, earBottomFrac: 0.52 };
+    const { lineY, startX, endX, fadeH, earTopY, earMidFrac } = computeGuideLine(em, W, H);
+
+    const guardLbl = taperGuardLabel[state.taperStyle] || '#1.5';
+    const styleLbl = taperStyleLabel[state.taperStyle] || 'Taper';
+
+    // ── STORE final line position for the step-by-step guide ──
+    state.guideLine = {
+      lineYFrac: lineY / H, startXFrac: startX / W, endXFrac: endX / W,
+      earTopFrac: em.earTopFrac, earMidFrac,
+    };
+
+    drawGuideOverlay(ctx, W, H, lineY, startX, endX, fadeH, guardLbl, styleLbl);
+    makeGuideDraggable(canvas, img, lineY, startX, endX, fadeH, guardLbl, styleLbl, earTopY);
+
+    if (navigator.vibrate) navigator.vibrate(60);
+    return canvas;
   });
 }
 
@@ -1928,84 +1947,372 @@ function showUpgrade() {
   addUpgradeMessage('<p>Upgrade to <strong>SelfHaircut Pro</strong> for Claude AI personalized guidance on your exact head shape, unlimited analyses, and mid-cut progress feedback.</p>');
 }
 
-// ── STEP-BY-STEP GUIDE ──
-function addGuideSteps() {
+// ── FADE PLAN — multi-step, photo-overlay cut plan ──────────
+// Builds state.fadePlan from the confirmed guide line (state.guideLine)
+// and the chosen style. Each step gets its own zone (line/band/detail)
+// for drawStepOverlay, plus guard/lever/start/height/flick guidance.
+
+const FADE_GUARDS = {
+  low:  { line: '#1.5', blend: '#2', top: '#2' },
+  mid:  { line: '#2',   blend: '#3', top: '#3' },
+  high: { line: '#2',   blend: '#3', top: '#4' },
+  skin: { line: '#0',   blend: '#1', top: '#2' },
+};
+
+const FADE_STEP_TEXT = {
+  low: [
+    { title: 'Set your guideline', lever: 'closed',
+      startDesc: 'Start right at your sideburn, on the gold line.',
+      heightDesc: "Clip along the line only — don't go above it yet.",
+      flickDesc: 'Flick the clipper outward at the front edge to soften the corner.',
+      video: 'https://www.youtube.com/results?search_query=how+to+blend+fade+line+hair' },
+    { title: 'Blend the fade zone', lever: 'half-open',
+      startDesc: 'Start just above the guideline, inside the shaded zone.',
+      heightDesc: 'Work upward through the whole shaded zone.',
+      flickDesc: 'Flick the clipper out as you reach the top edge of the zone.',
+      video: 'https://www.youtube.com/results?search_query=how+to+clip+sides+fade+clipper+tutorial' },
+    { title: 'Blend the upper sides', lever: 'open',
+      startDesc: 'Pick up where the fade zone ended.',
+      heightDesc: 'Continue blending upward toward the top of your head.',
+      flickDesc: "Flick out at the very top so there's no hard line into the longer hair.",
+      video: 'https://www.youtube.com/results?search_query=how+to+blend+fade+into+longer+hair' },
+    { title: 'Edge up', lever: null,
+      startDesc: 'Switch to a detail trimmer for your hairline and sideburns.',
+      heightDesc: "Trace your natural hairline — don't cut a new shape.",
+      flickDesc: 'Check both sides together for symmetry before you finish.',
+      video: 'https://www.youtube.com/results?search_query=how+to+edge+up+hairline+barber' },
+  ],
+  mid: [
+    { title: 'Set your guideline', lever: 'closed',
+      startDesc: 'Start at your sideburn, right on the gold line.',
+      heightDesc: 'Clip along the line — this sets the floor for your mid taper.',
+      flickDesc: 'Flick the clipper out slightly at the front edge.',
+      video: 'https://www.youtube.com/results?search_query=how+to+blend+fade+line+hair' },
+    { title: 'Blend the fade zone', lever: 'half-open',
+      startDesc: 'Start just above the guideline, inside the shaded zone.',
+      heightDesc: 'Work upward through the shaded zone with short flicking strokes.',
+      flickDesc: 'Flick out as you reach the top edge of the zone — no hard lines.',
+      video: 'https://www.youtube.com/results?search_query=how+to+blend+mid+fade' },
+    { title: 'Blend the upper sides', lever: 'open',
+      startDesc: 'Pick up where the fade zone ended.',
+      heightDesc: 'Blend upward toward the top of your head.',
+      flickDesc: 'Flick out at the top edge to merge into the longer hair.',
+      video: 'https://www.youtube.com/results?search_query=how+to+blend+fade+into+longer+hair' },
+    { title: 'Edge up', lever: null,
+      startDesc: 'Switch to a detail trimmer for the hairline and sideburn corners.',
+      heightDesc: 'Outline your natural hairline.',
+      flickDesc: 'Compare both sides for symmetry.',
+      video: 'https://www.youtube.com/results?search_query=how+to+edge+up+hairline+barber' },
+  ],
+  high: [
+    { title: 'Set your guideline', lever: 'closed',
+      startDesc: 'Start at your sideburn, right on the gold line.',
+      heightDesc: 'Clip along the line — this sets the floor for your high taper.',
+      flickDesc: 'Flick the clipper out slightly at the front edge.',
+      video: 'https://www.youtube.com/results?search_query=how+to+blend+fade+line+hair' },
+    { title: 'Blend the fade zone', lever: 'half-open',
+      startDesc: 'Start just above the guideline, inside the shaded zone.',
+      heightDesc: 'Work upward through the shaded zone with short flicking strokes.',
+      flickDesc: 'Flick out as you reach the top edge of the zone.',
+      video: 'https://www.youtube.com/results?search_query=fade+transition+zone+tutorial' },
+    { title: 'Blend the upper sides', lever: 'open',
+      startDesc: 'Pick up where the fade zone ended.',
+      heightDesc: 'Blend upward toward the top of your head — this is the biggest zone in a high taper.',
+      flickDesc: 'Flick out at the top edge to merge into the longer hair on top.',
+      video: 'https://www.youtube.com/results?search_query=high+taper+fade+tutorial' },
+    { title: 'Edge up', lever: null,
+      startDesc: 'Switch to a detail trimmer for the hairline and sideburn corners.',
+      heightDesc: 'Outline your natural hairline sharp and clean.',
+      flickDesc: 'Compare both sides for symmetry.',
+      video: 'https://www.youtube.com/results?search_query=how+to+edge+up+sharp+hairline' },
+  ],
+  skin: [
+    { title: 'Set your guideline', lever: 'closed',
+      startDesc: 'Start at your sideburn, right on the gold line.',
+      heightDesc: 'Go bald along the line with an open blade — this is the skin base of your fade.',
+      flickDesc: 'Flick out at the front edge to keep the skin clean.',
+      video: 'https://www.youtube.com/results?search_query=skin+fade+base+open+blade' },
+    { title: 'Blend the fade zone', lever: 'half-open',
+      startDesc: 'Start just above the guideline, inside the shaded zone.',
+      heightDesc: 'Work upward through the shaded zone, lever half-open to soften the skin line.',
+      flickDesc: 'Flick out as you reach the top edge of the zone.',
+      video: 'https://www.youtube.com/results?search_query=blend+skin+line+fade+lever' },
+    { title: 'Blend the upper sides', lever: 'open',
+      startDesc: 'Pick up where the fade zone ended.',
+      heightDesc: 'Blend upward toward the top of your head.',
+      flickDesc: 'Flick out at the top edge to merge into the longer hair.',
+      video: 'https://www.youtube.com/results?search_query=how+to+blend+fade+into+longer+hair' },
+    { title: 'Edge up', lever: null,
+      startDesc: 'Switch to a detail trimmer for your hairline and sideburns.',
+      heightDesc: 'A skin fade lives or dies by clean edges — trace your natural hairline.',
+      flickDesc: 'Compare both sides for symmetry before you finish.',
+      video: 'https://www.youtube.com/results?search_query=how+to+edge+up+sharp+hairline' },
+  ],
+  buzz: [
+    { title: 'First pass — with the grain', lever: null,
+      startDesc: 'Start at the front hairline.',
+      heightDesc: 'Work front-to-back across the whole head, overlapping each pass by about half the guard width.',
+      flickDesc: 'Keep the clipper flat against the scalp — no flicking needed yet.',
+      video: 'https://www.youtube.com/results?search_query=buzz+cut+with+grain+technique' },
+    { title: 'Second pass — against the grain', lever: null,
+      startDesc: 'Start at the back of the head this time.',
+      heightDesc: 'Go back-to-front for a cleaner, more even finish.',
+      flickDesc: 'This pass catches any strands the first pass missed.',
+      video: 'https://www.youtube.com/results?search_query=buzz+cut+against+grain+finish' },
+    { title: 'Edge up', lever: null,
+      startDesc: 'Switch to a detail trimmer for the hairline, sideburns, and neckline.',
+      heightDesc: 'Square or round the neckline based on your preference.',
+      flickDesc: 'Compare both sides for symmetry before you finish.',
+      video: 'https://www.youtube.com/results?search_query=how+to+edge+up+hairline+barber' },
+  ],
+};
+
+// Builds state.fadePlan: 4 steps (3 for buzz), bottom-to-top across the
+// marked ear / guide line.
+function buildFadePlan() {
+  const style = state.taperStyle || 'low';
+  const gl = state.guideLine;
+  const text = FADE_STEP_TEXT[style] || FADE_STEP_TEXT.low;
+
+  if (style === 'buzz') {
+    const wideStartX = 0.03, wideEndX = 0.97;
+    const topFrac = Math.max(0.04, gl.earTopFrac * 0.3);
+    state.fadePlan = [
+      { ...text[0], guard: '#3–4', zone: { type: 'band', topFrac, bottomFrac: 0.95, startXFrac: wideStartX, endXFrac: wideEndX } },
+      { ...text[1], guard: '#3–4', zone: { type: 'band', topFrac, bottomFrac: 0.95, startXFrac: wideStartX, endXFrac: wideEndX } },
+      { ...text[2], guard: null,   zone: { type: 'detail', topFrac: gl.earTopFrac, bottomFrac: 0.55, startXFrac: gl.startXFrac, endXFrac: gl.endXFrac } },
+    ];
+    return state.fadePlan;
+  }
+
+  const guards = FADE_GUARDS[style] || FADE_GUARDS.low;
+  const fadeHFrac = 0.09;
+  const fadeTopFrac  = Math.max(0, gl.lineYFrac - fadeHFrac);
+  const upperTopFrac = Math.max(0.04, gl.earTopFrac * 0.4);
+  const wideStartX = Math.max(0.02, gl.startXFrac - 0.10);
+  const wideEndX   = Math.min(0.98, gl.endXFrac + 0.06);
+
+  state.fadePlan = [
+    { ...text[0], guard: guards.line,
+      zone: { type: 'line', lineYFrac: gl.lineYFrac, startXFrac: gl.startXFrac, endXFrac: gl.endXFrac } },
+    { ...text[1], guard: guards.blend,
+      zone: { type: 'band', topFrac: fadeTopFrac, bottomFrac: gl.lineYFrac, startXFrac: wideStartX, endXFrac: wideEndX } },
+    { ...text[2], guard: guards.top,
+      zone: { type: 'band', topFrac: upperTopFrac, bottomFrac: fadeTopFrac, startXFrac: wideStartX, endXFrac: wideEndX } },
+    { ...text[3], guard: null,
+      zone: { type: 'detail', topFrac: gl.earTopFrac, bottomFrac: gl.lineYFrac, startXFrac: gl.startXFrac, endXFrac: gl.endXFrac } },
+  ];
+  return state.fadePlan;
+}
+
+function leverLabel(lever) {
+  return { closed: 'Closed', 'half-open': 'Half-open', open: 'Open' }[lever] || '';
+}
+
+// ── STEP OVERLAY — one highlighted zone per fade-plan step ──
+function drawStepOverlay(ctx, W, H, step, guideLine) {
+  const GOLD = 'rgba(232,213,163,0.95)';
+  const GOLD_DIM = 'rgba(232,213,163,0.5)';
+  const zone = step.zone;
+
+  if (zone.type === 'line') {
+    const lineY = zone.lineYFrac * H, startX = zone.startXFrac * W, endX = zone.endXFrac * W;
+
+    ctx.save(); ctx.shadowColor = 'rgba(232,213,163,0.7)'; ctx.shadowBlur = 12;
+    ctx.strokeStyle = GOLD; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(startX, lineY); ctx.lineTo(endX, lineY); ctx.stroke(); ctx.restore();
+
+    [startX, endX].forEach(x => {
+      ctx.save(); ctx.shadowColor = 'rgba(232,213,163,0.8)'; ctx.shadowBlur = 12;
+      ctx.fillStyle = GOLD; ctx.beginPath(); ctx.arc(x, lineY, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    });
+
+    ctx.save(); ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = GOLD;
+    ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 8;
+    const lbl = 'Clip along this line';
+    ctx.fillText(lbl, startX + (endX - startX) / 2 - ctx.measureText(lbl).width / 2, lineY + 18);
+    ctx.restore();
+
+  } else if (zone.type === 'band') {
+    const topY = zone.topFrac * H, botY = zone.bottomFrac * H;
+    const startX = zone.startXFrac * W, endX = zone.endXFrac * W;
+
+    // Reference line — where the marked-ear guideline sits
+    const refY = guideLine.lineYFrac * H;
+    ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = GOLD_DIM; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(startX, refY); ctx.lineTo(endX, refY); ctx.stroke(); ctx.restore();
+
+    // Shaded zone with grid (matches the "fade up to here" zone styling)
+    ctx.save(); ctx.globalAlpha = 0.14; ctx.fillStyle = 'white';
+    ctx.fillRect(startX, topY, endX - startX, botY - topY); ctx.restore();
+
+    ctx.save(); ctx.globalAlpha = 0.18; ctx.strokeStyle = 'white'; ctx.lineWidth = 0.7;
+    for (let x = startX; x <= endX; x += 14) { ctx.beginPath(); ctx.moveTo(x, topY); ctx.lineTo(x, botY); ctx.stroke(); }
+    for (let y = topY; y <= botY; y += 14) { ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(endX, y); ctx.stroke(); }
+    ctx.restore();
+
+    ctx.save(); ctx.strokeStyle = GOLD; ctx.lineWidth = 1.5; ctx.setLineDash([]);
+    ctx.strokeRect(startX, topY, endX - startX, botY - topY); ctx.restore();
+
+    // Upward arrow + "flick out here" near the top edge
+    const arrowX = startX + (endX - startX) / 2;
+    ctx.save(); ctx.strokeStyle = GOLD; ctx.fillStyle = GOLD; ctx.lineWidth = 2;
+    ctx.shadowColor = 'rgba(232,213,163,0.7)'; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.moveTo(arrowX, botY - 6); ctx.lineTo(arrowX, topY + 16); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(arrowX, topY + 16); ctx.lineTo(arrowX - 5, topY + 24); ctx.lineTo(arrowX + 5, topY + 24); ctx.closePath(); ctx.fill();
+    ctx.restore();
+
+    ctx.save(); ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = GOLD;
+    ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 6;
+    const flbl = '↑ flick out here';
+    ctx.fillText(flbl, Math.min(endX - ctx.measureText(flbl).width - 6, arrowX + 14), topY + 18);
+    ctx.restore();
+
+  } else if (zone.type === 'detail') {
+    const topY = zone.topFrac * H, botY = zone.bottomFrac * H;
+    const startX = zone.startXFrac * W, endX = zone.endXFrac * W;
+    const pad = 10;
+
+    ctx.save(); ctx.strokeStyle = GOLD; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+    ctx.shadowColor = 'rgba(232,213,163,0.6)'; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.roundRect(startX - pad, topY - pad, (endX - startX) + pad * 2, (botY - topY) + pad * 2, 8); ctx.stroke();
+    ctx.restore();
+
+    ctx.save(); ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = GOLD;
+    ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 6;
+    ctx.fillText('Detail trim here', startX - pad, Math.max(14, topY - pad - 6));
+    ctx.restore();
+  }
+
+  // Corner badge: guard + lever (or "Detail trimmer")
+  const badgeText = step.guard
+    ? (step.lever ? `${step.guard}  ·  ${leverLabel(step.lever)}` : step.guard)
+    : 'Detail trimmer';
+  ctx.save(); ctx.font = 'bold 12px sans-serif';
+  const bw = ctx.measureText(badgeText).width + 16;
+  const bx = W - bw - 8, by = H - 30;
+  ctx.fillStyle = 'rgba(0,0,0,0.65)';
+  ctx.beginPath(); ctx.roundRect(bx, by, bw, 22, 5); ctx.fill();
+  ctx.fillStyle = GOLD;
+  ctx.fillText(badgeText, bx + 8, by + 15); ctx.restore();
+}
+
+// Loads the photo, draws it, overlays the step's zone — static, view-only.
+async function renderStepCanvas(file, step, guideLine) {
+  const { canvas, ctx, W, H } = await loadScaledCanvas(file);
+  drawStepOverlay(ctx, W, H, step, guideLine);
+  return canvas;
+}
+
+// Lightweight message with a static (non-draggable) canvas embedded.
+function addStepMessage(html, canvas) {
+  const msg = document.createElement('div');
+  msg.className = 'msg';
+  msg.innerHTML = `${aiAvatar()}<div class="msg-body"><div class="msg-name">SelfHaircut.ai</div>
+    <div class="msg-text">${html}
+      <div class="guide-img-wrap" style="position:relative;"></div>
+    </div></div>`;
+  messagesWrap.appendChild(msg);
+  canvas.style.width = '100%';
+  msg.querySelector('.guide-img-wrap').appendChild(canvas);
+  scrollBottom();
+}
+
+// Presents fade-plan step i: overlay + guard/lever/start/height/flick + "Mark step done".
+async function presentFadePlanStep(i) {
+  const plan = state.fadePlan;
+  if (!plan || !plan[i]) return;
+  state.currentStep = i;
+  const step = plan[i];
+
+  addTyping(`Preparing step ${i + 1}`);
+  const canvas = await renderStepCanvas(state.lastPhotoFile, step, state.guideLine);
+  removeTyping();
+
+  const guardRow = step.guard
+    ? `<div class="fade-step-row"><span class="fade-step-icon">🪒</span><div><strong>Guard:</strong> ${step.guard}</div></div>`
+    : `<div class="fade-step-row"><span class="fade-step-icon">🪒</span><div><strong>Tool:</strong> Detail trimmer</div></div>`;
+  const leverRow = step.lever
+    ? `<div class="fade-step-row"><span class="fade-step-icon">🎛</span><div><strong>Lever:</strong> ${leverLabel(step.lever)}</div></div>`
+    : '';
+  const vidLink = step.video
+    ? `<a href="${step.video}" target="_blank" rel="noopener" style="font-size:11px;color:var(--accent2);text-decoration:none;margin-top:8px;display:inline-block;">▶ Watch technique</a>`
+    : '';
+  const doneBtn = `<button class="opt-btn" style="margin-top:10px;width:100%;" onclick="completeFadeStep(${i})">✓ Mark step ${i + 1} done</button>`;
+
+  addStepMessage(`<div class="fade-step-panel">
+    <div class="steps-title">Step ${i + 1} of ${plan.length}: ${step.title}</div>
+    ${guardRow}
+    ${leverRow}
+    <div class="fade-step-row"><span class="fade-step-icon">📍</span><div><strong>Start:</strong> ${step.startDesc}</div></div>
+    <div class="fade-step-row"><span class="fade-step-icon">📏</span><div><strong>How high:</strong> ${step.heightDesc}</div></div>
+    <div class="fade-step-row"><span class="fade-step-icon">👉</span><div><strong>Flick out:</strong> ${step.flickDesc}</div></div>
+    ${vidLink}
+    ${doneBtn}
+  </div>`, canvas);
+}
+
+// Marks step i done. Either moves to a progress-photo check (with a skip
+// option) or, on the final step, shows the wrap-up.
+function completeFadeStep(i) {
+  const plan = state.fadePlan;
+  if (!plan) return;
+
+  if (i === plan.length - 1) {
+    addAIMessage(`<p>✂️ <strong>That's the full fade plan!</strong> Take a final look in the mirror from both sides to confirm everything blends evenly.</p>`, null);
+    addFadePlanWrapUp();
+    return;
+  }
+
+  addAIMessage(
+    `<p>Nice work on step ${i + 1}. Upload a quick progress photo so I can check it before moving to step ${i + 2} — or skip ahead if you're confident.</p>`,
+    ['Skip, next step']
+  );
+  state.nextFileHandler = (file) => reviewProgressPhoto(file, i);
+}
+
+// Re-marks the ear on a progress photo, recomputes the guide line + zones,
+// and either advances to the next step or re-presents this step with a
+// corrected overlay.
+async function reviewProgressPhoto(file, i) {
+  state.nextFileHandler = null;
+  state.lastPhotoFile = file;
+
+  const earMarks = await markEarPosition(file);
+  if (!earMarks) {
+    addAIMessage(`<p>I couldn't find your ear in that photo — for an accurate check, make sure your ear is visible and well-lit, then upload again.</p>`, null);
+    state.nextFileHandler = (f) => reviewProgressPhoto(f, i);
+    return;
+  }
+
+  addTyping('Checking your progress');
+  const { W, H } = await loadScaledCanvas(file);
+  const prevLineYFrac = state.guideLine.lineYFrac;
+  const { lineY, startX, endX } = computeGuideLine(earMarks, W, H);
+  const newLineYFrac = lineY / H;
+
+  state.guideLine = {
+    lineYFrac: newLineYFrac, startXFrac: startX / W, endXFrac: endX / W,
+    earTopFrac: earMarks.earTopFrac, earMidFrac: (earMarks.earTopFrac + earMarks.earBottomFrac) / 2,
+  };
+  buildFadePlan();
+  removeTyping();
+
+  const TOLERANCE = 0.04;
+  if (Math.abs(newLineYFrac - prevLineYFrac) <= TOLERANCE) {
+    addAIMessage(`<p>✅ <strong>Looking even — nice work!</strong> Your line is holding steady. Let's move to the next step.</p>`, null);
+    presentFadePlanStep(i + 1);
+  } else {
+    addAIMessage(`<p>👀 <strong>This step needs a touch more blending.</strong> I've recalculated the zone based on your new photo — follow the updated overlay, then mark it done again.</p>`, null);
+    presentFadePlanStep(i);
+  }
+}
+
+// ── WRAP-UP — cheat sheet, tools, share, completion ──
+function addFadePlanWrapUp() {
   const style = state.taperStyle || 'low';
   const styleLabel = { low: 'Low Taper', mid: 'Mid Taper', high: 'High Taper', skin: 'Skin Fade', buzz: 'Buzz Cut' }[style] || 'Taper';
-  const steps = {
-    low: [
-      { t: 'Clip the sides', d: 'Use a <strong>#2 guard</strong>, working upward from the neck to the guide line. Keep the clipper flat.' },
-      { t: 'Blend at the line', d: 'Switch to a <strong>#1.5</strong>, position just below the line, use a flicking wrist motion upward.' },
-      { t: 'Fade the bottom', d: 'Use <strong>#0.5 or open blade</strong> on the bottom 2cm. Press flat at the bottom, rotate away as you lift.' },
-      { t: 'Edge up', d: 'Detail trimmer on the hairline, sideburns, and neckline. Check symmetry by lining up both sides at once.' },
-    ],
-    mid: [
-      { t: 'Clip above the line', d: 'Use a <strong>#3 guard</strong> on the upper sides above the guide line.' },
-      { t: 'Work the mid zone', d: '<strong>#2</strong> from the guide line down, blending upward with short flicking strokes.' },
-      { t: 'Fade the lower sides', d: '<strong>#1</strong> on the lower sides, then <strong>#0.5</strong> at the very bottom near the neck.' },
-      { t: 'Check and blend', d: 'Run your hand against the grain. Any hard lines? Blend with the higher guard using a flicking motion.' },
-      { t: 'Edge up', d: 'Outline the hairline and sideburn corners with a detail trimmer.' },
-    ],
-    high: [
-      { t: 'Top-to-line pass', d: '<strong>#4 guard</strong> from the top of the head down to the guide line.' },
-      { t: 'Transition zone', d: '<strong>#2</strong> from the guide line down — blend with upward flicks at the border.' },
-      { t: 'Lower sides', d: '<strong>#1</strong> then <strong>#0.5</strong> as you approach the temple and below.' },
-      { t: 'Skin at the base', d: 'Open blade or balding clipper on the bottom inch near the neck.' },
-      { t: 'Edge up', d: 'Detail trim the hairline and sideburns sharp.' },
-    ],
-    skin: [
-      { t: 'Remove bulk', d: '<strong>#2 guard</strong> across the entire sides and back.' },
-      { t: 'Drop to #1', d: 'Re-run with <strong>#1</strong>, stopping a few inches above the neck.' },
-      { t: 'Open blade fade', d: '<strong>Guards off</strong> on the bottom, flicking away from the head as you lift.' },
-      { t: 'Blend the skin line', d: 'Lever half-open to smooth the transition between bare skin and the #1 zone.' },
-      { t: 'Edge sharp', d: 'The skin fade lives or dies by clean edges — detail trimmer on the hairline and neckline.' },
-    ],
-    buzz: [
-      { t: 'Pick your guard', d: '<strong>#3</strong> (10mm) for a short buzz, <strong>#4</strong> (13mm) for a relaxed look.' },
-      { t: 'With the grain', d: 'Front-to-back across the whole head, overlapping passes by 50%.' },
-      { t: 'Against the grain', d: 'Back-to-front pass for a cleaner, more even finish — catches strays the first pass missed.' },
-      { t: 'Edge up', d: 'Hairline, sideburns, neckline. Square neckline = sharper; rounded = more natural.' },
-    ],
-  };
-  const list = steps[style] || steps.low;
-
-  // Video links per technique
-  const videos = {
-    'Clip the sides':    'https://www.youtube.com/results?search_query=how+to+clip+sides+fade+clipper+tutorial',
-    'Blend at the line': 'https://www.youtube.com/results?search_query=how+to+blend+fade+line+hair',
-    'Fade the bottom':   'https://www.youtube.com/results?search_query=how+to+fade+bottom+skin+fade+tutorial',
-    'Edge up':           'https://www.youtube.com/results?search_query=how+to+edge+up+hairline+barber',
-    'Blend above the line': 'https://www.youtube.com/results?search_query=how+to+blend+high+taper',
-    'Work the mid zone': 'https://www.youtube.com/results?search_query=how+to+blend+mid+fade',
-    'Check and blend':   'https://www.youtube.com/results?search_query=how+to+check+blend+fade+no+lines',
-    'Top-to-line pass':  'https://www.youtube.com/results?search_query=high+taper+fade+tutorial',
-    'Transition zone':   'https://www.youtube.com/results?search_query=fade+transition+zone+tutorial',
-    'Lower sides':       'https://www.youtube.com/results?search_query=lower+sides+fade+taper',
-    'Skin at the base':  'https://www.youtube.com/results?search_query=skin+fade+base+open+blade',
-    'Remove bulk':       'https://www.youtube.com/results?search_query=how+to+remove+bulk+sides+clipper',
-    'Drop to #1':        'https://www.youtube.com/results?search_query=how+to+use+1+guard+fade',
-    'Open blade fade':   'https://www.youtube.com/results?search_query=open+blade+skin+fade+tutorial',
-    'Blend the skin line':'https://www.youtube.com/results?search_query=blend+skin+line+fade+lever',
-    'Edge sharp':        'https://www.youtube.com/results?search_query=how+to+edge+up+sharp+hairline',
-    'Pick your guard':   'https://www.youtube.com/results?search_query=buzz+cut+guard+size+guide',
-    'With the grain':    'https://www.youtube.com/results?search_query=buzz+cut+with+grain+technique',
-    'Against the grain': 'https://www.youtube.com/results?search_query=buzz+cut+against+grain+finish',
-    'Clip above the line':'https://www.youtube.com/results?search_query=how+to+clip+above+taper+line',
-    'Fade the lower sides':'https://www.youtube.com/results?search_query=fade+lower+sides+hair+tutorial',
-  };
-
-  const stepsHtml = list.map((s, i) => {
-    const vid = videos[s.t];
-    const vidLink = vid ? `<a href="${vid}" target="_blank" rel="noopener" style="font-size:10px;color:var(--accent2);text-decoration:none;margin-top:4px;display:inline-block;">▶ Watch technique</a>` : '';
-    return `<div class="step-item">
-      <div class="step-num">${i + 1}</div>
-      <div class="step-content">
-        <div class="step-title">${s.t}</div>
-        <div class="step-desc">${s.d}</div>
-        ${vidLink}
-      </div>
-    </div>`;
-  }).join('');
 
   // Affiliate tool recommendations by style
   const tools = {
@@ -2034,23 +2341,14 @@ function addGuideSteps() {
   const cheat = (cheatData[style]||cheatData.low).map(r=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12px;"><span style="color:var(--text2);">${r.l}</span><strong style="color:#e8d5a3;">${r.g}</strong></div>`).join('');
   const cheatSheet = `<div style="margin-top:14px;padding:12px;background:var(--surface2);border-radius:10px;"><div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">💈 Guard cheat sheet</div>${cheat}</div>`;
 
-  // Plain-text steps for clipboard
-  const plainSteps = list.map((s,i)=>`${i+1}. ${s.t}: ${s.d.replace(/<[^>]+>/g,'')}`).join('\n');
-
   const shareBtn = `<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
     <button class="opt-btn" onclick="saveGuideImage(this)" style="flex:1;min-width:100px;">💾 Save guide</button>
     <button class="opt-btn" onclick="shareGuide(this)" style="flex:1;min-width:100px;">↗ Share</button>
     <button class="opt-btn" onclick="copyGuideSteps(this,'${style}')" style="flex:1;min-width:100px;">📋 Copy steps</button>
   </div>`;
 
-  const lineInfo = state.guideLine
-    ? `<p style="color:var(--text3);font-size:12px;margin-bottom:10px;">Your fade line is anchored to the middle of your marked ear — clip up to that line, then blend with the guards below.</p>`
-    : '';
-
   addAIMessage(`<div class="steps-panel">
-    <div class="steps-title">✂ ${styleLabel} — step by step</div>
-    ${lineInfo}
-    ${stepsHtml}
+    <div class="steps-title">✂ ${styleLabel} — reference</div>
     ${cheatSheet}
     <div style="margin-top:12px;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;">🛒 Recommended tools</div>
     <div style="display:flex;flex-direction:column;gap:6px;">${toolsHtml}</div>
@@ -2215,10 +2513,10 @@ function triggerCamera() {
   document.getElementById('cameraInput').click();
 }
 
-// ── LIVE AR CAMERA ──
+// ── CAMERA CAPTURE (desktop) ──
 // Plain capture: live video preview, flip camera, capture a still photo.
 // Ear placement happens afterward via the manual 2-marker flow
-// (markEarPosition), so no live detection/overlay is needed here.
+// (markEarPosition).
 let arFacingMode = 'user';
 let arStream = null;
 
@@ -2416,6 +2714,15 @@ function optionClick(btn, value) {
     return;
   }
 
+  if (value === 'Skip, next step') {
+    state.nextFileHandler = null;
+    setTimeout(() => {
+      addUserMessage('Skip, next step', null);
+      presentFadePlanStep(state.currentStep + 1);
+    }, 150);
+    return;
+  }
+
   setTimeout(() => {
     addUserMessage(value, null);
     addTyping();
@@ -2430,6 +2737,7 @@ function optionClick(btn, value) {
 function resetChat() {
   started = false; pendingFiles = [];
   state.taperStyle = null; state.tools = null; state.phase = 'intro'; state.shownPhotoTip = false;
+  state.fadePlan = null; state.currentStep = 0; state.lastPhotoFile = null; state.nextFileHandler = null;
   messagesWrap.innerHTML = ''; messagesWrap.classList.remove('visible');
   hero.style.display = ''; uploadPreview.innerHTML = '';
   uploadPreview.classList.remove('has-files');
@@ -2455,7 +2763,7 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 
-  <!-- ── AR CAMERA MODAL ── -->
+  <!-- ── CAMERA CAPTURE MODAL ── -->
   <div id="arModal">
     <div id="arVideoWrap">
       <video id="arVideo" autoplay playsinline muted></video>
@@ -2484,7 +2792,7 @@ if ('serviceWorker' in navigator) {
       <div class="ptip-list">
         <div class="ptip-row"><div class="ptip-em">↔️</div><div><strong>Full side profile</strong> — turn 90° so your ear is front and center</div></div>
         <div class="ptip-row"><div class="ptip-em">💡</div><div><strong>Good lighting</strong> — bright room, no heavy shadows across the face</div></div>
-        <div class="ptip-row"><div class="ptip-em">👂</div><div><strong>Ear fully visible</strong> — the AI anchors the line to your sideburn</div></div>
+        <div class="ptip-row"><div class="ptip-em">👂</div><div><strong>Ear fully visible</strong> — you'll mark the top and bottom of it next</div></div>
         <div class="ptip-row"><div class="ptip-em">🧍</div><div><strong>Neutral head angle</strong> — don't tilt or face the camera</div></div>
       </div>
       <button class="ptip-btn" onclick="confirmPhotoTip()">Got it — choose photo</button>
