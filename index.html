@@ -263,6 +263,16 @@ body {
 #arVideo {
   width: 100%; height: 100%; object-fit: cover;
 }
+#arGuideOverlay {
+  position: absolute; inset: 0; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+#arGuideOverlay svg { width: 62%; max-width: 260px; }
+#arGuideCaption {
+  margin-top: 12px; padding: 6px 14px; border-radius: 20px;
+  background: rgba(0,0,0,0.5); color: #e8d5a3;
+  font-size: 12px; font-weight: 600; text-align: center; max-width: 80%;
+}
 #arTopBar {
   position: absolute; top: 0; left: 0; right: 0;
   padding: 16px; display: flex; justify-content: space-between; align-items: center;
@@ -596,8 +606,9 @@ body {
 
 /* Photo tip overlay */
 #photoTipOverlay{position:fixed;inset:0;z-index:8888;background:rgba(0,0,0,0.82);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:20px;}
-.ptip-card{background:#1c1c1c;border:1px solid rgba(255,255,255,0.1);border-radius:18px;padding:24px;max-width:310px;width:100%;text-align:center;}
+.ptip-card{background:#1c1c1c;border:1px solid rgba(255,255,255,0.1);border-radius:18px;padding:24px;max-width:310px;width:100%;max-height:90vh;overflow-y:auto;text-align:center;}
 .ptip-title{font-size:15px;font-weight:700;color:#fff;margin-bottom:16px;}
+.ptip-highlight{background:rgba(232,213,163,0.1);border:1px solid rgba(232,213,163,0.25);border-radius:10px;padding:10px 12px;margin-bottom:16px;font-size:12.5px;line-height:1.5;color:var(--accent);text-align:left;}
 .ptip-list{display:flex;flex-direction:column;gap:10px;margin-bottom:18px;text-align:left;}
 .ptip-row{display:flex;align-items:flex-start;gap:10px;font-size:13px;color:var(--text2);line-height:1.4;}
 .ptip-em{font-size:20px;flex-shrink:0;margin-top:1px;}
@@ -1473,11 +1484,82 @@ function getResponse(text) {
   return { html: '<p>Upload a side profile photo and I\'ll place your guide line. Make sure your ear is visible and the lighting is decent.</p>', options: null };
 }
 
+// ── PHOTO QUALITY GATE ──
+// Lightweight client-side heuristics that catch photos which would give an
+// inaccurate guide line — sideways, too dark, too zoomed in, or too blurry —
+// before spending an analysis on them.
+function assessPhotoQuality(file) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const issues = [];
+        if (img.width > img.height * 1.25) issues.push('landscape');
+        if (Math.min(img.width, img.height) < 360) issues.push('lowres');
+
+        const s = 80;
+        const c = document.createElement('canvas'); c.width = s; c.height = s;
+        const cx = c.getContext('2d');
+        cx.drawImage(img, 0, 0, s, s);
+        const d = cx.getImageData(0, 0, s, s).data;
+        const gray = new Float32Array(s * s);
+        let sum = 0;
+        for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+          const g = d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114;
+          gray[p] = g; sum += g;
+        }
+        const avg = sum / gray.length;
+        if (avg < 30) issues.push('dark');
+
+        let lapSum = 0, lapSumSq = 0, n = 0;
+        for (let y = 1; y < s - 1; y++) {
+          for (let x = 1; x < s - 1; x++) {
+            const i = y * s + x;
+            const lap = gray[i-1] + gray[i+1] + gray[i-s] + gray[i+s] - 4 * gray[i];
+            lapSum += lap; lapSumSq += lap * lap; n++;
+          }
+        }
+        const mean = lapSum / n;
+        const variance = lapSumSq / n - mean * mean;
+        if (variance < 20) issues.push('blurry');
+
+        resolve({ issues });
+      };
+      img.onerror = () => resolve({ issues: [] });
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve({ issues: [] });
+    reader.readAsDataURL(file);
+  });
+}
+
+const PHOTO_ISSUE_COPY = {
+  landscape: '📱 This looks like it was taken sideways — hold your phone <strong>upright (portrait)</strong> and retake.',
+  lowres: '🎯 This photo is too small or too zoomed in for an accurate line — fit your head and shoulders in frame and retake.',
+  dark: '💡 This photo is too dark for an accurate read — move to a brighter, evenly-lit spot and retake.',
+  blurry: '🌫️ This photo looks blurry — hold the camera steady and retake.',
+};
+
+function photoRetakeMessage(issues) {
+  const bullets = issues.map(k => `<div style="margin-top:6px;">${PHOTO_ISSUE_COPY[k]}</div>`).join('');
+  return `<p>Let's get a clearer shot before I place your line — here's what to fix:</p>
+    ${bullets}
+    ${idealPhotoSvg()}
+    ${uploadGuideChecklist()}`;
+}
+
 // ── PHOTO ANALYSIS ──
 async function analyzePhoto(file) {
   const usage = getUsage();
   if (!isPro() && usage >= FREE_LIMIT) {
     addUpgradeMessage(`<p>You've used all <strong>${FREE_LIMIT} free analyses</strong> for today. Upgrade to <strong>SelfHaircut Pro</strong> for unlimited AI-personalized guidance.</p>`);
+    return;
+  }
+
+  const quality = await assessPhotoQuality(file);
+  if (quality.issues.length > 0) {
+    addAIMessage(photoRetakeMessage(quality.issues), null);
     return;
   }
 
@@ -1709,13 +1791,29 @@ function makeGuideDraggable(canvas, img, initialLineY, startX, endX, fadeH, guar
   setTimeout(() => drawZoom(lineY, curStartX, curEndX), 80);
 }
 
-// Shared checklist shown both in the upload tip and on the "can't find ear" retake message.
+// Shared illustration: a portrait-framed side-profile silhouette with the
+// ear circled and the fade/taper zone highlighted — used in the photo tip,
+// the live AR camera overlay, and retake messages.
+function idealPhotoSvg() {
+  return `<svg viewBox="0 0 200 280" style="width:100%;max-width:200px;margin:0 auto 14px;display:block;background:#111;border-radius:10px;">
+    <rect x="5" y="5" width="190" height="270" rx="14" fill="none" stroke="#e8d5a3" stroke-width="1.5" stroke-dasharray="6 5" opacity="0.45"/>
+    <path d="M70,30 C45,30 35,55 35,90 C35,120 45,145 60,160 C55,180 58,205 50,230 L160,230 C150,205 130,190 122,165 C135,155 150,140 152,118 C154,98 145,75 128,58 C115,40 90,28 70,30 Z" fill="#3a3a3a" stroke="#666" stroke-width="1.5"/>
+    <ellipse cx="48" cy="118" rx="11" ry="17" fill="#3a3a3a" stroke="#e8d5a3" stroke-width="2"/>
+    <circle cx="48" cy="118" r="28" fill="none" stroke="#e8d5a3" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <path d="M50,150 C55,175 65,195 80,210 L130,210 C122,195 116,178 118,160 Z" fill="#e8d5a3" opacity="0.16"/>
+    <text x="100" y="250" text-anchor="middle" font-size="11" font-weight="700" fill="#e8d5a3">Hold phone upright</text>
+    <text x="100" y="265" text-anchor="middle" font-size="9.5" fill="#9a9a9a">Full side profile &#183; ear &amp; fade area visible</text>
+  </svg>`;
+}
+
+// Shared checklist shown both in the upload tip and on retake messages.
 function uploadGuideChecklist() {
   return `<div style="margin-top:8px;font-size:13px;color:var(--text2);line-height:1.7;">
-    ✓ Side profile only — turn 90° so your ear faces the camera<br>
-    ✓ Ear fully visible — not covered by hair<br>
-    ✓ Good lighting — no heavy shadows<br>
-    ✓ Neutral head angle — don't tilt or face forward
+    ✓ Hold your camera <strong>upright (portrait)</strong> — not sideways<br>
+    ✓ Turn <strong>fully to the side</strong> — show the whole side of your head<br>
+    ✓ <strong>Ear, sideburn &amp; fade area</strong> unobstructed — push hair back if needed<br>
+    ✓ Good, even lighting — no heavy shadows<br>
+    ✓ Don't zoom in — fit your head and shoulders in frame
   </div>`;
 }
 
@@ -2330,6 +2428,13 @@ async function reviewProgressPhoto(file, i) {
   state.nextFileHandler = null;
   state.lastPhotoFile = file;
 
+  const quality = await assessPhotoQuality(file);
+  if (quality.issues.length > 0) {
+    addAIMessage(photoRetakeMessage(quality.issues), null);
+    state.nextFileHandler = (f) => reviewProgressPhoto(f, i);
+    return;
+  }
+
   const earMarks = await markEarPosition(file);
   if (!earMarks) {
     addAIMessage(`<p>I couldn't find your ear in that photo — for an accurate check, make sure your ear is visible and well-lit, then upload again.</p>`, null);
@@ -2563,7 +2668,9 @@ function saveGuideImage(btn) {
 
 // ── FILE UPLOAD ──
 function triggerCamera() {
-  document.getElementById('cameraInput').click();
+  const doOpen = () => document.getElementById('cameraInput').click();
+  if (!state.shownPhotoTip) { state.shownPhotoTip = true; showPhotoTip(doOpen); }
+  else { doOpen(); }
 }
 
 // ── CAMERA CAPTURE (desktop) ──
@@ -2823,9 +2930,18 @@ if ('serviceWorker' in navigator) {
   <div id="arModal">
     <div id="arVideoWrap">
       <video id="arVideo" autoplay playsinline muted></video>
+      <div id="arGuideOverlay">
+        <svg viewBox="0 0 200 280" preserveAspectRatio="xMidYMid meet">
+          <path d="M70,30 C45,30 35,55 35,90 C35,120 45,145 60,160 C55,180 58,205 50,230 L160,230 C150,205 130,190 122,165 C135,155 150,140 152,118 C154,98 145,75 128,58 C115,40 90,28 70,30 Z" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2" stroke-dasharray="6 4"/>
+          <path d="M50,150 C55,175 65,195 80,210 L130,210 C122,195 116,178 118,160 Z" fill="#e8d5a3" opacity="0.18"/>
+          <ellipse cx="48" cy="118" rx="11" ry="17" fill="none" stroke="#e8d5a3" stroke-width="2.5"/>
+          <circle cx="48" cy="118" r="28" fill="none" stroke="#e8d5a3" stroke-width="2" stroke-dasharray="4 3"/>
+        </svg>
+        <div id="arGuideCaption">Align your side profile here &middot; keep ear &amp; fade area visible</div>
+      </div>
       <div id="arTopBar">
         <button class="ar-ctrl-btn" onclick="closeARCamera()">✕ Close</button>
-        <div id="arInstruction">Turn to a side profile so your ear is clearly visible</div>
+        <div id="arInstruction">Hold phone upright &middot; turn fully to the side &middot; keep ear unobstructed</div>
         <button class="ar-ctrl-btn" onclick="flipARCamera()">⟳ Flip</button>
       </div>
     </div>
@@ -2837,21 +2953,25 @@ if ('serviceWorker' in navigator) {
   <!-- Photo tip overlay -->
   <div id="photoTipOverlay">
     <div class="ptip-card">
-      <div class="ptip-title">📸 Tips for the best result</div>
-      <svg viewBox="0 0 200 140" style="width:100%;max-width:220px;margin:0 auto 14px;display:block;background:#111;border-radius:10px;">
-        <ellipse cx="115" cy="65" rx="52" ry="50" fill="#3a3a3a" stroke="#666" stroke-width="1.5"/>
-        <path d="M160 58 L173 65 L160 76 Z" fill="#3a3a3a" stroke="#666" stroke-width="1.5"/>
-        <ellipse cx="61" cy="65" rx="9" ry="14" fill="#3a3a3a" stroke="#e8d5a3" stroke-width="2"/>
-        <circle cx="61" cy="65" r="22" fill="none" stroke="#e8d5a3" stroke-width="1.5" stroke-dasharray="4 3"/>
-        <text x="100" y="133" text-anchor="middle" font-size="11" fill="#9a9a9a">Side profile, ear visible, head level</text>
+      <div class="ptip-title">📸 Get the most accurate fade guide</div>
+      <svg viewBox="0 0 200 280" style="width:100%;max-width:190px;margin:0 auto 14px;display:block;background:#111;border-radius:10px;">
+        <rect x="5" y="5" width="190" height="270" rx="14" fill="none" stroke="#e8d5a3" stroke-width="1.5" stroke-dasharray="6 5" opacity="0.45"/>
+        <path d="M70,30 C45,30 35,55 35,90 C35,120 45,145 60,160 C55,180 58,205 50,230 L160,230 C150,205 130,190 122,165 C135,155 150,140 152,118 C154,98 145,75 128,58 C115,40 90,28 70,30 Z" fill="#3a3a3a" stroke="#666" stroke-width="1.5"/>
+        <ellipse cx="48" cy="118" rx="11" ry="17" fill="#3a3a3a" stroke="#e8d5a3" stroke-width="2"/>
+        <circle cx="48" cy="118" r="28" fill="none" stroke="#e8d5a3" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <path d="M50,150 C55,175 65,195 80,210 L130,210 C122,195 116,178 118,160 Z" fill="#e8d5a3" opacity="0.16"/>
+        <text x="100" y="250" text-anchor="middle" font-size="11" font-weight="700" fill="#e8d5a3">Hold phone upright</text>
+        <text x="100" y="265" text-anchor="middle" font-size="9.5" fill="#9a9a9a">Full side profile &#183; ear &amp; fade area visible</text>
       </svg>
+      <div class="ptip-highlight">For best accuracy: hold the camera <strong>upright</strong> and show the <strong>full side of your head</strong> clearly.</div>
       <div class="ptip-list">
-        <div class="ptip-row"><div class="ptip-em">↔️</div><div><strong>Full side profile</strong> — turn 90° so your ear is front and center</div></div>
-        <div class="ptip-row"><div class="ptip-em">💡</div><div><strong>Good lighting</strong> — bright room, no heavy shadows across the face</div></div>
-        <div class="ptip-row"><div class="ptip-em">👂</div><div><strong>Ear fully visible</strong> — you'll mark the top and bottom of it next</div></div>
-        <div class="ptip-row"><div class="ptip-em">🧍</div><div><strong>Neutral head angle</strong> — don't tilt or face the camera</div></div>
+        <div class="ptip-row"><div class="ptip-em">📱</div><div><strong>Upright (portrait)</strong> — don't rotate your phone sideways</div></div>
+        <div class="ptip-row"><div class="ptip-em">↔️</div><div><strong>Turn fully to the side</strong> — the whole side of your head should be in frame</div></div>
+        <div class="ptip-row"><div class="ptip-em">👂</div><div><strong>Ear, sideburn &amp; fade area unobstructed</strong> — push hair back if it's covering your ear</div></div>
+        <div class="ptip-row"><div class="ptip-em">💡</div><div><strong>Good, even lighting</strong> — bright room, no heavy shadows</div></div>
+        <div class="ptip-row"><div class="ptip-em">🎯</div><div><strong>Don't zoom in</strong> — fit your head and shoulders in the frame</div></div>
       </div>
-      <button class="ptip-btn" onclick="confirmPhotoTip()">Got it — choose photo</button>
+      <button class="ptip-btn" onclick="confirmPhotoTip()">Got it — let's go</button>
     </div>
   </div>
 </body>
