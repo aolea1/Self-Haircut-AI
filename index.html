@@ -1621,28 +1621,32 @@ function drawGuideOverlay(ctx, W, H, lineY, startX, endX, fadeH, guardLbl, style
 }
 
 // ── DRAGGABLE GUIDE ──
-function makeGuideDraggable(canvas, img, initialLineY, startX, endX, fadeH, guardLbl, styleLbl, earTopY) {
+function makeGuideDraggable(canvas, img, initialLineY, startX, endX, fadeH, guardLbl, styleLbl, earTopY, W, H, dpr) {
   let lineY = initialLineY;
   let curStartX = startX, curEndX = endX;
   const lineW = endX - startX; // keep width constant while translating
   let dragging = false;
   let dragOriginX = 0, dragOriginY = 0;
   let snapLineY = initialLineY, snapStartX = startX;
-  const W = canvas.width, H = canvas.height;
   const ctx = canvas.getContext('2d');
 
-  // Zoom inset
-  const zc = document.createElement('canvas'); zc.width = 150; zc.height = 90;
-  zc.style.cssText = 'position:absolute;bottom:8px;left:8px;border-radius:8px;border:1px solid rgba(232,213,163,0.4);pointer-events:none;opacity:0.92;';
+  // Zoom inset — its own retina-sharp backing store
+  const zW = 150, zH = 90;
+  const zc = document.createElement('canvas');
+  zc.width = zW * dpr; zc.height = zH * dpr;
+  zc.style.cssText = `width:${zW}px;height:${zH}px;position:absolute;bottom:8px;left:8px;border-radius:8px;border:1px solid rgba(232,213,163,0.4);pointer-events:none;opacity:0.92;`;
   const zwrap = canvas.parentElement;
   if (zwrap) { zwrap.style.position = 'relative'; zwrap.appendChild(zc); }
   const zctx = zc.getContext('2d');
+  zctx.imageSmoothingEnabled = true;
+  zctx.imageSmoothingQuality = 'high';
+  zctx.scale(dpr, dpr);
   const drawZoom = (ly, sx, ex) => {
-    const zH = 90, zW = 150, zoomScale = 2.5;
+    const zoomScale = 2.5;
     const srcH = zH/zoomScale, srcW = zW/zoomScale;
-    const srcY = ly - srcH/2, srcX = (sx+ex)/2 - srcW/2;
+    const srcY = (ly - srcH/2) * dpr, srcX = ((sx+ex)/2 - srcW/2) * dpr;
     zctx.clearRect(0,0,zW,zH);
-    zctx.drawImage(canvas, srcX, srcY, srcW, srcH, 0, 0, zW, zH);
+    zctx.drawImage(canvas, srcX, srcY, srcW*dpr, srcH*dpr, 0, 0, zW, zH);
     const zLineY = zH/2;
     zctx.save(); zctx.strokeStyle='rgba(232,213,163,0.9)'; zctx.lineWidth=2;
     zctx.shadowColor='rgba(255,255,255,0.8)'; zctx.shadowBlur=6;
@@ -1729,10 +1733,13 @@ function markEarPosition(file) {
       img.onload = () => {
         const maxW = 540;
         const scale = Math.min(1, maxW / img.width);
+        const dpr = Math.min(window.devicePixelRatio || 1, 3);
         const canvas = document.createElement('canvas');
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
+        canvas.width = Math.round(img.width * scale * dpr);
+        canvas.height = Math.round(img.height * scale * dpr);
         const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         canvas.style.width = '100%';
         canvas.style.display = 'block';
@@ -1860,6 +1867,9 @@ function markEarPosition(file) {
 
 // ── DRAW GUIDE ──
 // ── LOAD A FILE INTO A SCALED CANVAS (shared by drawGuide + step overlays) ──
+// The canvas backing store is rendered at devicePixelRatio so overlays stay
+// crisp on retina/mobile screens; W/H stay in the same "logical" coordinate
+// space all the overlay math already uses (ctx is pre-scaled to match).
 function loadScaledCanvas(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -1868,12 +1878,17 @@ function loadScaledCanvas(file) {
       img.onload = () => {
         const maxW = 540;
         const scale = Math.min(1, maxW / img.width);
+        const W = img.width * scale, H = img.height * scale;
+        const dpr = Math.min(window.devicePixelRatio || 1, 3);
         const canvas = document.createElement('canvas');
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
+        canvas.width = Math.round(W * dpr);
+        canvas.height = Math.round(H * dpr);
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve({ img, canvas, ctx, W: canvas.width, H: canvas.height });
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.scale(dpr, dpr);
+        ctx.drawImage(img, 0, 0, W, H);
+        resolve({ img, canvas, ctx, W, H, dpr });
       };
       img.onerror = reject;
       img.src = e.target.result;
@@ -1910,7 +1925,7 @@ function computeGuideLine(em, W, H) {
 }
 
 function drawGuide(file, guide, earMarks) {
-  return loadScaledCanvas(file).then(({ img, canvas, ctx, W, H }) => {
+  return loadScaledCanvas(file).then(({ img, canvas, ctx, W, H, dpr }) => {
     // ── LABELS ──
     // The first guideline is the bald reference line — always "Guard: None"
     // (bare blade, lever closed). Buzz cuts have no bald guideline.
@@ -1940,7 +1955,7 @@ function drawGuide(file, guide, earMarks) {
     state.fadeOffsetYFrac = 0;
 
     drawGuideOverlay(ctx, W, H, lineY, startX, endX, fadeH, guardLbl, styleLbl);
-    makeGuideDraggable(canvas, img, lineY, startX, endX, fadeH, guardLbl, styleLbl, earTopY);
+    makeGuideDraggable(canvas, img, lineY, startX, endX, fadeH, guardLbl, styleLbl, earTopY, W, H, dpr);
 
     if (navigator.vibrate) navigator.vibrate(60);
     return canvas;
@@ -2565,7 +2580,7 @@ function openARCamera() {
 
 function startARStream() {
   if (arStream) arStream.getTracks().forEach(t => t.stop());
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: arFacingMode }, audio: false })
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: arFacingMode, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false })
     .then(stream => {
       arStream = stream;
       const vid = document.getElementById('arVideo');
@@ -2618,7 +2633,7 @@ async function captureARFrame() {
     document.getElementById('arModal').style.display = 'none';
     if (capBtn) { capBtn.textContent = '📸 Capture Photo'; capBtn.disabled = false; }
     sendMessage();
-  }, 'image/jpeg', 0.92);
+  }, 'image/jpeg', 0.95);
 }
 
 
@@ -2711,12 +2726,14 @@ function flipThumbFile(idx, thumbImg, thumb) {
       const c = document.createElement('canvas');
       c.width = image.width; c.height = image.height;
       const ctx = c.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
       ctx.translate(image.width, 0); ctx.scale(-1, 1); ctx.drawImage(image, 0, 0);
       c.toBlob(blob => {
         const flipped = new File([blob], file.name, { type: 'image/jpeg' });
         pendingFiles[idx] = flipped;
         thumbImg.src = URL.createObjectURL(flipped);
-      }, 'image/jpeg', 0.92);
+      }, 'image/jpeg', 0.95);
     };
     image.src = ev.target.result;
   };
