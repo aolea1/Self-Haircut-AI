@@ -805,6 +805,10 @@ body {
 .fade-step-row:last-of-type { margin-bottom: 0; }
 .fade-step-row strong { color: var(--text); }
 .fade-step-icon { flex-shrink: 0; font-size: 14px; line-height: 1.5; }
+.fade-step-zone-label {
+  font-size: 11.5px; font-weight: 600; color: var(--accent2);
+  letter-spacing: 0.2px; margin-bottom: 12px;
+}
 
 /* ── SIDEBAR OVERLAY ── */
 .sidebar-overlay {
@@ -1016,6 +1020,9 @@ const state = {
   currentStep: 0,        // index into fadePlan
   lastPhotoFile: null,   // most recent File, used to re-render step overlays
   nextFileHandler: null, // if set, the next uploaded file routes here instead of analyzePhoto
+  fadeGeometry: null,    // { earXfrac, earTopFrac, earBottomFrac, earMidFrac } — LOCKED from the first photo, never recomputed
+  fadeOffsetXFrac: 0,    // translation offset applied to the locked geometry for the current progress photo
+  fadeOffsetYFrac: 0,
 };
 
 const BACKEND_URL = 'https://selfhaircut-backend.onrender.com';
@@ -1500,9 +1507,12 @@ async function freeAnalysis(file, earMarks) {
     const used = getUsage();
     state.phase = 'guide-shown';
     const styleLabel = { low: 'Low Taper', mid: 'Mid Taper', high: 'High Taper', skin: 'Skin Fade', buzz: 'Buzz Cut' }[state.taperStyle] || 'Taper';
-    const guardTip = { low: '#1.5', mid: '#2', high: '#2', skin: '#0.5', buzz: '#3' }[state.taperStyle] || '#1.5';
+    const blendGuard = { low: '#1', mid: '#1.5', high: '#2', skin: '#0.5', buzz: '#3–4' }[state.taperStyle] || '#1';
+    const lineMsg = state.taperStyle === 'buzz'
+      ? `I placed your <strong>${styleLabel} guide line</strong> at the exact midpoint of your marked ear — a steady reference point. Drag to fine-tune, then start your first pass with a <strong>${blendGuard} guard</strong>.`
+      : `I placed your <strong>${styleLabel} guide line</strong> at the <strong>exact midpoint</strong> of your marked ear. Drag to fine-tune. This is your <strong>bald guideline — Guard: None, lever closed</strong>: clip directly along it, then blend upward starting with a <strong>${blendGuard} guard</strong>.`;
     addAIMessageWithCanvas(
-      `<p>I placed your <strong>${styleLabel} guide line</strong> based on your sideburn area. Drag the line to fine-tune the position, then clip along it and blend upward with a <strong>${guardTip} guard</strong>.</p>
+      `<p>${lineMsg}</p>
        <p style="color:var(--text2);font-size:12px;margin-top:6px;">📍 ${barberPlacementNote(state.taperStyle)}</p>
        <p style="color:var(--text3);font-size:12px;">Heuristic analysis ${used}/${FREE_LIMIT} · <span style="color:var(--accent2);cursor:pointer;text-decoration:underline;" onclick="showUpgrade()">Upgrade to Pro</span> for Claude AI placement</p>`,
       canvas
@@ -1600,7 +1610,7 @@ function drawGuideOverlay(ctx, W, H, lineY, startX, endX, fadeH, guardLbl, style
   ctx.fillText(lbl, startX + (endX - startX) / 2 - ctx.measureText(lbl).width / 2, lineY + 18);
   ctx.restore();
 
-  const badgeText = `${styleLbl}  ${guardLbl}`;
+  const badgeText = guardLbl === 'None' ? `${styleLbl}  ·  Guard: None` : `${styleLbl}  ${guardLbl}`;
   ctx.save(); ctx.font = 'bold 12px sans-serif';
   const bw = ctx.measureText(badgeText).width + 16;
   const bx = endX - bw - 6, by = lineY + fadeH + 6;
@@ -1797,9 +1807,9 @@ function markEarPosition(file) {
           let earBottomFrac = Math.max(marks.top.y, marks.bottom.y);
           const earXfrac    = (marks.top.x + marks.bottom.x) / 2;
 
-          // Confidence check — barber rule: when the marks look unrealistic,
-          // default the placement lower and wider, never higher.
-          const MIN_SPAN = 0.03, CONSERVATIVE_BIAS = 0.015, MIN_EAR_TOP = 0.15;
+          // Confidence check — guard against unrealistic/degenerate marks
+          // without biasing the midpoint up or down.
+          const MIN_SPAN = 0.03, MIN_EAR_TOP = 0.15;
           if (earBottomFrac - earTopFrac < MIN_SPAN) {
             const mid = (earTopFrac + earBottomFrac) / 2;
             earTopFrac = mid - MIN_SPAN / 2;
@@ -1810,8 +1820,6 @@ function markEarPosition(file) {
             earTopFrac = MIN_EAR_TOP;
             earBottomFrac = earTopFrac + span;
           }
-          earTopFrac    = Math.min(0.95, earTopFrac + CONSERVATIVE_BIAS);
-          earBottomFrac = Math.min(0.98, earBottomFrac + CONSERVATIVE_BIAS);
 
           // Premium "Generating your guide…" transition before handing off.
           msg.querySelector('.msg-text').innerHTML =
@@ -1878,18 +1886,17 @@ function loadScaledCanvas(file) {
 // ════════════════════════════════════════════════════════
 // DETERMINISTIC PLACEMENT — anchored to the user-marked ear
 //
-// PRIMARY RULE: the fade line sits at the vertical MIDPOINT
-// of the marked ear.
-// HARD LIMIT: the line is never placed above the marked
-// top of the ear.
+// BARBER RULE #1: the bald guideline sits at the EXACT
+// mathematical midpoint between the top-of-ear and
+// bottom-of-ear markers — no visual estimation, no bias.
+// Everything else (fade zones, blends) is built upward
+// from this single anchor point.
 // LINE: short, sideburn-width only.
 // ════════════════════════════════════════════════════════
 function computeGuideLine(em, W, H) {
-  const earTopY = em.earTopFrac * H;
   const earMidFrac = (em.earTopFrac + em.earBottomFrac) / 2;
-  // Conservative bias: settle slightly BELOW the literal midpoint, never above it.
-  const CONSERVATIVE_BIAS = 0.015;
-  const lineY = Math.max(earTopY, (earMidFrac + CONSERVATIVE_BIAS) * H);
+  const lineY = earMidFrac * H;
+  const earTopY = em.earTopFrac * H;
   const earX  = em.earXfrac * W;
 
   // ── LINE: short, matches sideburn width only ──
@@ -1905,7 +1912,9 @@ function computeGuideLine(em, W, H) {
 function drawGuide(file, guide, earMarks) {
   return loadScaledCanvas(file).then(({ img, canvas, ctx, W, H }) => {
     // ── LABELS ──
-    const taperGuardLabel = { low: '#1.5', mid: '#2', high: '#2', skin: '#0', buzz: '#3' };
+    // The first guideline is the bald reference line — always "Guard: None"
+    // (bare blade, lever closed). Buzz cuts have no bald guideline.
+    const taperGuardLabel = { low: 'None', mid: 'None', high: 'None', skin: 'None', buzz: '#3' };
     const taperStyleLabel = { low: 'Low Taper', mid: 'Mid Taper', high: 'High Taper', skin: 'Skin Fade', buzz: 'Buzz' };
 
     const em = earMarks || { earXfrac: 0.56, earTopFrac: 0.40, earBottomFrac: 0.52 };
@@ -1919,6 +1928,16 @@ function drawGuide(file, guide, earMarks) {
       lineYFrac: lineY / H, startXFrac: startX / W, endXFrac: endX / W,
       earTopFrac: em.earTopFrac, earMidFrac,
     };
+
+    // ── LOCK the barber geometry from this (first) photo ──
+    // state.fadePlan/guideLine are built from this once and never
+    // regenerated; progress photos are aligned to it via a translation
+    // offset instead (state.fadeOffsetXFrac/YFrac).
+    state.fadeGeometry = {
+      earXfrac: em.earXfrac, earTopFrac: em.earTopFrac, earBottomFrac: em.earBottomFrac, earMidFrac,
+    };
+    state.fadeOffsetXFrac = 0;
+    state.fadeOffsetYFrac = 0;
 
     drawGuideOverlay(ctx, W, H, lineY, startX, endX, fadeH, guardLbl, styleLbl);
     makeGuideDraggable(canvas, img, lineY, startX, endX, fadeH, guardLbl, styleLbl, earTopY);
@@ -1952,114 +1971,117 @@ function showUpgrade() {
 // and the chosen style. Each step gets its own zone (line/band/detail)
 // for drawStepOverlay, plus guard/lever/start/height/flick guidance.
 
+// The bald guideline (step 1) is always "Guard: None" — bare blade, lever
+// closed. Everything else is built upward from there: `blend` is the guard
+// for the fade zone directly above the line, `top` for the upper sides.
 const FADE_GUARDS = {
-  low:  { line: '#1.5', blend: '#2', top: '#2' },
-  mid:  { line: '#2',   blend: '#3', top: '#3' },
-  high: { line: '#2',   blend: '#3', top: '#4' },
-  skin: { line: '#0',   blend: '#1', top: '#2' },
+  low:  { blend: '#1',   top: '#2' },
+  mid:  { blend: '#1.5', top: '#3' },
+  high: { blend: '#2',   top: '#4' },
+  skin: { blend: '#0.5', top: '#1.5' },
 };
 
 const FADE_STEP_TEXT = {
   low: [
-    { title: 'Set your guideline', lever: 'closed',
-      startDesc: 'Start right at your sideburn, on the gold line.',
-      heightDesc: "Clip along the line only — don't go above it yet.",
+    { title: 'Set your bald guideline', lever: 'closed', zoneLabel: 'Bald guideline — the foundation for your whole fade',
+      startDesc: 'Start right at your sideburn, on the gold line — no guard, bare blade.',
+      heightDesc: "Clip along the line only, lever closed — don't go above it yet.",
       flickDesc: 'Flick the clipper outward at the front edge to soften the corner.',
       video: 'https://www.youtube.com/results?search_query=how+to+blend+fade+line+hair' },
-    { title: 'Blend the fade zone', lever: 'half-open',
+    { title: 'Blend the fade zone', lever: 'half-open', zoneLabel: 'Fade zone — blend upward from your bald guideline',
       startDesc: 'Start just above the guideline, inside the shaded zone.',
       heightDesc: 'Work upward through the whole shaded zone.',
       flickDesc: 'Flick the clipper out as you reach the top edge of the zone.',
       video: 'https://www.youtube.com/results?search_query=how+to+clip+sides+fade+clipper+tutorial' },
-    { title: 'Blend the upper sides', lever: 'open',
+    { title: 'Blend the upper sides', lever: 'open', zoneLabel: 'Upper sides — blend into the longer hair on top',
       startDesc: 'Pick up where the fade zone ended.',
       heightDesc: 'Continue blending upward toward the top of your head.',
       flickDesc: "Flick out at the very top so there's no hard line into the longer hair.",
       video: 'https://www.youtube.com/results?search_query=how+to+blend+fade+into+longer+hair' },
-    { title: 'Edge up', lever: null,
+    { title: 'Edge up', lever: null, zoneLabel: 'Hairline & sideburns — detail trim zone',
       startDesc: 'Switch to a detail trimmer for your hairline and sideburns.',
       heightDesc: "Trace your natural hairline — don't cut a new shape.",
       flickDesc: 'Check both sides together for symmetry before you finish.',
       video: 'https://www.youtube.com/results?search_query=how+to+edge+up+hairline+barber' },
   ],
   mid: [
-    { title: 'Set your guideline', lever: 'closed',
-      startDesc: 'Start at your sideburn, right on the gold line.',
-      heightDesc: 'Clip along the line — this sets the floor for your mid taper.',
+    { title: 'Set your bald guideline', lever: 'closed', zoneLabel: 'Bald guideline — the foundation for your whole fade',
+      startDesc: 'Start at your sideburn, right on the gold line — no guard, bare blade.',
+      heightDesc: 'Clip along the line, lever closed — this sets the floor for your mid taper.',
       flickDesc: 'Flick the clipper out slightly at the front edge.',
       video: 'https://www.youtube.com/results?search_query=how+to+blend+fade+line+hair' },
-    { title: 'Blend the fade zone', lever: 'half-open',
+    { title: 'Blend the fade zone', lever: 'half-open', zoneLabel: 'Fade zone — blend upward from your bald guideline',
       startDesc: 'Start just above the guideline, inside the shaded zone.',
       heightDesc: 'Work upward through the shaded zone with short flicking strokes.',
       flickDesc: 'Flick out as you reach the top edge of the zone — no hard lines.',
       video: 'https://www.youtube.com/results?search_query=how+to+blend+mid+fade' },
-    { title: 'Blend the upper sides', lever: 'open',
+    { title: 'Blend the upper sides', lever: 'open', zoneLabel: 'Upper sides — blend into the longer hair on top',
       startDesc: 'Pick up where the fade zone ended.',
       heightDesc: 'Blend upward toward the top of your head.',
       flickDesc: 'Flick out at the top edge to merge into the longer hair.',
       video: 'https://www.youtube.com/results?search_query=how+to+blend+fade+into+longer+hair' },
-    { title: 'Edge up', lever: null,
+    { title: 'Edge up', lever: null, zoneLabel: 'Hairline & sideburns — detail trim zone',
       startDesc: 'Switch to a detail trimmer for the hairline and sideburn corners.',
       heightDesc: 'Outline your natural hairline.',
       flickDesc: 'Compare both sides for symmetry.',
       video: 'https://www.youtube.com/results?search_query=how+to+edge+up+hairline+barber' },
   ],
   high: [
-    { title: 'Set your guideline', lever: 'closed',
-      startDesc: 'Start at your sideburn, right on the gold line.',
-      heightDesc: 'Clip along the line — this sets the floor for your high taper.',
+    { title: 'Set your bald guideline', lever: 'closed', zoneLabel: 'Bald guideline — the foundation for your whole fade',
+      startDesc: 'Start at your sideburn, right on the gold line — no guard, bare blade.',
+      heightDesc: 'Clip along the line, lever closed — this sets the floor for your high taper.',
       flickDesc: 'Flick the clipper out slightly at the front edge.',
       video: 'https://www.youtube.com/results?search_query=how+to+blend+fade+line+hair' },
-    { title: 'Blend the fade zone', lever: 'half-open',
+    { title: 'Blend the fade zone', lever: 'half-open', zoneLabel: 'Fade zone — blend upward from your bald guideline',
       startDesc: 'Start just above the guideline, inside the shaded zone.',
       heightDesc: 'Work upward through the shaded zone with short flicking strokes.',
       flickDesc: 'Flick out as you reach the top edge of the zone.',
       video: 'https://www.youtube.com/results?search_query=fade+transition+zone+tutorial' },
-    { title: 'Blend the upper sides', lever: 'open',
+    { title: 'Blend the upper sides', lever: 'open', zoneLabel: 'Upper sides — blend into the longer hair on top',
       startDesc: 'Pick up where the fade zone ended.',
       heightDesc: 'Blend upward toward the top of your head — this is the biggest zone in a high taper.',
       flickDesc: 'Flick out at the top edge to merge into the longer hair on top.',
       video: 'https://www.youtube.com/results?search_query=high+taper+fade+tutorial' },
-    { title: 'Edge up', lever: null,
+    { title: 'Edge up', lever: null, zoneLabel: 'Hairline & sideburns — detail trim zone',
       startDesc: 'Switch to a detail trimmer for the hairline and sideburn corners.',
       heightDesc: 'Outline your natural hairline sharp and clean.',
       flickDesc: 'Compare both sides for symmetry.',
       video: 'https://www.youtube.com/results?search_query=how+to+edge+up+sharp+hairline' },
   ],
   skin: [
-    { title: 'Set your guideline', lever: 'closed',
-      startDesc: 'Start at your sideburn, right on the gold line.',
-      heightDesc: 'Go bald along the line with an open blade — this is the skin base of your fade.',
+    { title: 'Set your bald guideline', lever: 'closed', zoneLabel: 'Bald guideline — the skin base for your whole fade',
+      startDesc: 'Start at your sideburn, right on the gold line — no guard, bare blade.',
+      heightDesc: 'Go bald along the line, lever closed — this is the skin base of your fade.',
       flickDesc: 'Flick out at the front edge to keep the skin clean.',
       video: 'https://www.youtube.com/results?search_query=skin+fade+base+open+blade' },
-    { title: 'Blend the fade zone', lever: 'half-open',
+    { title: 'Blend the fade zone', lever: 'half-open', zoneLabel: 'Fade zone — blend upward from your bald guideline',
       startDesc: 'Start just above the guideline, inside the shaded zone.',
       heightDesc: 'Work upward through the shaded zone, lever half-open to soften the skin line.',
       flickDesc: 'Flick out as you reach the top edge of the zone.',
       video: 'https://www.youtube.com/results?search_query=blend+skin+line+fade+lever' },
-    { title: 'Blend the upper sides', lever: 'open',
+    { title: 'Blend the upper sides', lever: 'open', zoneLabel: 'Upper sides — blend into the longer hair on top',
       startDesc: 'Pick up where the fade zone ended.',
       heightDesc: 'Blend upward toward the top of your head.',
       flickDesc: 'Flick out at the top edge to merge into the longer hair.',
       video: 'https://www.youtube.com/results?search_query=how+to+blend+fade+into+longer+hair' },
-    { title: 'Edge up', lever: null,
+    { title: 'Edge up', lever: null, zoneLabel: 'Hairline & sideburns — detail trim zone',
       startDesc: 'Switch to a detail trimmer for your hairline and sideburns.',
       heightDesc: 'A skin fade lives or dies by clean edges — trace your natural hairline.',
       flickDesc: 'Compare both sides for symmetry before you finish.',
       video: 'https://www.youtube.com/results?search_query=how+to+edge+up+sharp+hairline' },
   ],
   buzz: [
-    { title: 'First pass — with the grain', lever: null,
+    { title: 'First pass — with the grain', lever: null, zoneLabel: 'Whole head — first pass with the grain',
       startDesc: 'Start at the front hairline.',
       heightDesc: 'Work front-to-back across the whole head, overlapping each pass by about half the guard width.',
       flickDesc: 'Keep the clipper flat against the scalp — no flicking needed yet.',
       video: 'https://www.youtube.com/results?search_query=buzz+cut+with+grain+technique' },
-    { title: 'Second pass — against the grain', lever: null,
+    { title: 'Second pass — against the grain', lever: null, zoneLabel: 'Whole head — second pass against the grain',
       startDesc: 'Start at the back of the head this time.',
       heightDesc: 'Go back-to-front for a cleaner, more even finish.',
       flickDesc: 'This pass catches any strands the first pass missed.',
       video: 'https://www.youtube.com/results?search_query=buzz+cut+against+grain+finish' },
-    { title: 'Edge up', lever: null,
+    { title: 'Edge up', lever: null, zoneLabel: 'Hairline, sideburns & neckline — detail trim zone',
       startDesc: 'Switch to a detail trimmer for the hairline, sideburns, and neckline.',
       heightDesc: 'Square or round the neckline based on your preference.',
       flickDesc: 'Compare both sides for symmetry before you finish.',
@@ -2093,7 +2115,7 @@ function buildFadePlan() {
   const wideEndX   = Math.min(0.98, gl.endXFrac + 0.06);
 
   state.fadePlan = [
-    { ...text[0], guard: guards.line,
+    { ...text[0], guard: 'None',
       zone: { type: 'line', lineYFrac: gl.lineYFrac, startXFrac: gl.startXFrac, endXFrac: gl.endXFrac } },
     { ...text[1], guard: guards.blend,
       zone: { type: 'band', topFrac: fadeTopFrac, bottomFrac: gl.lineYFrac, startXFrac: wideStartX, endXFrac: wideEndX } },
@@ -2110,13 +2132,17 @@ function leverLabel(lever) {
 }
 
 // ── STEP OVERLAY — one highlighted zone per fade-plan step ──
-function drawStepOverlay(ctx, W, H, step, guideLine) {
+// `offset` ({x, y} fractions) translates the LOCKED zone geometry onto a
+// new progress photo without recomputing any of the zones themselves —
+// see state.fadeGeometry / state.fadeOffsetXFrac / state.fadeOffsetYFrac.
+function drawStepOverlay(ctx, W, H, step, guideLine, offset) {
   const GOLD = 'rgba(232,213,163,0.95)';
   const GOLD_DIM = 'rgba(232,213,163,0.5)';
   const zone = step.zone;
+  const off = offset || { x: 0, y: 0 };
 
   if (zone.type === 'line') {
-    const lineY = zone.lineYFrac * H, startX = zone.startXFrac * W, endX = zone.endXFrac * W;
+    const lineY = (zone.lineYFrac + off.y) * H, startX = (zone.startXFrac + off.x) * W, endX = (zone.endXFrac + off.x) * W;
 
     ctx.save(); ctx.shadowColor = 'rgba(232,213,163,0.7)'; ctx.shadowBlur = 12;
     ctx.strokeStyle = GOLD; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
@@ -2129,16 +2155,16 @@ function drawStepOverlay(ctx, W, H, step, guideLine) {
 
     ctx.save(); ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = GOLD;
     ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 8;
-    const lbl = 'Clip along this line';
+    const lbl = step.guard === 'None' ? 'Bald guideline — clip here' : 'Clip along this line';
     ctx.fillText(lbl, startX + (endX - startX) / 2 - ctx.measureText(lbl).width / 2, lineY + 18);
     ctx.restore();
 
   } else if (zone.type === 'band') {
-    const topY = zone.topFrac * H, botY = zone.bottomFrac * H;
-    const startX = zone.startXFrac * W, endX = zone.endXFrac * W;
+    const topY = (zone.topFrac + off.y) * H, botY = (zone.bottomFrac + off.y) * H;
+    const startX = (zone.startXFrac + off.x) * W, endX = (zone.endXFrac + off.x) * W;
 
     // Reference line — where the marked-ear guideline sits
-    const refY = guideLine.lineYFrac * H;
+    const refY = (guideLine.lineYFrac + off.y) * H;
     ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = GOLD_DIM; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(startX, refY); ctx.lineTo(endX, refY); ctx.stroke(); ctx.restore();
 
@@ -2170,8 +2196,8 @@ function drawStepOverlay(ctx, W, H, step, guideLine) {
     ctx.restore();
 
   } else if (zone.type === 'detail') {
-    const topY = zone.topFrac * H, botY = zone.bottomFrac * H;
-    const startX = zone.startXFrac * W, endX = zone.endXFrac * W;
+    const topY = (zone.topFrac + off.y) * H, botY = (zone.bottomFrac + off.y) * H;
+    const startX = (zone.startXFrac + off.x) * W, endX = (zone.endXFrac + off.x) * W;
     const pad = 10;
 
     ctx.save(); ctx.strokeStyle = GOLD; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
@@ -2186,9 +2212,11 @@ function drawStepOverlay(ctx, W, H, step, guideLine) {
   }
 
   // Corner badge: guard + lever (or "Detail trimmer")
-  const badgeText = step.guard
-    ? (step.lever ? `${step.guard}  ·  ${leverLabel(step.lever)}` : step.guard)
-    : 'Detail trimmer';
+  const badgeText = step.guard === 'None'
+    ? `Guard: None  ·  ${leverLabel(step.lever)}`
+    : step.guard
+      ? (step.lever ? `${step.guard}  ·  ${leverLabel(step.lever)}` : step.guard)
+      : 'Detail trimmer';
   ctx.save(); ctx.font = 'bold 12px sans-serif';
   const bw = ctx.measureText(badgeText).width + 16;
   const bx = W - bw - 8, by = H - 30;
@@ -2199,9 +2227,9 @@ function drawStepOverlay(ctx, W, H, step, guideLine) {
 }
 
 // Loads the photo, draws it, overlays the step's zone — static, view-only.
-async function renderStepCanvas(file, step, guideLine) {
+async function renderStepCanvas(file, step, guideLine, offset) {
   const { canvas, ctx, W, H } = await loadScaledCanvas(file);
-  drawStepOverlay(ctx, W, H, step, guideLine);
+  drawStepOverlay(ctx, W, H, step, guideLine, offset);
   return canvas;
 }
 
@@ -2227,12 +2255,15 @@ async function presentFadePlanStep(i) {
   const step = plan[i];
 
   addTyping(`Preparing step ${i + 1}`);
-  const canvas = await renderStepCanvas(state.lastPhotoFile, step, state.guideLine);
+  const offset = { x: state.fadeOffsetXFrac, y: state.fadeOffsetYFrac };
+  const canvas = await renderStepCanvas(state.lastPhotoFile, step, state.guideLine, offset);
   removeTyping();
 
-  const guardRow = step.guard
-    ? `<div class="fade-step-row"><span class="fade-step-icon">🪒</span><div><strong>Guard:</strong> ${step.guard}</div></div>`
-    : `<div class="fade-step-row"><span class="fade-step-icon">🪒</span><div><strong>Tool:</strong> Detail trimmer</div></div>`;
+  const guardRow = step.guard === 'None'
+    ? `<div class="fade-step-row"><span class="fade-step-icon">🪒</span><div><strong>Guard: None</strong> — bare blade, this is your bald guideline</div></div>`
+    : step.guard
+      ? `<div class="fade-step-row"><span class="fade-step-icon">🪒</span><div><strong>Guard:</strong> ${step.guard}</div></div>`
+      : `<div class="fade-step-row"><span class="fade-step-icon">🪒</span><div><strong>Tool:</strong> Detail trimmer</div></div>`;
   const leverRow = step.lever
     ? `<div class="fade-step-row"><span class="fade-step-icon">🎛</span><div><strong>Lever:</strong> ${leverLabel(step.lever)}</div></div>`
     : '';
@@ -2240,9 +2271,13 @@ async function presentFadePlanStep(i) {
     ? `<a href="${step.video}" target="_blank" rel="noopener" style="font-size:11px;color:var(--accent2);text-decoration:none;margin-top:8px;display:inline-block;">▶ Watch technique</a>`
     : '';
   const doneBtn = `<button class="opt-btn" style="margin-top:10px;width:100%;" onclick="completeFadeStep(${i})">✓ Mark step ${i + 1} done</button>`;
+  const zoneLabelHtml = step.zoneLabel
+    ? `<div class="fade-step-zone-label">${step.zoneLabel}</div>`
+    : '';
 
   addStepMessage(`<div class="fade-step-panel">
     <div class="steps-title">Step ${i + 1} of ${plan.length}: ${step.title}</div>
+    ${zoneLabelHtml}
     ${guardRow}
     ${leverRow}
     <div class="fade-step-row"><span class="fade-step-icon">📍</span><div><strong>Start:</strong> ${step.startDesc}</div></div>
@@ -2272,9 +2307,10 @@ function completeFadeStep(i) {
   state.nextFileHandler = (file) => reviewProgressPhoto(file, i);
 }
 
-// Re-marks the ear on a progress photo, recomputes the guide line + zones,
-// and either advances to the next step or re-presents this step with a
-// corrected overlay.
+// Re-marks the ear on a progress photo and aligns the LOCKED fade geometry
+// to it via a translation offset — the zones themselves (state.fadePlan)
+// are never regenerated, so instructions stay anchored to the original
+// calibration and never drift "out of whack".
 async function reviewProgressPhoto(file, i) {
   state.nextFileHandler = null;
   state.lastPhotoFile = file;
@@ -2287,24 +2323,26 @@ async function reviewProgressPhoto(file, i) {
   }
 
   addTyping('Checking your progress');
-  const { W, H } = await loadScaledCanvas(file);
-  const prevLineYFrac = state.guideLine.lineYFrac;
-  const { lineY, startX, endX } = computeGuideLine(earMarks, W, H);
-  const newLineYFrac = lineY / H;
 
-  state.guideLine = {
-    lineYFrac: newLineYFrac, startXFrac: startX / W, endXFrac: endX / W,
-    earTopFrac: earMarks.earTopFrac, earMidFrac: (earMarks.earTopFrac + earMarks.earBottomFrac) / 2,
-  };
-  buildFadePlan();
+  // Align the new photo to the LOCKED geometry from the first photo —
+  // a simple translation, computed against the original anchors so
+  // offsets never compound across multiple progress photos.
+  const geo = state.fadeGeometry;
+  const newEarMidFrac = (earMarks.earTopFrac + earMarks.earBottomFrac) / 2;
+  const offsetYFrac = newEarMidFrac - geo.earMidFrac;
+  const offsetXFrac = earMarks.earXfrac - geo.earXfrac;
   removeTyping();
 
   const TOLERANCE = 0.04;
-  if (Math.abs(newLineYFrac - prevLineYFrac) <= TOLERANCE) {
-    addAIMessage(`<p>✅ <strong>Looking even — nice work!</strong> Your line is holding steady. Let's move to the next step.</p>`, null);
+  if (Math.abs(offsetYFrac) <= TOLERANCE) {
+    state.fadeOffsetXFrac = 0;
+    state.fadeOffsetYFrac = 0;
+    addAIMessage(`<p>✅ <strong>Looking even — nice work!</strong> Your line is holding steady against the original guide. Let's move to the next step.</p>`, null);
     presentFadePlanStep(i + 1);
   } else {
-    addAIMessage(`<p>👀 <strong>This step needs a touch more blending.</strong> I've recalculated the zone based on your new photo — follow the updated overlay, then mark it done again.</p>`, null);
+    state.fadeOffsetXFrac = offsetXFrac;
+    state.fadeOffsetYFrac = offsetYFrac;
+    addAIMessage(`<p>👀 <strong>I've aligned the guide to your new photo.</strong> Follow the updated overlay for this step, then mark it done again.</p>`, null);
     presentFadePlanStep(i);
   }
 }
@@ -2738,6 +2776,7 @@ function resetChat() {
   started = false; pendingFiles = [];
   state.taperStyle = null; state.tools = null; state.phase = 'intro'; state.shownPhotoTip = false;
   state.fadePlan = null; state.currentStep = 0; state.lastPhotoFile = null; state.nextFileHandler = null;
+  state.guideLine = null; state.fadeGeometry = null; state.fadeOffsetXFrac = 0; state.fadeOffsetYFrac = 0;
   messagesWrap.innerHTML = ''; messagesWrap.classList.remove('visible');
   hero.style.display = ''; uploadPreview.innerHTML = '';
   uploadPreview.classList.remove('has-files');
