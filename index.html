@@ -2322,10 +2322,15 @@ function offerTaperShaping() {
 }
 
 function drawTaperShapeOverlay(ctx, W, H, gl, lines) {
-  const GOLD      = 'rgba(232,213,163,0.95)';
-  const GOLD_SOFT = 'rgba(232,213,163,0.55)';
-  const GOLD_DIM  = 'rgba(232,213,163,0.35)';
+  const GOLD      = 'rgba(232,213,163,0.97)';
+  const GOLD_SOFT = 'rgba(232,213,163,0.50)';
+  const GOLD_DIM  = 'rgba(232,213,163,0.30)';
   const active    = lines._active || null; // { lineKey, pointKey } set by drag handler
+
+  // Sub-pixel alignment — shift by 0.5px so strokes land on physical pixel centres.
+  // The ctx already has ctx.scale(dpr,dpr) from loadScaledCanvas; 0.5 logical px = 0.5*dpr physical px,
+  // which rounds to the nearest pixel boundary and eliminates anti-alias bleed on 1-2px lines.
+  ctx.save(); ctx.translate(0.5, 0.5);
 
   const toPx = p => ({ x: p.x * W, y: p.y * H });
   const sb0 = toPx(lines.sideburn.p0), sb1 = toPx(lines.sideburn.p1);
@@ -2336,8 +2341,8 @@ function drawTaperShapeOverlay(ctx, W, H, gl, lines) {
   const refY = gl.lineYFrac * H;
   const refStartX = gl.startXFrac * W, refEndX = gl.endXFrac * W;
   ctx.save();
-  ctx.setLineDash([5, 5]); ctx.strokeStyle = GOLD_DIM; ctx.lineWidth = 1.5;
-  ctx.shadowColor = 'rgba(232,213,163,0.3)'; ctx.shadowBlur = 4;
+  ctx.setLineDash([4, 4]); ctx.strokeStyle = GOLD_DIM; ctx.lineWidth = 1;
+  ctx.shadowColor = 'rgba(232,213,163,0.25)'; ctx.shadowBlur = 2;
   ctx.beginPath(); ctx.moveTo(refStartX, refY); ctx.lineTo(refEndX, refY); ctx.stroke();
   ctx.restore();
 
@@ -2350,22 +2355,22 @@ function drawTaperShapeOverlay(ctx, W, H, gl, lines) {
 
   // Gradient: strongest near bald line, fades toward top (conveys "fade builds up from here")
   const grad = ctx.createLinearGradient(0, maxY, 0, minY);
-  grad.addColorStop(0,    'rgba(232,213,163,0.32)');
-  grad.addColorStop(0.45, 'rgba(232,213,163,0.18)');
-  grad.addColorStop(1,    'rgba(232,213,163,0.06)');
+  grad.addColorStop(0,    'rgba(232,213,163,0.28)');
+  grad.addColorStop(0.50, 'rgba(232,213,163,0.14)');
+  grad.addColorStop(1,    'rgba(232,213,163,0.04)');
   ctx.fillStyle = grad;
   ctx.fillRect(minX, minY, maxX - minX, maxY - minY);
 
-  // Subtle gold grid texture at very low opacity
-  ctx.globalAlpha = 0.10; ctx.strokeStyle = 'rgba(232,213,163,1)'; ctx.lineWidth = 0.6;
-  for (let x = minX; x <= maxX; x += 16) { ctx.beginPath(); ctx.moveTo(x, minY); ctx.lineTo(x, maxY); ctx.stroke(); }
-  for (let y = minY; y <= maxY; y += 16) { ctx.beginPath(); ctx.moveTo(minX, y); ctx.lineTo(maxX, y); ctx.stroke(); }
+  // Tight gold grid texture — 12px spacing keeps it subtle but visible
+  ctx.globalAlpha = 0.08; ctx.strokeStyle = 'rgba(232,213,163,1)'; ctx.lineWidth = 0.5;
+  for (let x = minX; x <= maxX; x += 12) { ctx.beginPath(); ctx.moveTo(x, minY); ctx.lineTo(x, maxY); ctx.stroke(); }
+  for (let y = minY; y <= maxY; y += 12) { ctx.beginPath(); ctx.moveTo(minX, y); ctx.lineTo(maxX, y); ctx.stroke(); }
   ctx.restore();
 
-  // ── Quad outline — gold glow ──────────────────────────────
+  // ── Quad outline — thin crisp gold stroke, minimal glow ──
   ctx.save();
-  ctx.shadowColor = 'rgba(232,213,163,0.5)'; ctx.shadowBlur = 10;
-  ctx.strokeStyle = GOLD_SOFT; ctx.lineWidth = 2; ctx.setLineDash([]);
+  ctx.shadowColor = 'rgba(232,213,163,0.35)'; ctx.shadowBlur = 4;
+  ctx.strokeStyle = GOLD_SOFT; ctx.lineWidth = 1; ctx.setLineDash([]);
   quadPath(ctx, quad); ctx.stroke();
   ctx.restore();
 
@@ -2374,54 +2379,59 @@ function drawTaperShapeOverlay(ctx, W, H, gl, lines) {
 
   const drawHandle = (p, lk, pk) => {
     const on = isActivePoint(lk, pk);
-    const R = on ? 18 : 14;
+    // Smaller logical radius — at dpr=3 these become 30-36px physical, still thumb-friendly
+    const R = on ? 10 : 8;
 
-    // Outer glow ring (visible when active, subtle otherwise)
-    ctx.save();
-    ctx.strokeStyle = on ? 'rgba(232,213,163,0.45)' : 'rgba(232,213,163,0.18)';
-    ctx.lineWidth = on ? 3.5 : 2;
-    ctx.shadowColor = 'rgba(232,213,163,0.7)'; ctx.shadowBlur = on ? 28 : 14;
-    ctx.beginPath(); ctx.arc(p.x, p.y, R + 6, 0, Math.PI * 2); ctx.stroke();
-    ctx.restore();
+    // Glow ring — tight blur, visible only when active
+    if (on) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(232,213,163,0.5)';
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = 'rgba(232,213,163,0.8)'; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(p.x, p.y, R + 5, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
 
-    // Main disc
+    // Main disc — crisp fill, tight shadow
     ctx.save();
-    ctx.shadowColor = 'rgba(232,213,163,0.9)'; ctx.shadowBlur = on ? 22 : 14;
+    ctx.shadowColor = 'rgba(232,213,163,0.75)'; ctx.shadowBlur = on ? 8 : 5;
     ctx.fillStyle = GOLD;
     ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
 
     // Inner specular highlight
     ctx.save();
-    ctx.fillStyle = 'rgba(255,252,235,0.55)';
-    ctx.beginPath(); ctx.arc(p.x - R * 0.25, p.y - R * 0.28, R * 0.38, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,252,235,0.60)';
+    ctx.beginPath(); ctx.arc(p.x - R * 0.28, p.y - R * 0.30, R * 0.36, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   };
 
   const drawLine = (p0, p1, lk, label) => {
     const lineActive = active && active.lineKey === lk;
-    // Glow pass
+    // Thin crisp line + tight glow — 1.5px logical = 4.5px physical at dpr=3
     ctx.save();
-    ctx.shadowColor = 'rgba(232,213,163,0.7)'; ctx.shadowBlur = lineActive ? 22 : 14;
-    ctx.strokeStyle = lineActive ? GOLD : 'rgba(232,213,163,0.82)';
-    ctx.lineWidth = lineActive ? 4 : 3; ctx.lineCap = 'round';
+    ctx.shadowColor = 'rgba(232,213,163,0.6)'; ctx.shadowBlur = lineActive ? 6 : 3;
+    ctx.strokeStyle = lineActive ? GOLD : 'rgba(232,213,163,0.88)';
+    ctx.lineWidth = lineActive ? 2 : 1.5; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
     ctx.restore();
 
     drawHandle(p0, lk, 'p0');
     drawHandle(p1, lk, 'p1');
 
-    // Label above top handle
+    // Label above top handle — tight shadow for clean legibility
     ctx.save();
-    ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = GOLD;
-    ctx.shadowColor = 'rgba(0,0,0,0.95)'; ctx.shadowBlur = 8;
+    ctx.font = 'bold 11px sans-serif'; ctx.fillStyle = GOLD; ctx.textBaseline = 'bottom';
+    ctx.shadowColor = 'rgba(0,0,0,1)'; ctx.shadowBlur = 5;
     const tw = ctx.measureText(label).width;
-    ctx.fillText(label, p1.x - tw / 2, Math.max(14, p1.y - 28));
+    ctx.fillText(label, p1.x - tw / 2, Math.max(12, p1.y - 14));
     ctx.restore();
   };
 
   drawLine(sb0, sb1, 'sideburn', 'Sideburn');
   drawLine(rr0, rr1, 'rear',     'Behind ear');
+
+  ctx.restore(); // undo translate(0.5, 0.5)
 }
 
 // Drag handling for the 4 taper-line endpoints. Large hit targets for
@@ -2438,18 +2448,29 @@ function makeTaperLinesDraggable(canvas, lines, gl, W, H, redraw) {
 
   const clampPoint = (lineKey, pointKey, x, y) => {
     let xFrac = x / W, yFrac = y / H;
-    if (lineKey === 'sideburn') {
-      xFrac = Math.max(gl.startXFrac - 0.10, Math.min(gl.startXFrac + 0.10, xFrac));
-    } else {
-      xFrac = Math.max(gl.endXFrac - 0.08, Math.min(gl.endXFrac + 0.14, xFrac));
-    }
+
+    // Allow full image-width movement — only hard edges are image bounds.
+    xFrac = Math.max(0.01, Math.min(0.99, xFrac));
+
+    // y: must stay above image top and no more than 5% below the bald line.
     yFrac = Math.max(0.02, Math.min(gl.lineYFrac + 0.05, yFrac));
+
+    // Prevent top handle (p1) going below bottom handle (p0) — keep min 2% gap.
     const line = lines[lineKey];
     if (pointKey === 'p1') {
-      yFrac = Math.min(yFrac, line.p0.y - 0.03);
+      yFrac = Math.min(yFrac, line.p0.y - 0.02);
     } else {
-      yFrac = Math.max(yFrac, line.p1.y + 0.03);
+      yFrac = Math.max(yFrac, line.p1.y + 0.02);
     }
+
+    // Prevent the two lines from crossing each other (min 1% gap in x).
+    const other = lineKey === 'sideburn' ? lines.rear : lines.sideburn;
+    if (lineKey === 'sideburn') {
+      xFrac = Math.min(xFrac, other[pointKey].x - 0.01);
+    } else {
+      xFrac = Math.max(xFrac, other[pointKey].x + 0.01);
+    }
+
     return { x: xFrac, y: yFrac };
   };
 
@@ -2505,7 +2526,9 @@ function applyTaperPreset(btn, preset) {
 }
 
 async function startTaperShaping() {
-  const gl = state.guideLine;
+  // Freeze a snapshot of guideLine so later bald-line drags don't silently
+  // shift the taper canvas reference point.
+  const gl = { ...state.guideLine };
   const { img, canvas, ctx, W, H } = await loadScaledCanvas(state.lastPhotoFile);
   removeTyping();
 
@@ -2579,9 +2602,44 @@ async function startTaperShaping() {
 function finalizeTaperShape(btn) {
   const msg = btn.closest('.msg');
   const lines = msg._taperLines;
+  const sb = lines.sideburn, re = lines.rear;
+
+  // ── Shape validation ──────────────────────────────────────
+  // Catch clearly wrong shapes before generating a bad fade plan.
+  const sbHeight = sb.p0.y - sb.p1.y; // positive = top above bottom ✓
+  const reHeight = re.p0.y - re.p1.y;
+  const xGap     = re.p0.x - sb.p0.x; // positive = rear is to the right ✓
+
+  let warning = null;
+  if (sbHeight <= 0 || reHeight <= 0) {
+    warning = 'The taper lines look inverted — make sure the top dot is above the bottom dot on each line.';
+  } else if (xGap < 0.01) {
+    warning = 'The two lines are overlapping or crossing. Drag them apart slightly so the sideburn line stays to the left of the behind-ear line.';
+  } else if (sbHeight < 0.03 && reHeight < 0.03) {
+    warning = 'The taper zone is very thin. Drag the top dot higher to create a visible fade zone, or it\'ll be hard to blend.';
+  }
+
+  if (warning) {
+    // Show inline warning — don't lock yet
+    let warn = msg.querySelector('.taper-lock-warning');
+    if (!warn) {
+      warn = document.createElement('p');
+      warn.className = 'taper-lock-warning';
+      warn.style.cssText = 'color:rgba(255,180,80,0.9);font-size:12.5px;margin:8px 0 0;line-height:1.5;';
+      btn.insertAdjacentElement('beforebegin', warn);
+    }
+    warn.textContent = '⚠️ ' + warning;
+    return;
+  }
+
+  // Remove any leftover warning
+  const existingWarn = msg.querySelector('.taper-lock-warning');
+  if (existingWarn) existingWarn.remove();
+
+  // Deep-copy the exact final positions — these become the source of truth.
   state.taperLines = {
-    sideburn: { p0: { ...lines.sideburn.p0 }, p1: { ...lines.sideburn.p1 } },
-    rear:     { p0: { ...lines.rear.p0 },     p1: { ...lines.rear.p1 } },
+    sideburn: { p0: { ...sb.p0 }, p1: { ...sb.p1 } },
+    rear:     { p0: { ...re.p0 }, p1: { ...re.p1 } },
   };
 
   msg._taperCanvas.style.pointerEvents = 'none';
