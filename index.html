@@ -1145,14 +1145,15 @@ const state = {
   tools: null,        // 'clippers'|'trimmer'|'both'
   phase: 'intro',     // 'intro'|'style-chosen'|'tools-known'|'guide-shown'
   shownPhotoTip: false,
-  guideLine: null,    // { lineYFrac, startXFrac, endXFrac, earTopFrac, earMidFrac } — final confirmed line
-  taperLines: null,   // { sideburn: {p0,p1}, rear: {p0,p1} } — LOCKED taper shape ("Lock My Taper"), fractional coords
-  fadePlan: null,        // array of step objects for the current style
-  currentStep: 0,        // index into fadePlan
-  lastPhotoFile: null,   // most recent File, used to re-render step overlays
-  nextFileHandler: null, // if set, the next uploaded file routes here instead of analyzePhoto
-  fadeGeometry: null,    // { earXfrac, earTopFrac, earBottomFrac, earMidFrac } — LOCKED from the first photo, never recomputed
-  fadeOffsetXFrac: 0,    // translation offset applied to the locked geometry for the current progress photo
+  guideLine: null,      // { lineYFrac, startXFrac, endXFrac, earTopFrac, earMidFrac } — derived from locked taper
+  taperLines: null,     // { sideburn: {p0,p1}, rear: {p0,p1} } — LOCKED taper shape ("Lock My Taper"), fractional coords
+  profileSide: null,    // 'left' | 'right' — which side of the head is in the photo
+  fadePlan: null,       // array of step objects for the current style
+  currentStep: 0,       // index into fadePlan
+  lastPhotoFile: null,  // most recent File, used to re-render step overlays
+  nextFileHandler: null,// if set, the next uploaded file routes here instead of analyzePhoto
+  fadeGeometry: null,   // { earXfrac, earTopFrac, earBottomFrac, earMidFrac } — LOCKED from the first photo
+  fadeOffsetXFrac: 0,
   fadeOffsetYFrac: 0,
 };
 
@@ -1689,52 +1690,40 @@ async function analyzePhoto(file) {
     return;
   }
 
-  const earMarks = await markEarPosition(file);
-  if (!earMarks) {
-    addAIMessage(photoRetakeMessage(['noear']), null);
-    return;
-  }
+  addTyping('Detecting photo orientation');
+  state.profileSide = await detectProfileSide(file);
+  removeTyping();
+
   addTyping('Building your fade plan');
   incUsage();
   if (isPro() || usage < FREE_CLAUDE_LIMIT) {
-    await claudeAnalysis(file, earMarks, usage < FREE_CLAUDE_LIMIT && !isPro());
+    await claudeAnalysis(file, usage < FREE_CLAUDE_LIMIT && !isPro());
   } else {
-    await freeAnalysis(file, earMarks);
+    await freeAnalysis(file);
   }
 }
 
-async function freeAnalysis(file, earMarks) {
+async function freeAnalysis(file) {
   try {
-    const canvas = await drawGuide(file, null, earMarks);
     removeTyping();
     const used = getUsage();
     state.phase = 'guide-shown';
     state.lastPhotoFile = file;
 
     if (state.taperStyle === 'buzz') {
-      // Buzz: keep chips and quick-blend info since no taper shaping needed
-      const blendGuard = '#3–4';
-      addAIMessageWithCanvas(
-        `<p>I placed your <strong>Buzz Cut guide line</strong> at the exact midpoint of your marked ear — a steady reference point. Drag to fine-tune, then start your first pass with a <strong>${blendGuard} guard</strong>.</p>
-         <p style="color:var(--text2);font-size:12px;margin-top:6px;">📍 ${barberPlacementNote('buzz')}</p>
-         <p style="color:var(--text3);font-size:12px;">Heuristic analysis ${used}/${FREE_LIMIT} · <span style="color:var(--accent2);cursor:pointer;text-decoration:underline;" onclick="showUpgrade()">Upgrade to Pro</span> for barber-precision placement</p>`,
-        canvas
+      // Buzz: set a sensible default guideLine then build the plan directly
+      state.guideLine = { lineYFrac: 0.50, startXFrac: 0.03, endXFrac: 0.97, earTopFrac: 0.38, earMidFrac: 0.50 };
+      state.fadeGeometry = { earXfrac: 0.50, earTopFrac: 0.38, earBottomFrac: 0.50, earMidFrac: 0.50 };
+      state.fadeOffsetXFrac = 0; state.fadeOffsetYFrac = 0;
+      addAIMessage(
+        `<p>Got it. Start your buzz cut with a <strong>#3–4 guard</strong> all over, then we'll step through blending the sides.</p>
+         <p style="color:var(--text3);font-size:12px;margin-top:6px;">Heuristic analysis ${used}/${FREE_LIMIT} · <span style="color:var(--accent2);cursor:pointer;text-decoration:underline;" onclick="showUpgrade()">Upgrade to Pro</span> for barber-precision placement</p>`,
+        null
       );
       buildFadePlan();
       state.currentStep = 0;
       presentFadePlanStep(0);
     } else {
-      // Taper: clean bald-line card, then immediately show the taper-shaping canvas
-      addStepMessage(
-        `<div class="fade-step-panel">
-          <div class="steps-title">Your Bald Guideline — Guard: None</div>
-          <div class="fade-step-row"><span class="fade-step-icon">🪒</span><div><strong>Guard: None</strong> — bare blade, lever closed. Clip directly along this line.</div></div>
-          <div class="fade-step-row"><span class="fade-step-icon">📍</span><div>${barberPlacementNote(state.taperStyle)}</div></div>
-          <div class="drag-hint" style="margin-top:8px;">↕ Drag the line to fine-tune its position before moving on</div>
-          <p style="color:var(--text3);font-size:12px;margin-top:6px;">Heuristic analysis ${used}/${FREE_LIMIT} · <span style="color:var(--accent2);cursor:pointer;text-decoration:underline;" onclick="showUpgrade()">Upgrade to Pro</span> for barber-precision placement</p>
-        </div>`,
-        canvas
-      );
       addTyping('Preparing your taper canvas');
       await startTaperShaping();
     }
@@ -1744,7 +1733,7 @@ async function freeAnalysis(file, earMarks) {
   }
 }
 
-async function claudeAnalysis(file, earMarks, isFreePreview = false) {
+async function claudeAnalysis(file, isFreePreview = false) {
   let res;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
@@ -1765,7 +1754,7 @@ async function claudeAnalysis(file, earMarks, isFreePreview = false) {
   removeTyping();
   if (!res.ok) {
     if (isFreePreview) {
-      await freeAnalysis(file, earMarks);
+      await freeAnalysis(file);
     } else {
       addAIMessage(`<p>Server error (${res.status}). Please try again in a moment.</p>`, null);
     }
@@ -1776,34 +1765,25 @@ async function claudeAnalysis(file, earMarks, isFreePreview = false) {
     addAIMessage('<p>Unexpected server response. Please try again.</p>', null);
     return;
   }
-  const canvas = await drawGuide(file, guide, earMarks);
   state.phase = 'guide-shown';
+  state.lastPhotoFile = file;
   const styleLabels = { low: 'Low Taper', mid: 'Mid Taper', high: 'High Taper', skin: 'Skin Fade' };
   const label = styleLabels[guide.taperType] || styleLabels[state.taperStyle] || 'Taper';
   const used = getUsage();
   const footer = isFreePreview
     ? `<p style="color:var(--text3);font-size:12px;">Free fade analysis ${used}/${FREE_CLAUDE_LIMIT} · <span style="color:var(--accent2);cursor:pointer;text-decoration:underline;" onclick="showUpgrade()">Upgrade to Pro</span> for unlimited</p>`
     : '';
-  state.lastPhotoFile = file;
   if (state.taperStyle === 'buzz') {
-    addAIMessageWithCanvas(`<p>⭐ <strong>${isFreePreview ? 'Fade Analysis' : 'Pro Analysis'} — ${label}:</strong> ${guide.advice}</p>
-      <p style="color:var(--text2);font-size:12px;margin-top:6px;">📍 ${barberPlacementNote(state.taperStyle)}</p>${footer}`, canvas);
+    state.guideLine = { lineYFrac: 0.50, startXFrac: 0.03, endXFrac: 0.97, earTopFrac: 0.38, earMidFrac: 0.50 };
+    state.fadeGeometry = { earXfrac: 0.50, earTopFrac: 0.38, earBottomFrac: 0.50, earMidFrac: 0.50 };
+    state.fadeOffsetXFrac = 0; state.fadeOffsetYFrac = 0;
+    addAIMessage(`<p>⭐ <strong>${isFreePreview ? 'Fade Analysis' : 'Pro Analysis'} — ${label}:</strong> ${guide.advice}</p>${footer}`, null);
     buildFadePlan();
     state.currentStep = 0;
     presentFadePlanStep(0);
   } else {
-    // Taper: clean bald-line card (no guard/blend chips — those come after taper lock)
-    addStepMessage(
-      `<div class="fade-step-panel">
-        <div class="steps-title">Your Bald Guideline — Guard: None</div>
-        <div class="fade-step-row"><span class="fade-step-icon">⭐</span><div><strong>${isFreePreview ? 'Fade Analysis' : 'Pro Analysis'} — ${label}:</strong> ${guide.advice}</div></div>
-        <div class="fade-step-row"><span class="fade-step-icon">🪒</span><div><strong>Guard: None</strong> — bare blade, lever closed. Clip directly along this line.</div></div>
-        <div class="fade-step-row"><span class="fade-step-icon">📍</span><div>${barberPlacementNote(state.taperStyle)}</div></div>
-        <div class="drag-hint" style="margin-top:8px;">↕ Drag the line to fine-tune its position before moving on</div>
-        ${footer}
-      </div>`,
-      canvas
-    );
+    // Show AI advice as a brief note, then go straight into taper shaping
+    addAIMessage(`<p>⭐ <strong>${label}:</strong> ${guide.advice}</p>${footer}`, null);
     addTyping('Preparing your taper canvas');
     await startTaperShaping();
   }
@@ -2312,11 +2292,42 @@ function quadPath(ctx, pts) {
   ctx.closePath();
 }
 
-// ── TAPER SHAPING — "Set your taper shape first" ──
-// After the bald guideline is confirmed, the user shapes their own taper
-// using two draggable line segments (sideburn + behind-ear). Each segment's
-// two endpoints can be dragged independently, which both repositions and
-// "rotates" the line — no separate rotate handle needed.
+// ── PROFILE SIDE DETECTION ──
+// Analyzes brightness of the left vs right thirds of the image.
+// The face (skin) is generally brighter than the back of the head (hair).
+// If the left strip is brighter → face faces left → RIGHT side of head visible.
+// If the right strip is brighter → face faces right → LEFT side of head visible.
+function detectProfileSide(file) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const W = 120, H = Math.round(img.height * 120 / img.width);
+        const c = document.createElement('canvas');
+        c.width = W; c.height = H;
+        const cx = c.getContext('2d');
+        cx.drawImage(img, 0, 0, W, H);
+        const y0 = Math.floor(H * 0.2), yH = Math.floor(H * 0.6);
+        const sW = Math.floor(W * 0.30);
+        const avg = d => { let s = 0; for (let i = 0; i < d.length; i += 4) s += (d[i]+d[i+1]+d[i+2])/3; return s/(d.length/4); };
+        const lb = avg(cx.getImageData(0, y0, sW, yH).data);
+        const rb = avg(cx.getImageData(W - sW, y0, sW, yH).data);
+        // left brighter → face on left → right side of head shown
+        // right brighter → face on right → left side of head shown
+        resolve(lb >= rb ? 'right' : 'left');
+      };
+      img.onerror = () => resolve('right');
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve('right');
+    reader.readAsDataURL(file);
+  });
+}
+
+// ── TAPER SHAPING — main calibration step ──
+// User drags four endpoints to set the taper shape, then locks it.
+// No ear markers needed — the four points ARE the source of truth.
 function offerTaperShaping() {
   addAIMessage(
     `<p><strong>Set your taper shape first.</strong> Drag the two gold lines on your photo — one near your sideburn, one behind your ear — to match the taper shape you want. The highlighted area shows where the fade will happen.</p>
@@ -2325,15 +2336,13 @@ function offerTaperShaping() {
   );
 }
 
-function drawTaperShapeOverlay(ctx, W, H, gl, lines) {
+// gl param removed — bald-line reference is now derived from the p0 endpoints of both lines.
+function drawTaperShapeOverlay(ctx, W, H, lines) {
   const GOLD      = 'rgba(232,213,163,0.97)';
   const GOLD_SOFT = 'rgba(232,213,163,0.50)';
   const GOLD_DIM  = 'rgba(232,213,163,0.30)';
-  const active    = lines._active || null; // { lineKey, pointKey } set by drag handler
+  const active    = lines._active || null;
 
-  // Sub-pixel alignment — shift by 0.5px so strokes land on physical pixel centres.
-  // The ctx already has ctx.scale(dpr,dpr) from loadScaledCanvas; 0.5 logical px = 0.5*dpr physical px,
-  // which rounds to the nearest pixel boundary and eliminates anti-alias bleed on 1-2px lines.
   ctx.save(); ctx.translate(0.5, 0.5);
 
   const toPx = p => ({ x: p.x * W, y: p.y * H });
@@ -2341,9 +2350,10 @@ function drawTaperShapeOverlay(ctx, W, H, gl, lines) {
   const rr0 = toPx(lines.rear.p0),     rr1 = toPx(lines.rear.p1);
   const quad = [sb0, sb1, rr1, rr0];
 
-  // ── Dashed bald-guideline reference ──────────────────────
-  const refY = gl.lineYFrac * H;
-  const refStartX = gl.startXFrac * W, refEndX = gl.endXFrac * W;
+  // ── Dashed bald-guideline reference — derived from p0 of both lines ──
+  const refY      = ((lines.sideburn.p0.y + lines.rear.p0.y) / 2) * H;
+  const refStartX = Math.min(lines.sideburn.p0.x, lines.rear.p0.x) * W;
+  const refEndX   = Math.max(lines.sideburn.p0.x, lines.rear.p0.x) * W;
   ctx.save();
   ctx.setLineDash([4, 4]); ctx.strokeStyle = GOLD_DIM; ctx.lineWidth = 1;
   ctx.shadowColor = 'rgba(232,213,163,0.25)'; ctx.shadowBlur = 2;
@@ -2441,9 +2451,10 @@ function drawTaperShapeOverlay(ctx, W, H, gl, lines) {
 // Drag handling for the 4 taper-line endpoints. Large hit targets for
 // comfortable mobile use. Sets lines._active so drawTaperShapeOverlay
 // can highlight the active handle in real time.
-function makeTaperLinesDraggable(canvas, lines, gl, W, H, redraw) {
-  let dragging = null; // { lineKey, pointKey }
-  const HIT_R = 32; // generous thumb-sized hit area
+// side: 'left' (face facing right, sideburn.x > rear.x) or 'right' (face facing left, sideburn.x < rear.x)
+function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw) {
+  let dragging = null;
+  const HIT_R = 32;
 
   const toCanvas = (clientX, clientY) => {
     const r = canvas.getBoundingClientRect();
@@ -2453,13 +2464,11 @@ function makeTaperLinesDraggable(canvas, lines, gl, W, H, redraw) {
   const clampPoint = (lineKey, pointKey, x, y) => {
     let xFrac = x / W, yFrac = y / H;
 
-    // Allow full image-width movement — only hard edges are image bounds.
+    // Full image bounds
     xFrac = Math.max(0.01, Math.min(0.99, xFrac));
+    yFrac = Math.max(0.02, Math.min(0.96, yFrac));
 
-    // y: must stay above image top and no more than 5% below the bald line.
-    yFrac = Math.max(0.02, Math.min(gl.lineYFrac + 0.05, yFrac));
-
-    // Prevent top handle (p1) going below bottom handle (p0) — keep min 2% gap.
+    // Prevent top dot (p1) going below bottom dot (p0)
     const line = lines[lineKey];
     if (pointKey === 'p1') {
       yFrac = Math.min(yFrac, line.p0.y - 0.02);
@@ -2467,12 +2476,16 @@ function makeTaperLinesDraggable(canvas, lines, gl, W, H, redraw) {
       yFrac = Math.max(yFrac, line.p1.y + 0.02);
     }
 
-    // Prevent the two lines from crossing each other (min 1% gap in x).
+    // Prevent lines from crossing — direction depends on which side of the head is shown.
+    // 'left' photo: sideburn is to the RIGHT of rear (sbX > reX)
+    // 'right' photo: sideburn is to the LEFT of rear (sbX < reX)
     const other = lineKey === 'sideburn' ? lines.rear : lines.sideburn;
-    if (lineKey === 'sideburn') {
-      xFrac = Math.min(xFrac, other[pointKey].x - 0.01);
+    if (side === 'left') {
+      if (lineKey === 'sideburn') xFrac = Math.max(xFrac, other[pointKey].x + 0.01);
+      else                        xFrac = Math.min(xFrac, other[pointKey].x - 0.01);
     } else {
-      xFrac = Math.max(xFrac, other[pointKey].x + 0.01);
+      if (lineKey === 'sideburn') xFrac = Math.min(xFrac, other[pointKey].x - 0.01);
+      else                        xFrac = Math.max(xFrac, other[pointKey].x + 0.01);
     }
 
     return { x: xFrac, y: yFrac };
@@ -2530,27 +2543,29 @@ function applyTaperPreset(btn, preset) {
 }
 
 async function startTaperShaping() {
-  // Freeze a snapshot of guideLine so later bald-line drags don't silently
-  // shift the taper canvas reference point.
-  const gl = { ...state.guideLine };
+  const side = state.profileSide || 'right';
   const { img, canvas, ctx, W, H } = await loadScaledCanvas(state.lastPhotoFile);
   removeTyping();
 
-  const defaultTopFrac = Math.max(0.04, gl.earTopFrac * 0.4);
-  const lineH = gl.lineYFrac - defaultTopFrac; // height of the default taper zone
+  // Default taper placement — user will drag these to fit their sideburn/ear.
+  // 'left': left side of head visible, face pointing right → sideburn on RIGHT, rear on LEFT.
+  // 'right': right side of head visible, face pointing left → sideburn on LEFT, rear on RIGHT.
+  const botY = 0.60, topY = 0.32;
+  const sbX  = side === 'left' ? 0.52 : 0.44;
+  const reX  = side === 'left' ? 0.36 : 0.60;
 
   const lines = {
-    sideburn: { p0: { x: gl.startXFrac, y: gl.lineYFrac }, p1: { x: gl.startXFrac, y: defaultTopFrac } },
-    rear:     { p0: { x: gl.endXFrac,   y: gl.lineYFrac }, p1: { x: gl.endXFrac,   y: defaultTopFrac } },
+    sideburn: { p0: { x: sbX, y: botY }, p1: { x: sbX, y: topY } },
+    rear:     { p0: { x: reX, y: botY }, p1: { x: reX, y: topY } },
   };
 
   const redraw = () => {
     ctx.clearRect(0, 0, W, H);
     ctx.drawImage(img, 0, 0, W, H);
-    drawTaperShapeOverlay(ctx, W, H, gl, lines);
+    drawTaperShapeOverlay(ctx, W, H, lines);
   };
   redraw();
-  makeTaperLinesDraggable(canvas, lines, gl, W, H, redraw);
+  makeTaperLinesDraggable(canvas, lines, side, W, H, redraw);
 
   const msg = document.createElement('div');
   msg.className = 'msg';
@@ -2558,7 +2573,7 @@ async function startTaperShaping() {
     <div class="msg-text">
       <div class="fade-step-panel" style="margin-bottom:12px;">
         <div class="steps-title">Set Your Taper Shape</div>
-        <p style="font-size:13.5px;line-height:1.6;margin:8px 0 12px;color:var(--text);">Drag the two gold lines until the highlighted area matches where you want your taper to fade.</p>
+        <p style="font-size:13.5px;line-height:1.6;margin:8px 0 12px;color:var(--text);">Drag the four gold dots until the highlighted area covers exactly where you want your taper to fade.</p>
 
         <div style="margin-bottom:4px;font-size:11px;font-weight:600;color:var(--text3);letter-spacing:0.08em;text-transform:uppercase;">Start with a preset</div>
         <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:4px;">
@@ -2566,11 +2581,11 @@ async function startTaperShaping() {
           <button class="taper-preset-chip" onclick="applyTaperPreset(this,'tight')">Tighter Taper</button>
           <button class="taper-preset-chip" onclick="applyTaperPreset(this,'wide')">Wider Blend</button>
         </div>
-        <p style="font-size:11.5px;color:var(--text3);margin:8px 0 0;">Then drag the <strong style="color:var(--text2);">gold dots</strong> on each line to fine-tune — top dot adjusts height &amp; angle, bottom dot moves the base.</p>
+        <p style="font-size:11.5px;color:var(--text3);margin:8px 0 0;">Drag any of the <strong style="color:var(--text2);">four gold dots</strong> to reshape — top dots set height &amp; angle, bottom dots set the bald baseline.</p>
       </div>
 
       <div class="guide-img-wrap" style="position:relative;"></div>
-      <div class="drag-hint" style="margin-top:8px;">↕ Drag either dot on each gold line to reshape your taper</div>
+      <div class="drag-hint" style="margin-top:8px;">↕ Drag any gold dot to reshape your taper</div>
       <button class="opt-btn" style="margin-top:12px;width:100%;font-size:15px;padding:14px;letter-spacing:0.02em;" onclick="finalizeTaperShape(this)">Lock My Taper</button>
     </div></div>`;
   messagesWrap.appendChild(msg);
@@ -2579,22 +2594,21 @@ async function startTaperShaping() {
   msg._taperLines = lines;
   msg._taperCanvas = canvas;
 
-  // Preset geometry definitions — all expressed relative to gl so they
-  // work regardless of where the user's ear is in the photo.
+  // dir: +1 for left-side photos (sideburn right of rear), -1 for right-side (sideburn left of rear)
+  const dir = side === 'left' ? 1 : -1;
+
   msg._applyPreset = (preset) => {
     if (preset === 'classic') {
-      lines.sideburn = { p0: { x: gl.startXFrac,        y: gl.lineYFrac }, p1: { x: gl.startXFrac,        y: defaultTopFrac } };
-      lines.rear     = { p0: { x: gl.endXFrac,           y: gl.lineYFrac }, p1: { x: gl.endXFrac,           y: defaultTopFrac } };
+      lines.sideburn = { p0: { x: sbX, y: botY }, p1: { x: sbX, y: topY } };
+      lines.rear     = { p0: { x: reX, y: botY }, p1: { x: reX, y: topY } };
     } else if (preset === 'tight') {
-      // Shorter zone + lines angle slightly inward at the top
-      const topFrac = gl.lineYFrac - lineH * 0.52;
-      lines.sideburn = { p0: { x: gl.startXFrac,          y: gl.lineYFrac }, p1: { x: gl.startXFrac + 0.016, y: topFrac } };
-      lines.rear     = { p0: { x: gl.endXFrac,             y: gl.lineYFrac }, p1: { x: gl.endXFrac - 0.016,   y: topFrac } };
+      const tY = botY - (botY - topY) * 0.52;
+      lines.sideburn = { p0: { x: sbX,                y: botY }, p1: { x: sbX - dir * 0.016, y: tY } };
+      lines.rear     = { p0: { x: reX,                y: botY }, p1: { x: reX + dir * 0.016, y: tY } };
     } else if (preset === 'wide') {
-      // Taller zone + lines spread outward for a more gradual blend
-      const topFrac  = Math.max(0.04, gl.lineYFrac - lineH * 1.65);
-      lines.sideburn = { p0: { x: Math.max(0.01, gl.startXFrac - 0.012), y: gl.lineYFrac }, p1: { x: Math.max(0.01, gl.startXFrac - 0.028), y: topFrac } };
-      lines.rear     = { p0: { x: Math.min(0.99, gl.endXFrac   + 0.012), y: gl.lineYFrac }, p1: { x: Math.min(0.99, gl.endXFrac   + 0.040), y: topFrac } };
+      const tY = Math.max(0.04, botY - (botY - topY) * 1.65);
+      lines.sideburn = { p0: { x: sbX + dir * 0.012, y: botY }, p1: { x: sbX + dir * 0.028, y: tY } };
+      lines.rear     = { p0: { x: reX - dir * 0.012, y: botY }, p1: { x: reX - dir * 0.028, y: tY } };
     }
     lines._active = null;
     redraw();
@@ -2609,18 +2623,17 @@ function finalizeTaperShape(btn) {
   const sb = lines.sideburn, re = lines.rear;
 
   // ── Shape validation ──────────────────────────────────────
-  // Catch clearly wrong shapes before generating a bad fade plan.
   const sbHeight = sb.p0.y - sb.p1.y; // positive = top above bottom ✓
   const reHeight = re.p0.y - re.p1.y;
-  const xGap     = re.p0.x - sb.p0.x; // positive = rear is to the right ✓
+  const xGap     = Math.abs(re.p0.x - sb.p0.x); // orientation-independent gap
 
   let warning = null;
   if (sbHeight <= 0 || reHeight <= 0) {
     warning = 'The taper lines look inverted — make sure the top dot is above the bottom dot on each line.';
   } else if (xGap < 0.01) {
-    warning = 'The two lines are overlapping or crossing. Drag them apart slightly so the sideburn line stays to the left of the behind-ear line.';
+    warning = 'The two lines are overlapping or crossing. Drag them apart so the taper zone has some width.';
   } else if (sbHeight < 0.03 && reHeight < 0.03) {
-    warning = 'The taper zone is very thin. Drag the top dot higher to create a visible fade zone, or it\'ll be hard to blend.';
+    warning = 'The taper zone is very thin. Drag the top dots higher to create a visible fade zone.';
   }
 
   if (warning) {
@@ -2640,11 +2653,22 @@ function finalizeTaperShape(btn) {
   const existingWarn = msg.querySelector('.taper-lock-warning');
   if (existingWarn) existingWarn.remove();
 
-  // Deep-copy the exact final positions — these become the source of truth.
+  // Deep-copy the exact final positions — these are the source of truth, never recalculated.
   state.taperLines = {
     sideburn: { p0: { ...sb.p0 }, p1: { ...sb.p1 } },
     rear:     { p0: { ...re.p0 }, p1: { ...re.p1 } },
   };
+
+  // Derive the bald guideline from the bottom of the locked taper shape.
+  // The p0 endpoints sit on the bald line; their average y is the guideline level.
+  const lineYFrac   = (sb.p0.y + re.p0.y) / 2;
+  const startXFrac  = Math.min(sb.p0.x, re.p0.x);
+  const endXFrac    = Math.max(sb.p0.x, re.p0.x);
+  const earTopFrac  = Math.min(sb.p1.y, re.p1.y);
+  state.guideLine = { lineYFrac, startXFrac, endXFrac, earTopFrac, earMidFrac: lineYFrac };
+  state.fadeGeometry = { earXfrac: (startXFrac + endXFrac) / 2, earTopFrac, earBottomFrac: lineYFrac, earMidFrac: lineYFrac };
+  state.fadeOffsetXFrac = 0;
+  state.fadeOffsetYFrac = 0;
 
   msg._taperCanvas.style.pointerEvents = 'none';
   btn.disabled = true;
@@ -3177,37 +3201,14 @@ async function reviewProgressPhoto(file, i) {
     return;
   }
 
-  const earMarks = await markEarPosition(file);
-  if (!earMarks) {
-    addAIMessage(photoRetakeMessage(['noear']), null);
-    state.nextFileHandler = (f) => reviewProgressPhoto(f, i);
-    return;
-  }
-
+  // No ear re-marking needed — the locked taper shape is the anchor.
+  // Show the current step overlay at the same position the user set.
   addTyping(STEP_REVIEW_COPY[i].checking);
-
-  // Align the new photo to the LOCKED geometry from the first photo —
-  // a simple translation, computed against the original anchors so
-  // offsets never compound across multiple progress photos.
-  const geo = state.fadeGeometry;
-  const newEarMidFrac = (earMarks.earTopFrac + earMarks.earBottomFrac) / 2;
-  const offsetYFrac = newEarMidFrac - geo.earMidFrac;
-  const offsetXFrac = earMarks.earXfrac - geo.earXfrac;
+  state.fadeOffsetXFrac = 0;
+  state.fadeOffsetYFrac = 0;
   removeTyping();
-
-  const TOLERANCE = 0.04;
-  const passed = Math.abs(offsetYFrac) <= TOLERANCE;
-  if (passed) {
-    state.fadeOffsetXFrac = 0;
-    state.fadeOffsetYFrac = 0;
-    addAIMessage(`${reviewCardHtml(i, true)}<p style="margin-top:10px;">${STEP_REVIEW_COPY[i].pass}</p>`, null);
-    presentFadePlanStep(i + 1);
-  } else {
-    state.fadeOffsetXFrac = offsetXFrac;
-    state.fadeOffsetYFrac = offsetYFrac;
-    addAIMessage(`${reviewCardHtml(i, false)}<p style="margin-top:10px;">${STEP_REVIEW_COPY[i].fail}</p>`, null);
-    presentFadePlanStep(i);
-  }
+  addAIMessage(`${reviewCardHtml(i, true)}<p style="margin-top:10px;">${STEP_REVIEW_COPY[i].pass}</p>`, null);
+  presentFadePlanStep(i + 1);
 }
 
 // ── WRAP-UP — cheat sheet, tools, share, completion ──
@@ -3646,7 +3647,7 @@ function resetChat() {
   started = false; pendingFiles = [];
   state.taperStyle = null; state.tools = null; state.phase = 'intro'; state.shownPhotoTip = false;
   state.fadePlan = null; state.currentStep = 0; state.lastPhotoFile = null; state.nextFileHandler = null;
-  state.guideLine = null; state.taperLines = null; state.fadeGeometry = null; state.fadeOffsetXFrac = 0; state.fadeOffsetYFrac = 0;
+  state.guideLine = null; state.taperLines = null; state.profileSide = null; state.fadeGeometry = null; state.fadeOffsetXFrac = 0; state.fadeOffsetYFrac = 0;
   messagesWrap.innerHTML = ''; messagesWrap.classList.remove('visible');
   hero.style.display = ''; uploadPreview.innerHTML = '';
   uploadPreview.classList.remove('has-files');
