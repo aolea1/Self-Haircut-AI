@@ -622,13 +622,17 @@ body {
 .ptip-panel-label.good{color:var(--accent);}
 .ptip-panel-label.bad{color:var(--red);}
 
-.ptip-badge{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.ptip-badge svg{width:11px;height:11px;}
+.ptip-badge{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;line-height:0;}
+.ptip-badge svg{width:11px;height:11px;display:block;}
 .ptip-badge.good{background:var(--accent);color:#000;}
 .ptip-badge.bad{background:var(--red);color:#fff;}
+/* Replace SVG checkmark with a typographically-centered unicode character */
+.ptip-badge.good{position:relative;overflow:hidden;}
+.ptip-badge.good svg{display:none;}
+.ptip-badge.good::after{content:'✓';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:12px;font-weight:900;line-height:1;color:#000;}
 
 .ptip-illustration{border-radius:12px;overflow:hidden;margin-bottom:14px;line-height:0;aspect-ratio:570/397;background:#161616;}
-.ptip-illustration img{width:100%;height:100%;object-fit:cover;display:block;}
+.ptip-illustration img{width:100%;height:100%;object-fit:contain;display:block;}
 
 .ptip-tag-row{display:flex;gap:8px;}
 .ptip-tag{flex:1;text-align:center;padding:10px 6px;background:var(--surface3);border-radius:10px;}
@@ -653,8 +657,8 @@ body {
 .ptip-mistakes-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;}
 @media (max-width:680px){ .ptip-mistakes-row{grid-template-columns:repeat(2,1fr);} }
 .ptip-mistake{text-align:center;}
-.ptip-mistake-thumb{position:relative;border-radius:10px;overflow:hidden;margin-bottom:8px;aspect-ratio:206/105;background:#161616;}
-.ptip-mistake-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+.ptip-mistake-thumb{position:relative;border-radius:10px;overflow:hidden;margin-bottom:8px;aspect-ratio:16/10;background:#161616;}
+.ptip-mistake-thumb img{width:100%;height:100%;object-fit:contain;display:block;}
 .ptip-mistake strong{display:block;font-size:11px;font-weight:700;color:var(--text);line-height:1.3;}
 .ptip-mistake span{display:block;font-size:10px;color:var(--text3);line-height:1.3;margin-top:2px;}
 
@@ -1946,7 +1950,7 @@ const PTIP_ICON = {
   profile: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21v-3.4C6.6 16.1 5 13.7 5 11a7 7 0 0 1 13.6-2.4c.8.2 1.4.8 1.4 1.9 0 1.1-.8 1.7-1.6 1.9-.4 2-1.8 3.6-3.6 4.4V21"/></svg>`,
   target: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>`,
   star: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.7 7-6.3-3.8L5.7 21l1.7-7L2 9.2l7.1-.6L12 2z"/></svg>`,
-  check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  check: `<svg viewBox="1 4 22 15" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
   x: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
   info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="7.5" r="0.6" fill="currentColor"/></svg>`,
 };
@@ -3263,7 +3267,7 @@ function addFadePlanWrapUp() {
   setTimeout(() => {
     addAIMessage(`<p>✂️ <strong>You're all set!</strong> Follow those steps and you'll have a clean taper. Come back and let me know how it came out — or upload another photo if you need a touch-up.</p>`, null);
     scrollBottom();
-  }, 800);
+  }, 200);
   // Email capture after first guide
   showEmailCapture();
 }
@@ -3634,7 +3638,7 @@ function optionClick(btn, value) {
       removeTyping();
       const r = getResponse(value);
       addAIMessage(r.html, r.options);
-    }, 800);
+    }, 300);
   }, 150);
 }
 
