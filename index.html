@@ -1021,9 +1021,9 @@ body {
       <div class="lp-hero">
         <div class="lp-badge">Low Taper Fade</div>
         <h1 class="lp-h1">Cut Your Own Low Taper Fade With Barber-Level Precision</h1>
-        <p class="lp-sub">Upload a side photo and mark the top and bottom of your ear — we calculate the exact midpoint and place your taper line there, barber-calibrated and ready to follow.</p>
+        <p class="lp-sub">Upload a side photo, shape your taper to fit your head, and follow a barber-guided fade plan built around your exact look — step by step.</p>
         <button class="lp-cta" onclick="startGuide()">
-          Get My Precision Fade Guide
+          Let's Start This Self Cut
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
         </button>
         <div class="lp-cta-note">No signup &nbsp;·&nbsp; Free to start &nbsp;·&nbsp; Works on any phone</div>
@@ -1050,22 +1050,22 @@ body {
           <div class="lp-step">
             <div class="lp-step-n">01</div>
             <div>
-              <div class="lp-step-title">Upload a side photo</div>
-              <div class="lp-step-desc">Side profile, ear visible. Takes 10 seconds.</div>
+              <div class="lp-step-title">Upload your side profile</div>
+              <div class="lp-step-desc">Take or upload one clean side photo. Make sure the side of your head and taper area are clearly visible.</div>
             </div>
           </div>
           <div class="lp-step">
             <div class="lp-step-n">02</div>
             <div>
-              <div class="lp-step-title">Mark your ear, get your line</div>
-              <div class="lp-step-desc">Place two markers — top and bottom of your ear. We calculate the exact midpoint and draw your taper line there instantly. Drag to adjust before you cut anything.</div>
+              <div class="lp-step-title">Shape your low taper</div>
+              <div class="lp-step-desc">Drag four points on your photo until the highlighted zone matches exactly where you want your taper to fall. No guesswork — you see it live before you cut anything.</div>
             </div>
           </div>
           <div class="lp-step">
             <div class="lp-step-n">03</div>
             <div>
-              <div class="lp-step-title">Follow barber guidance</div>
-              <div class="lp-step-desc">Exact guard numbers. Exact technique. Step by step.</div>
+              <div class="lp-step-title">Follow your fade plan</div>
+              <div class="lp-step-desc">Get barber coaching for every stage — what guard to use, where to trim, how to move the clipper, and when to stop. One step at a time.</div>
             </div>
           </div>
         </div>
@@ -1077,7 +1077,7 @@ body {
       <div class="lp-final">
         <div class="lp-final-title">Your most precise fade<br>starts now.</div>
         <button class="lp-cta" onclick="startGuide()">
-          Get My Precision Fade Guide
+          Let's Start This Self Cut
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
         </button>
         <div class="lp-cta-note" style="margin-top:12px;">Free to try &nbsp;·&nbsp; No barber required</div>
@@ -1947,9 +1947,9 @@ function uploadGuideChecklist() {
   const rows = [
     ['Hold your phone upright (portrait)', 'Do not hold your phone sideways.'],
     ['Turn fully to the side', 'Show the entire side of your head.'],
-    ['Ear, sideburn &amp; fade area visible', "Push your hair back if it's in the way."],
+    ['Move close — fill the frame with the taper area', 'The closer the camera, the more precisely you can place your taper points.'],
+    ['Ear, sideburn &amp; fade zone fully visible', "Push your hair back if it's covering the area."],
     ['Good, even lighting', 'Stand in natural light and avoid heavy shadows.'],
-    ["Don't zoom in", 'Fit your head and shoulders in the frame.'],
   ];
   return `<div class="ptip-list">${rows.map(([title, desc]) => `
     <div class="ptip-row">
@@ -1965,7 +1965,7 @@ function renderPhotoTipOverlay() {
   const tagRow = [
     [PTIP_ICON.phone, 'Hold upright', 'Portrait mode'],
     [PTIP_ICON.profile, 'Full side profile', 'Turn fully to the side'],
-    [PTIP_ICON.target, 'Ear &amp; fade visible', 'Clear view of ear, sideburn &amp; fade area'],
+    [PTIP_ICON.target, 'Close up — taper zone', 'Fill the frame with your sideburn &amp; fade area'],
   ];
   const mistakes = [
     ['sideways', 'Phone sideways', 'Hold your phone upright (portrait).'],
@@ -1986,7 +1986,7 @@ function renderPhotoTipOverlay() {
       <div class="ptip-header-icon">${PTIP_ICON.camera}</div>
       <div>
         <div class="ptip-title">Let's get the perfect shot</div>
-        <div class="ptip-subtitle">A clear side profile gives you the most accurate fade guide.</div>
+        <div class="ptip-subtitle">Get close — the more of the taper area that fills the frame, the more precisely your four points will land.</div>
       </div>
     </div>
 
@@ -2005,7 +2005,7 @@ function renderPhotoTipOverlay() {
         ${uploadGuideChecklist()}
         <div class="ptip-protip">
           <span class="ptip-protip-icon">${PTIP_ICON.star}</span>
-          <div><strong>Pro tip</strong><span>Stand about an arm's length away from the camera for the sharpest results.</span></div>
+          <div><strong>Pro tip</strong><span>Move the camera close until the sideburn and taper area fills most of the frame — the closer, the more accurately you can place your taper points.</span></div>
         </div>
       </div>
     </div>
@@ -2292,6 +2292,24 @@ function quadPath(ctx, pts) {
   ctx.closePath();
 }
 
+// Rounded variant — draws quad with smooth bezier corners for a natural, barber-like shape.
+function quadPathRounded(ctx, pts, r) {
+  const n = pts.length;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const prev = pts[(i + n - 1) % n], curr = pts[i], next = pts[(i + 1) % n];
+    const d0 = Math.hypot(curr.x - prev.x, curr.y - prev.y);
+    const d1 = Math.hypot(next.x - curr.x, next.y - curr.y);
+    const rad = Math.min(r, d0 / 2, d1 / 2);
+    const tx0 = (curr.x - prev.x) / d0 * rad, ty0 = (curr.y - prev.y) / d0 * rad;
+    const tx1 = (next.x - curr.x) / d1 * rad, ty1 = (next.y - curr.y) / d1 * rad;
+    if (i === 0) ctx.moveTo(curr.x - tx0, curr.y - ty0);
+    else ctx.lineTo(curr.x - tx0, curr.y - ty0);
+    ctx.quadraticCurveTo(curr.x, curr.y, curr.x + tx1, curr.y + ty1);
+  }
+  ctx.closePath();
+}
+
 // ── PROFILE SIDE DETECTION ──
 // Analyzes brightness of the left vs right thirds of the image.
 // The face (skin) is generally brighter than the back of the head (hair).
@@ -2364,8 +2382,9 @@ function drawTaperShapeOverlay(ctx, W, H, lines) {
   const minX = Math.min(...quad.map(p => p.x)), maxX = Math.max(...quad.map(p => p.x));
   const minY = Math.min(...quad.map(p => p.y)), maxY = Math.max(...quad.map(p => p.y));
 
+  const CORNER_R_SHAPE = Math.min(12, (maxX - minX) * 0.1, (maxY - minY) * 0.18);
   ctx.save();
-  quadPath(ctx, quad); ctx.clip();
+  quadPathRounded(ctx, quad, CORNER_R_SHAPE); ctx.clip();
 
   // Gradient: strongest near bald line, fades toward top (conveys "fade builds up from here")
   const grad = ctx.createLinearGradient(0, maxY, 0, minY);
@@ -2385,7 +2404,7 @@ function drawTaperShapeOverlay(ctx, W, H, lines) {
   ctx.save();
   ctx.shadowColor = 'rgba(232,213,163,0.35)'; ctx.shadowBlur = 4;
   ctx.strokeStyle = GOLD_SOFT; ctx.lineWidth = 1; ctx.setLineDash([]);
-  quadPath(ctx, quad); ctx.stroke();
+  quadPathRounded(ctx, quad, CORNER_R_SHAPE); ctx.stroke();
   ctx.restore();
 
   // ── Line segments + premium handles ──────────────────────
@@ -2572,15 +2591,9 @@ async function startTaperShaping() {
   msg.innerHTML = `${aiAvatar()}<div class="msg-body"><div class="msg-name">SelfHaircut.ai</div>
     <div class="msg-text">
       <div class="fade-step-panel" style="margin-bottom:12px;">
-        <div class="steps-title">Set Your Taper Shape</div>
+        <div class="steps-title">Adjust your low taper</div>
         <p style="font-size:13.5px;line-height:1.6;margin:8px 0 12px;color:var(--text);">Drag the four gold dots until the highlighted area covers exactly where you want your taper to fade.</p>
 
-        <div style="margin-bottom:4px;font-size:11px;font-weight:600;color:var(--text3);letter-spacing:0.08em;text-transform:uppercase;">Start with a preset</div>
-        <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:4px;">
-          <button class="taper-preset-chip active" onclick="applyTaperPreset(this,'classic')">Classic Low Taper</button>
-          <button class="taper-preset-chip" onclick="applyTaperPreset(this,'tight')">Tighter Taper</button>
-          <button class="taper-preset-chip" onclick="applyTaperPreset(this,'wide')">Wider Blend</button>
-        </div>
         <p style="font-size:11.5px;color:var(--text3);margin:8px 0 0;">Drag any of the <strong style="color:var(--text2);">four gold dots</strong> to reshape — top dots set height &amp; angle, bottom dots set the bald baseline.</p>
       </div>
 
@@ -2691,62 +2704,66 @@ function showUpgrade() {
 // and the chosen style. Each step gets its own zone (line/band/detail)
 // for drawStepOverlay, plus guard/lever/start/height/flick guidance.
 
-// The bald guideline (step 1) is always "Guard: None" — bare blade, no
-// lever setting. Steps 2-4 (soften / build / light touch-up) step up from
-// there: `build` is the guard for the main blend zone, `soften`/`refine`
-// are half a guard size lighter on either side of it.
+// Guard ladder for each style — 6 blend steps + final cleanup.
+// For low taper: open blade → 0.5 open → 1 open → 1.5 open → 2 open → cleanup
 const FADE_GUARDS = {
-  low:  { soften: '#0.5', build: '#1',   refine: '#0.5' },
-  mid:  { soften: '#1',   build: '#1.5', refine: '#1' },
-  high: { soften: '#1.5', build: '#2',   refine: '#1.5' },
-  skin: { soften: '#0',   build: '#0.5', refine: '#0' },
+  low:  { s1: ‘None’, s2: ‘None’, s3: ‘#0.5’, s4: ‘#1’, s5: ‘#1.5’, s6: ‘#2’ },
+  mid:  { s1: ‘None’, s2: ‘None’, s3: ‘#1’,   s4: ‘#1.5’, s5: ‘#2’, s6: ‘#2.5’ },
+  high: { s1: ‘None’, s2: ‘None’, s3: ‘#1.5’, s4: ‘#2’,   s5: ‘#2.5’, s6: ‘#3’ },
+  skin: { s1: ‘None’, s2: ‘None’, s3: ‘#0.5’, s4: ‘#1’,   s5: ‘#1.5’, s6: ‘#2’ },
 };
 
-// Shared 5-step content for taper styles (low/mid/high/skin) — same goal/
-// instructions/motion/mistake/stopWhen copy for every style; only the guard
-// numbers (FADE_GUARDS) and zone geometry (buildFadePlan) differ per style.
+// 7-step taper content — realistic low-taper barber ladder.
 const FADE_STEP_TEXT_TAPER = [
-  { title: 'Create Your Bald Line', lever: 'n/a', zoneLabel: 'Bald guideline — the foundation for your whole fade',
-    goal: 'Create the initial bald guideline.',
-    instructions: 'Follow the highlighted line slowly. Stay at the middle of your ear and do not go above the guide. Use light pressure and focus on creating a clean, even guideline.',
-    motion: 'Move slowly and trace the line carefully.',
-    mistake: 'Do not push too high. Keep the line clean and controlled.',
-    stopWhen: 'Stop once you have one clean, even line all the way across — don’t go over it a second time.',
-    video: 'https://www.youtube.com/results?search_query=how+to+blend+fade+line+hair' },
-  { title: 'Begin the Blend', lever: 'open', zoneLabel: 'Soften zone — directly above your bald line',
-    goal: 'Begin softening the harsh line.',
-    instructions: 'Use light flicking motions directly above the guideline. Stay inside the highlighted area only.',
-    motion: 'Flick upward gently — do not dig into the head.',
-    mistake: 'Do not move too high. Stay tight to the guide.',
-    stopWhen: 'Stop when the harsh line starts softening — it does not need to disappear completely yet.',
-    video: 'https://www.youtube.com/results?search_query=how+to+clip+sides+fade+clipper+tutorial' },
-  { title: 'Build Your Blend', lever: 'open', zoneLabel: 'Build zone — blend higher into the fade',
-    goal: 'Blend higher into the fade.',
-    instructions: 'Use smooth upward flicking motions through the highlighted area.',
-    motion: 'Flick out at the top.',
-    mistake: 'Do not flick too low or you may create another hard line.',
-    stopWhen: 'Stop when the fade begins looking smooth from bottom to top.',
-    video: 'https://www.youtube.com/results?search_query=how+to+blend+fade+into+longer+hair' },
-  { title: 'Smooth the Transition', lever: 'half-closed', zoneLabel: 'Touch-up zone — one small area for a light cleanup pass',
-    goal: 'Give the fade a final light cleanup.',
-    instructions: 'Only touch the highlighted area with very light flicking motions. This is a light cleanup pass, not a new section to cut.',
-    motion: 'Light taps and flicks — barely touching the hair.',
-    mistake: 'Less is more here. Avoid overcutting — if it looks done, it is done.',
-    stopWhen: 'Stop once the highlighted area blends in with the rest of the fade — don’t keep going over the same spot.',
-    video: 'https://www.youtube.com/results?search_query=how+to+blend+fade+into+longer+hair' },
-  { title: 'Final Cleanup', lever: null, zoneLabel: 'Hairline & sideburns — final cleanup',
-    goal: 'Clean around your ear and taper shape.',
-    instructions: 'Follow the taper shape and remove stray hairs.',
-    motion: 'Small controlled movements.',
-    mistake: 'Do not raise the taper higher.',
-    stopWhen: 'Stop once your edges are sharp and both sides match — resist the urge to keep trimming.',
+  { title: ‘Create Your Bald Line’, lever: ‘n/a’, zoneLabel: ‘Bald guideline — the foundation for your whole fade’,
+    goal: ‘Create the bald guideline with a bare blade.’,
+    instructions: ‘Follow the highlighted line slowly. Stay right at this line — do not go above it. Use light, even pressure and trace from front to back in one smooth pass.’,
+    motion: ‘Slow, controlled trace along the line.’,
+    mistake: ‘Do not push above the guide on this pass. This is just the baseline — everything else builds from here.’,
+    stopWhen: ‘Stop once you have one clean, even line all the way across. Do not go over it a second time.’ },
+  { title: ‘Open Lever — No Guard’, lever: ‘open’, zoneLabel: ‘Soften zone — half an inch above the bald line’,
+    goal: ‘Begin softening the harsh bald line using light upward flicking.’,
+    instructions: ‘With the lever fully open and no guard, use gentle upward flicking motions in the highlighted zone directly above the bald line. You are softening the harsh edge — not removing more hair.’,
+    motion: ‘Short, light upward flicks. The blade barely kisses the skin at the top of each flick.’,
+    mistake: ‘Do not dig in or press hard. If the line looks like it is disappearing, you are doing it right.’,
+    stopWhen: ‘Stop when the harsh bald line softens into a gradual fade — roughly half an inch of soft transition above the line.’ },
+  { title: ‘0.5 Guard — Lever Open’, lever: ‘open’, zoneLabel: ‘Blend zone — above the open-lever pass’,
+    goal: ‘Continue softening the transition with a 0.5 guard.’,
+    instructions: ‘Attach the 0.5 guard with the lever fully open. Use smooth upward flicking motions through the highlighted area, starting just above where you finished in the last step.’,
+    motion: ‘Fluid upward flicks, flicking the clipper away from the head at the top of each stroke.’,
+    mistake: ‘Avoid going back down into the open-blade zone — let the lower area settle.’,
+    stopWhen: ‘Stop when the transition from bare skin into the 0.5 length looks smooth and gradual.’ },
+  { title: ‘1 Guard — Lever Open’, lever: ‘open’, zoneLabel: ‘Build zone — main fade body’,
+    goal: ‘Build the main body of the fade upward.’,
+    instructions: ‘Switch to the 1 guard with the lever open. Work through the highlighted zone using confident upward flicking motions. This is the core of the fade.’,
+    motion: ‘Smooth, overlapping upward strokes — flick out at the top of each pass.’,
+    mistake: ‘Do not drop back down into the lower zones. Each guard builds on the one below it.’,
+    stopWhen: ‘Stop when the 1 guard blends cleanly into the 0.5 zone below and transitions naturally into the longer hair above.’ },
+  { title: ‘1.5 Guard — Lever Open’, lever: ‘open’, zoneLabel: ‘Transition zone — blend into longer hair’,
+    goal: ‘Smooth the upper transition into the longer hair.’,
+    instructions: ‘Switch to the 1.5 guard with the lever open. Use light flicking motions through the top of the highlighted area to blend the fade into the natural hair length above.’,
+    motion: ‘Very light flicking — less pressure as you move higher.’,
+    mistake: ‘Less is more at this stage. A few passes is enough — over-cutting here will push your fade too high.’,
+    stopWhen: ‘Stop when there is a gradual, seamless blend from the fade into the longer hair above. No visible line.’ },
+  { title: ‘2 Guard — Lever Open’, lever: ‘open’, zoneLabel: ‘Icing zone — final blend at the top edge’,
+    goal: ‘Final light blending pass at the very top of the fade.’,
+    instructions: ‘Switch to the 2 guard with the lever open. With very light pressure, make a single gentle flicking pass along the top edge of the fade. This is the finishing touch — it just softens the last transition.’,
+    motion: ‘One or two light flicks only. Barely touching the hair.’,
+    mistake: ‘This is "icing on the cake" — one pass is enough. Do not keep going over the same area.’,
+    stopWhen: ‘Stop after one clean pass. The fade should now look smooth from skin to full length with no visible hard lines.’ },
+  { title: ‘Final Cleanup’, lever: ‘open’, zoneLabel: ‘Taper area — corner-of-blade detailing’,
+    goal: ‘Remove any remaining lines or dark patches with precision detailing.’,
+    instructions: ‘With the lever fully open and no guard, use only the corner of the blade to lightly target any areas that still look heavy or have a faint line. Do not cut a full stroke — just tap and flick lightly at the darker spots only.’,
+    motion: ‘Short corner-of-blade flicks directly on the darker area. Gentle upward taps only.’,
+    mistake: ‘Only touch the spots that still look heavy. If an area looks blended, leave it alone — less is more.’,
+    stopWhen: ‘Stop once the dark patches or faint lines are gone. Your taper should now blend clean from skin to full length.’,
     finishingTouches: [
-      { label: 'Around the ear', desc: 'Clean up any stray hairs around your ear for a sharp, finished look.' },
-      { label: 'Sideburns', desc: 'Even out your sideburns so both sides match.' },
-      { label: 'Neckline', desc: 'Clean your neckline — straight or rounded, whichever you prefer.' },
-      { label: 'Lineup (optional)', desc: 'For a sharper look, lightly define your hairline along the trimmer edge.' },
+      { label: ‘Still seeing a line?’, desc: ‘Open the lever fully and use only the corner of the blade. Lightly flick upward at only the darker areas. Do not press — just graze the surface.’ },
+      { label: ‘Around the ear’, desc: ‘Clean up any stray hairs around your ear for a sharp, finished look.’ },
+      { label: ‘Sideburns’, desc: ‘Even out your sideburns so both sides match.’ },
+      { label: ‘Neckline’, desc: ‘Clean your neckline — straight or rounded, whichever you prefer.’ },
     ],
-    video: 'https://www.youtube.com/results?search_query=how+to+edge+up+hairline+barber' },
+    video: ‘https://www.youtube.com/results?search_query=how+to+edge+up+hairline+barber’ },
 ];
 
 const FADE_STEP_TEXT = {
@@ -2791,9 +2808,8 @@ function buildFadePlan() {
   const guards = FADE_GUARDS[style] || FADE_GUARDS.low;
   const tl = state.taperLines;
 
-  // The user's locked taper shape (two line segments) is divided into 3
-  // equal sections via linear interpolation — Soften / Build / Refine —
-  // each producing a quad zone bounded by the sideburn and behind-ear lines.
+  // Divide the locked taper shape into 5 equal quad zones (t = 0→1/5 … 4/5→1)
+  // for the 5 blend steps. Step 1 = bald line, steps 2-6 = quads, step 7 = detail.
   const lerpPt = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
   const taperQuad = (tA, tB) => [
     lerpPt(tl.sideburn.p0, tl.sideburn.p1, tA),
@@ -2802,17 +2818,20 @@ function buildFadePlan() {
     lerpPt(tl.rear.p0, tl.rear.p1, tA),
   ];
   const dimZone = (tB) => tB > 0 ? { type: 'quad', points: taperQuad(0, tB) } : null;
+  const T = 1/5;
 
   state.fadePlan = [
-    { ...text[0], guard: 'None',
+    { ...text[0], guard: guards.s1,
       zone: { type: 'line', lineYFrac: gl.lineYFrac, startXFrac: gl.startXFrac, endXFrac: gl.endXFrac },
       dimZone: null },
-    { ...text[1], guard: guards.soften, zone: { type: 'quad', points: taperQuad(0, 1/3) },   dimZone: dimZone(0) },
-    { ...text[2], guard: guards.build,  zone: { type: 'quad', points: taperQuad(1/3, 2/3) }, dimZone: dimZone(1/3) },
-    { ...text[3], guard: guards.refine, zone: { type: 'quad', points: taperQuad(2/3, 1) },   dimZone: dimZone(2/3), adaptive: true },
-    { ...text[4], guard: null,
+    { ...text[1], guard: guards.s2, zone: { type: 'quad', points: taperQuad(0,   T) },   dimZone: dimZone(0) },
+    { ...text[2], guard: guards.s3, zone: { type: 'quad', points: taperQuad(T,   T*2) }, dimZone: dimZone(T) },
+    { ...text[3], guard: guards.s4, zone: { type: 'quad', points: taperQuad(T*2, T*3) }, dimZone: dimZone(T*2) },
+    { ...text[4], guard: guards.s5, zone: { type: 'quad', points: taperQuad(T*3, T*4) }, dimZone: dimZone(T*3) },
+    { ...text[5], guard: guards.s6, zone: { type: 'quad', points: taperQuad(T*4, 1) },   dimZone: dimZone(T*4) },
+    { ...text[6], guard: null,
       zone: { type: 'detail', topFrac: gl.earTopFrac, bottomFrac: gl.lineYFrac, startXFrac: gl.startXFrac, endXFrac: gl.endXFrac },
-      dimZone: dimZone(1) },
+      dimZone: dimZone(1), adaptive: true },
   ];
   return state.fadePlan;
 }
@@ -2978,6 +2997,7 @@ function drawStepOverlay(ctx, W, H, step, guideLine, offset) {
     const hxs = highlightPts.map(p => p.x), hys = highlightPts.map(p => p.y);
     const startX = Math.min(...hxs), endX = Math.max(...hxs);
     const topY = Math.min(...hys), botY = Math.max(...hys);
+    const CORNER_R = Math.min(14, (endX - startX) * 0.12, (botY - topY) * 0.25);
 
     // Reference line — where the bald guideline sits
     const refY = (guideLine.lineYFrac + off.y) * H;
@@ -2985,24 +3005,32 @@ function drawStepOverlay(ctx, W, H, step, guideLine, offset) {
     ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = GOLD_DIM; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(refStartX, refY); ctx.lineTo(refEndX, refY); ctx.stroke(); ctx.restore();
 
-    // Shaded zone with grid, clipped to the highlighted shape (matches the
-    // "fade up to here" zone styling)
+    // Outer glow — radiating gold aura around the active zone
     ctx.save();
-    quadPath(ctx, highlightPts); ctx.clip();
-    ctx.globalAlpha = 0.14; ctx.fillStyle = 'white';
+    ctx.shadowColor = 'rgba(232,213,163,0.55)'; ctx.shadowBlur = 22;
+    ctx.strokeStyle = 'rgba(232,213,163,0.6)'; ctx.lineWidth = 3; ctx.setLineDash([]);
+    quadPathRounded(ctx, highlightPts, CORNER_R); ctx.stroke();
+    ctx.restore();
+
+    // Shaded zone with grid, clipped to the rounded shape
+    ctx.save();
+    quadPathRounded(ctx, highlightPts, CORNER_R); ctx.clip();
+    ctx.globalAlpha = 0.18; ctx.fillStyle = 'rgba(232,213,163,0.25)';
     ctx.fillRect(startX, topY, endX - startX, botY - topY);
-    ctx.globalAlpha = 0.18; ctx.strokeStyle = 'white'; ctx.lineWidth = 0.7;
+    ctx.globalAlpha = 0.2; ctx.strokeStyle = 'rgba(232,213,163,0.5)'; ctx.lineWidth = 0.7;
     for (let x = startX; x <= endX; x += 14) { ctx.beginPath(); ctx.moveTo(x, topY); ctx.lineTo(x, botY); ctx.stroke(); }
     for (let y = topY; y <= botY; y += 14) { ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(endX, y); ctx.stroke(); }
     ctx.restore();
 
-    ctx.save(); ctx.strokeStyle = GOLD; ctx.lineWidth = 1.5; ctx.setLineDash([]);
-    quadPath(ctx, highlightPts); ctx.stroke(); ctx.restore();
+    // Sharp gold border
+    ctx.save(); ctx.strokeStyle = GOLD; ctx.lineWidth = 1.8; ctx.setLineDash([]);
+    ctx.shadowColor = 'rgba(232,213,163,0.6)'; ctx.shadowBlur = 10;
+    quadPathRounded(ctx, highlightPts, CORNER_R); ctx.stroke(); ctx.restore();
 
     // Upward arrow + "flick out here" near the top edge
     const arrowX = startX + (endX - startX) / 2;
     ctx.save(); ctx.strokeStyle = GOLD; ctx.fillStyle = GOLD; ctx.lineWidth = 2;
-    ctx.shadowColor = 'rgba(232,213,163,0.7)'; ctx.shadowBlur = 8;
+    ctx.shadowColor = 'rgba(232,213,163,0.8)'; ctx.shadowBlur = 10;
     ctx.beginPath(); ctx.moveTo(arrowX, botY - 6); ctx.lineTo(arrowX, topY + 16); ctx.stroke();
     ctx.beginPath();
     ctx.moveTo(arrowX, topY + 16); ctx.lineTo(arrowX - 5, topY + 24); ctx.lineTo(arrowX + 5, topY + 24); ctx.closePath(); ctx.fill();
@@ -3088,7 +3116,7 @@ async function presentFadePlanStep(i) {
   const vidLink = step.video
     ? `<a href="${step.video}" target="_blank" rel="noopener" style="font-size:11px;color:var(--accent2);text-decoration:none;margin-top:8px;display:inline-block;">▶ Watch technique</a>`
     : '';
-  const doneBtn = `<button class="opt-btn" style="margin-top:10px;width:100%;" onclick="completeFadeStep(${i})">✓ Mark step ${i + 1} done</button>`;
+  const doneBtn = `<button class="opt-btn" style="margin-top:10px;width:100%;" onclick="completeFadeStep(${i})">→ Next fade step</button>`;
   const zoneLabelHtml = step.zoneLabel
     ? `<div class="fade-step-zone-label">${step.zoneLabel}</div>`
     : '';
@@ -3178,12 +3206,7 @@ function completeFadeStep(i) {
     return;
   }
 
-  addAIMessage(
-    `<p>Nice work on step ${i + 1}. Upload a quick progress photo and I'll run a Progress Check before moving to step ${i + 2}.</p>
-    <button class="fade-skip-link" onclick="skipFadeStep(${i})">Skip this check →</button>`,
-    null
-  );
-  state.nextFileHandler = (file) => reviewProgressPhoto(file, i);
+  presentFadePlanStep(i + 1);
 }
 
 // Re-marks the ear on a progress photo and aligns the LOCKED fade geometry
@@ -3234,10 +3257,10 @@ function addFadePlanWrapUp() {
 
   // Guard cheat sheet
   const cheatData = {
-    low:  [{g:'None',l:'Bald guideline'},{g:'#0.5',l:'Soften the line'},{g:'#1',l:'Build the fade'},{g:'#0.5',l:'Light touch-up'},{g:'Your call',l:'Final cleanup'}],
-    mid:  [{g:'None',l:'Bald guideline'},{g:'#1',l:'Soften the line'},{g:'#1.5',l:'Build the fade'},{g:'#1',l:'Light touch-up'},{g:'Your call',l:'Final cleanup'}],
-    high: [{g:'None',l:'Bald guideline'},{g:'#1.5',l:'Soften the line'},{g:'#2',l:'Build the fade'},{g:'#1.5',l:'Light touch-up'},{g:'Your call',l:'Final cleanup'}],
-    skin: [{g:'None',l:'Bald guideline'},{g:'#0',l:'Soften the line'},{g:'#0.5',l:'Build the fade'},{g:'#0',l:'Light touch-up'},{g:'Your call',l:'Final cleanup'}],
+    low:  [{g:'None',l:'Bald guideline'},{g:'None (lever open)',l:'Soften above line'},{g:'#0.5 open',l:'Blend zone'},{g:'#1 open',l:'Main fade'},{g:'#1.5 open',l:'Upper transition'},{g:'#2 open',l:'Final blend'},{g:'None (corner)',l:'Detail cleanup'}],
+    mid:  [{g:'None',l:'Bald guideline'},{g:'None (lever open)',l:'Soften above line'},{g:'#1 open',l:'Blend zone'},{g:'#1.5 open',l:'Main fade'},{g:'#2 open',l:'Upper transition'},{g:'#2.5 open',l:'Final blend'},{g:'None (corner)',l:'Detail cleanup'}],
+    high: [{g:'None',l:'Bald guideline'},{g:'None (lever open)',l:'Soften above line'},{g:'#1.5 open',l:'Blend zone'},{g:'#2 open',l:'Main fade'},{g:'#2.5 open',l:'Upper transition'},{g:'#3 open',l:'Final blend'},{g:'None (corner)',l:'Detail cleanup'}],
+    skin: [{g:'None',l:'Bald guideline'},{g:'None (lever open)',l:'Soften above line'},{g:'#0.5 open',l:'Blend zone'},{g:'#1 open',l:'Main fade'},{g:'#1.5 open',l:'Upper transition'},{g:'#2 open',l:'Final blend'},{g:'None (corner)',l:'Detail cleanup'}],
     buzz: [{g:'#3–4',l:'Full head'},{g:'#2',l:'Sides shorter'},{g:'#1',l:'Edges'}],
   };
   const cheat = (cheatData[style]||cheatData.low).map(r=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:12px;"><span style="color:var(--text2);">${r.l}</span><strong style="color:#e8d5a3;">${r.g}</strong></div>`).join('');
@@ -3269,8 +3292,6 @@ function addFadePlanWrapUp() {
     addAIMessage(`<p>✂️ <strong>You're all set!</strong> Follow those steps and you'll have a clean taper. Come back and let me know how it came out — or upload another photo if you need a touch-up.</p>`, null);
     scrollBottom();
   }, 200);
-  // Email capture after first guide
-  showEmailCapture();
 }
 
 
