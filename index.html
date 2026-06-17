@@ -631,6 +631,15 @@ body {
 
 /* Photo tip overlay */
 #photoTipOverlay{position:fixed;inset:0;z-index:8888;background:rgba(0,0,0,0.86);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:20px;}
+#cropModal{position:fixed;inset:0;z-index:9500;background:#0d0d0d;display:none;flex-direction:column;}
+#cropHeader{padding:16px 20px 12px;text-align:center;flex-shrink:0;}
+#cropHeader h2{font-size:16px;font-weight:700;color:#e8d5a3;margin:0 0 4px;}
+#cropHeader p{font-size:12px;color:var(--text3);margin:0;}
+#cropCanvasWrap{flex:1;position:relative;overflow:hidden;touch-action:none;}
+#cropCanvas{display:block;width:100%;height:100%;cursor:crosshair;}
+#cropFooter{padding:14px 20px 28px;display:flex;gap:10px;flex-shrink:0;}
+.crop-btn-primary{flex:1;padding:15px;background:#e8d5a3;color:#1a1410;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:-0.01em;}
+.crop-btn-skip{padding:15px 18px;background:transparent;color:var(--text3);border:1.5px solid rgba(255,255,255,0.12);border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;}
 .ptip-card{background:var(--surface);border:1px solid var(--border2);border-radius:20px;padding:26px;max-width:660px;width:100%;max-height:92vh;overflow-y:auto;overflow-anchor:none;box-shadow:0 24px 70px rgba(0,0,0,0.55);text-align:left;}
 
 .ptip-header{display:flex;align-items:flex-start;gap:14px;margin-bottom:20px;}
@@ -1056,7 +1065,6 @@ body {
             Take Picture
           </button>
         </div>
-        <div class="lp-cta-note">Free &nbsp;·&nbsp; No signup &nbsp;·&nbsp; Works on any phone</div>
       </div>
 
       <!-- HOW IT WORKS -->
@@ -1685,11 +1693,12 @@ function photoRetakeMessage(issues) {
 
 // ── PHOTO ANALYSIS ──
 async function analyzePhoto(file) {
+  const croppedFile = await showCropModal(file);
   state.taperStyle = state.taperStyle || 'low';
   state.tools = state.tools || 'clippers';
   state.phase = 'guide-shown';
-  state.lastPhotoFile = file;
-  state.profileSide = await detectProfileSide(file);
+  state.lastPhotoFile = croppedFile;
+  state.profileSide = await detectProfileSide(croppedFile);
   await startTaperShaping();
 }
 
@@ -3598,6 +3607,214 @@ function flipThumbFile(idx, thumbImg, thumb) {
 
 
 // ── START GUIDE (landing page CTA) ──
+// ── CROP MODAL ──
+const _crop = {
+  resolve: null, img: null, origFile: null,
+  box: { x: 0.1, y: 0.12, w: 0.8, h: 0.76 }, // normalized image fracs
+  drag: null, // { type: 'move'|'tl'|'tr'|'bl'|'br', startX, startY, startBox }
+  display: { x: 0, y: 0, w: 0, h: 0 }, // pixel rect where image is drawn on canvas
+};
+
+function _cropPt(e) {
+  const c = document.getElementById('cropCanvas');
+  const r = c.getBoundingClientRect();
+  const px = e.touches ? e.touches[0].clientX : e.clientX;
+  const py = e.touches ? e.touches[0].clientY : e.clientY;
+  return { x: px - r.left, y: py - r.top };
+}
+
+function _cropNorm(px, py) {
+  const d = _crop.display;
+  return { x: (px - d.x) / d.w, y: (py - d.y) / d.h };
+}
+
+function _cropCorners() {
+  const d = _crop.display, b = _crop.box;
+  const x0 = d.x + b.x * d.w, y0 = d.y + b.y * d.h;
+  const x1 = d.x + (b.x + b.w) * d.w, y1 = d.y + (b.y + b.h) * d.h;
+  return { tl: [x0, y0], tr: [x1, y0], bl: [x0, y1], br: [x1, y1] };
+}
+
+function _cropHitTest(px, py) {
+  const R = 28, c = _cropCorners();
+  for (const [k, [cx, cy]] of Object.entries(c)) {
+    if (Math.abs(px - cx) < R && Math.abs(py - cy) < R) return k;
+  }
+  const d = _crop.display, b = _crop.box;
+  const x0 = d.x + b.x * d.w, y0 = d.y + b.y * d.h;
+  const x1 = d.x + (b.x + b.w) * d.w, y1 = d.y + (b.y + b.h) * d.h;
+  if (px > x0 && px < x1 && py > y0 && py < y1) return 'move';
+  return null;
+}
+
+function _cropDraw() {
+  const canvas = document.getElementById('cropCanvas');
+  const wrap = document.getElementById('cropCanvasWrap');
+  const dpr = window.devicePixelRatio || 1;
+  const cw = wrap.clientWidth, ch = wrap.clientHeight;
+  canvas.width = cw * dpr; canvas.height = ch * dpr;
+  canvas.style.width = cw + 'px'; canvas.style.height = ch + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const img = _crop.img;
+  const iw = img.naturalWidth, ih = img.naturalHeight;
+  const scale = Math.min(cw / iw, ch / ih);
+  const dw = iw * scale, dh = ih * scale;
+  const dx = (cw - dw) / 2, dy = (ch - dh) / 2;
+  _crop.display = { x: dx, y: dy, w: dw, h: dh };
+
+  ctx.drawImage(img, dx, dy, dw, dh);
+
+  const b = _crop.box;
+  const bx = dx + b.x * dw, by = dy + b.y * dh;
+  const bw = b.w * dw, bh = b.h * dh;
+
+  // Dim outside crop
+  ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.58)';
+  ctx.fillRect(dx, dy, dw, dh);
+  ctx.clearRect(bx, by, bw, bh);
+  ctx.drawImage(img,
+    b.x * iw, b.y * ih, b.w * iw, b.h * ih,
+    bx, by, bw, bh);
+  ctx.restore();
+
+  // Gold border
+  ctx.save();
+  ctx.strokeStyle = '#e8d5a3'; ctx.lineWidth = 2;
+  ctx.shadowColor = 'rgba(232,213,163,0.55)'; ctx.shadowBlur = 8;
+  ctx.strokeRect(bx + 1, by + 1, bw - 2, bh - 2);
+  ctx.restore();
+
+  // Rule-of-thirds grid (subtle)
+  ctx.save(); ctx.strokeStyle = 'rgba(232,213,163,0.18)'; ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(bx + bw / 3, by); ctx.lineTo(bx + bw / 3, by + bh);
+  ctx.moveTo(bx + bw * 2 / 3, by); ctx.lineTo(bx + bw * 2 / 3, by + bh);
+  ctx.moveTo(bx, by + bh / 3); ctx.lineTo(bx + bw, by + bh / 3);
+  ctx.moveTo(bx, by + bh * 2 / 3); ctx.lineTo(bx + bw, by + bh * 2 / 3);
+  ctx.stroke(); ctx.restore();
+
+  // Corner handles
+  const R = 10;
+  for (const [cx, cy] of Object.values(_cropCorners())) {
+    ctx.save();
+    ctx.fillStyle = '#e8d5a3';
+    ctx.shadowColor = 'rgba(232,213,163,0.7)'; ctx.shadowBlur = 10;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+}
+
+function _cropClamp() {
+  const b = _crop.box;
+  const MIN = 0.2;
+  b.w = Math.max(MIN, Math.min(1 - b.x, b.w));
+  b.h = Math.max(MIN, Math.min(1 - b.y, b.h));
+  b.x = Math.max(0, Math.min(1 - b.w, b.x));
+  b.y = Math.max(0, Math.min(1 - b.h, b.y));
+}
+
+function _cropPointerDown(e) {
+  e.preventDefault();
+  const { x, y } = _cropPt(e);
+  const hit = _cropHitTest(x, y);
+  if (!hit) return;
+  const n = _cropNorm(x, y);
+  _crop.drag = { type: hit, startX: n.x, startY: n.y, startBox: { ..._crop.box } };
+}
+
+function _cropPointerMove(e) {
+  e.preventDefault();
+  if (!_crop.drag) return;
+  const { x, y } = _cropPt(e);
+  const n = _cropNorm(x, y);
+  const d = _crop.drag, sb = d.startBox;
+  const dx = n.x - d.startX, dy = n.y - d.startY;
+  const b = _crop.box;
+
+  if (d.type === 'move') {
+    b.x = sb.x + dx; b.y = sb.y + dy;
+  } else if (d.type === 'tl') {
+    b.x = sb.x + dx; b.y = sb.y + dy;
+    b.w = sb.w - dx; b.h = sb.h - dy;
+  } else if (d.type === 'tr') {
+    b.y = sb.y + dy; b.w = sb.w + dx; b.h = sb.h - dy;
+  } else if (d.type === 'bl') {
+    b.x = sb.x + dx; b.w = sb.w - dx; b.h = sb.h + dy;
+  } else if (d.type === 'br') {
+    b.w = sb.w + dx; b.h = sb.h + dy;
+  }
+  _cropClamp();
+  _cropDraw();
+}
+
+function _cropPointerUp(e) { _crop.drag = null; }
+
+function showCropModal(file) {
+  return new Promise(resolve => {
+    _crop.resolve = resolve;
+    _crop.origFile = file;
+    _crop.box = { x: 0.1, y: 0.12, w: 0.8, h: 0.76 };
+    _crop.drag = null;
+
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        _crop.img = img;
+        const modal = document.getElementById('cropModal');
+        modal.style.display = 'flex';
+        // Draw after a frame so the modal is visible and sized
+        requestAnimationFrame(() => { requestAnimationFrame(_cropDraw); });
+
+        const canvas = document.getElementById('cropCanvas');
+        canvas.addEventListener('pointerdown', _cropPointerDown);
+        canvas.addEventListener('pointermove', _cropPointerMove);
+        canvas.addEventListener('pointerup', _cropPointerUp);
+        canvas.addEventListener('touchstart', _cropPointerDown, { passive: false });
+        canvas.addEventListener('touchmove', _cropPointerMove, { passive: false });
+        canvas.addEventListener('touchend', _cropPointerUp);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function _closeCropModal() {
+  const modal = document.getElementById('cropModal');
+  modal.style.display = 'none';
+  const canvas = document.getElementById('cropCanvas');
+  canvas.removeEventListener('pointerdown', _cropPointerDown);
+  canvas.removeEventListener('pointermove', _cropPointerMove);
+  canvas.removeEventListener('pointerup', _cropPointerUp);
+  canvas.removeEventListener('touchstart', _cropPointerDown);
+  canvas.removeEventListener('touchmove', _cropPointerMove);
+  canvas.removeEventListener('touchend', _cropPointerUp);
+}
+
+function applyCrop() {
+  const img = _crop.img, b = _crop.box;
+  const srcX = Math.round(b.x * img.naturalWidth);
+  const srcY = Math.round(b.y * img.naturalHeight);
+  const srcW = Math.round(b.w * img.naturalWidth);
+  const srcH = Math.round(b.h * img.naturalHeight);
+  const out = document.createElement('canvas');
+  out.width = srcW; out.height = srcH;
+  out.getContext('2d').drawImage(img, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+  out.toBlob(blob => {
+    _closeCropModal();
+    _crop.resolve(new File([blob], 'crop.jpg', { type: 'image/jpeg' }));
+  }, 'image/jpeg', 0.95);
+}
+
+function skipCrop() {
+  _closeCropModal();
+  _crop.resolve(_crop.origFile);
+}
+
 function startGuide() {
   triggerUpload();
 }
@@ -3699,5 +3916,20 @@ if ('serviceWorker' in navigator) {
 
   <!-- Photo tip overlay -->
   <div id="photoTipOverlay"></div>
+
+  <!-- Crop modal -->
+  <div id="cropModal">
+    <div id="cropHeader">
+      <h2>Focus on your taper area</h2>
+      <p>Drag the corners to zoom in — closer = more precise</p>
+    </div>
+    <div id="cropCanvasWrap">
+      <canvas id="cropCanvas"></canvas>
+    </div>
+    <div id="cropFooter">
+      <button class="crop-btn-primary" onclick="applyCrop()">Use This Crop</button>
+      <button class="crop-btn-skip" onclick="skipCrop()">Full Photo</button>
+    </div>
+  </div>
 </body>
 </html>
