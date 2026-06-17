@@ -831,10 +831,24 @@ body {
 
 .guide-img-wrap {
   margin-top: 12px; border-radius: 12px;
-  overflow: hidden; border: 1px solid rgba(255,255,255,0.1);
-  max-width: 460px;
+  overflow: visible; border: 1px solid rgba(255,255,255,0.1);
+  max-width: 460px; position: relative;
 }
-.guide-img-wrap canvas { width: 100%; display: block; cursor: ns-resize; }
+.guide-img-wrap canvas { width: 100%; display: block; cursor: ns-resize; touch-action: none; }
+.taper-zoom-bubble {
+  position: absolute;
+  width: 112px; height: 112px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(232,213,163,0.92);
+  box-shadow: 0 6px 28px rgba(0,0,0,0.65), 0 0 0 1px rgba(0,0,0,0.4);
+  pointer-events: none;
+  display: none;
+  z-index: 20;
+  overflow: hidden;
+  transform: translate(-50%, calc(-100% - 18px));
+  background: #111;
+}
+.taper-zoom-bubble canvas { width: 112px; height: 112px; display: block; }
 
 .drag-hint {
   text-align: center; font-size: 11px; color: var(--text3);
@@ -2359,150 +2373,253 @@ function offerTaperShaping() {
   );
 }
 
-// gl param removed — bald-line reference is now derived from the p0 endpoints of both lines.
+// Draws the natural taper contour path: straight sides, gently curved top edge.
+// The curve on the top edge mimics the natural hair growth arc — not a box.
+function taperContourPath(ctx, sb0, sb1, rr1, rr0) {
+  ctx.beginPath();
+  ctx.moveTo(sb0.x, sb0.y);
+  ctx.lineTo(rr0.x, rr0.y);
+  ctx.lineTo(rr1.x, rr1.y);
+  // Top edge: quadratic arc that curves slightly above the two top points
+  const cpX = (sb1.x + rr1.x) / 2;
+  const cpY = Math.min(sb1.y, rr1.y) - Math.abs(rr1.x - sb1.x) * 0.10;
+  ctx.quadraticCurveTo(cpX, cpY, sb1.x, sb1.y);
+  ctx.closePath();
+}
+
+// Premium taper shape overlay. lines._active = { lineKey, pointKey } while dragging.
+// lines._fingerOffsetY = canvas-pixel amount the dot is shifted above the raw finger Y.
 function drawTaperShapeOverlay(ctx, W, H, lines) {
   const GOLD      = 'rgba(232,213,163,0.97)';
-  const GOLD_SOFT = 'rgba(232,213,163,0.50)';
-  const GOLD_DIM  = 'rgba(232,213,163,0.30)';
+  const GOLD_SOFT = 'rgba(232,213,163,0.55)';
+  const GOLD_DIM  = 'rgba(232,213,163,0.25)';
   const active    = lines._active || null;
 
   ctx.save(); ctx.translate(0.5, 0.5);
 
-  const toPx = p => ({ x: p.x * W, y: p.y * H });
-  const sb0 = toPx(lines.sideburn.p0), sb1 = toPx(lines.sideburn.p1);
-  const rr0 = toPx(lines.rear.p0),     rr1 = toPx(lines.rear.p1);
-  const quad = [sb0, sb1, rr1, rr0];
+  // Compute display positions: active handle is shifted up by _fingerOffsetY so dot
+  // appears above the finger. Other handles stay at their stored fractional position.
+  const offsetY = lines._fingerOffsetY || 0;
+  const getPx = (lineKey, ptKey) => {
+    const p = lines[lineKey][ptKey];
+    const isActive = active && active.lineKey === lineKey && active.pointKey === ptKey;
+    return { x: p.x * W, y: p.y * H - (isActive ? offsetY : 0) };
+  };
 
-  // ── Dashed bald-guideline reference — derived from p0 of both lines ──
+  const sb0 = getPx('sideburn', 'p0'), sb1 = getPx('sideburn', 'p1');
+  const rr0 = getPx('rear', 'p0'),     rr1 = getPx('rear', 'p1');
+
+  // ── Dashed bald-line reference ──
   const refY      = ((lines.sideburn.p0.y + lines.rear.p0.y) / 2) * H;
   const refStartX = Math.min(lines.sideburn.p0.x, lines.rear.p0.x) * W;
   const refEndX   = Math.max(lines.sideburn.p0.x, lines.rear.p0.x) * W;
   ctx.save();
-  ctx.setLineDash([4, 4]); ctx.strokeStyle = GOLD_DIM; ctx.lineWidth = 1;
-  ctx.shadowColor = 'rgba(232,213,163,0.25)'; ctx.shadowBlur = 2;
+  ctx.setLineDash([5, 5]); ctx.strokeStyle = GOLD_DIM; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(refStartX, refY); ctx.lineTo(refEndX, refY); ctx.stroke();
   ctx.restore();
 
-  // ── Taper preview — soft gold gradient fill inside quad ──
-  const minX = Math.min(...quad.map(p => p.x)), maxX = Math.max(...quad.map(p => p.x));
-  const minY = Math.min(...quad.map(p => p.y)), maxY = Math.max(...quad.map(p => p.y));
+  // ── Taper region: natural contour fill ──
+  const allPts = [sb0, sb1, rr0, rr1];
+  const minX = Math.min(...allPts.map(p => p.x)), maxX = Math.max(...allPts.map(p => p.x));
+  const minY = Math.min(...allPts.map(p => p.y)), maxY = Math.max(...allPts.map(p => p.y));
 
-  const CORNER_R_SHAPE = Math.min(12, (maxX - minX) * 0.1, (maxY - minY) * 0.18);
   ctx.save();
-  quadPathRounded(ctx, quad, CORNER_R_SHAPE); ctx.clip();
+  taperContourPath(ctx, sb0, sb1, rr1, rr0);
+  ctx.clip();
 
-  // Gradient: strongest near bald line, fades toward top (conveys "fade builds up from here")
+  // Gradient: dense gold at bald line, dissolves toward crown
   const grad = ctx.createLinearGradient(0, maxY, 0, minY);
-  grad.addColorStop(0,    'rgba(232,213,163,0.28)');
-  grad.addColorStop(0.50, 'rgba(232,213,163,0.14)');
+  grad.addColorStop(0,    'rgba(232,213,163,0.36)');
+  grad.addColorStop(0.45, 'rgba(232,213,163,0.18)');
   grad.addColorStop(1,    'rgba(232,213,163,0.04)');
   ctx.fillStyle = grad;
-  ctx.fillRect(minX, minY, maxX - minX, maxY - minY);
+  ctx.fillRect(minX - 2, minY - 2, maxX - minX + 4, maxY - minY + 4);
 
-  // Tight gold grid texture — 12px spacing keeps it subtle but visible
-  ctx.globalAlpha = 0.08; ctx.strokeStyle = 'rgba(232,213,163,1)'; ctx.lineWidth = 0.5;
-  for (let x = minX; x <= maxX; x += 12) { ctx.beginPath(); ctx.moveTo(x, minY); ctx.lineTo(x, maxY); ctx.stroke(); }
-  for (let y = minY; y <= maxY; y += 12) { ctx.beginPath(); ctx.moveTo(minX, y); ctx.lineTo(maxX, y); ctx.stroke(); }
+  // Subtle diagonal grain — more barber-like than a grid
+  ctx.globalAlpha = 0.07;
+  ctx.strokeStyle = 'rgba(232,213,163,1)'; ctx.lineWidth = 0.7;
+  const step = 16;
+  const span = (maxX - minX) + (maxY - minY);
+  for (let d = -span; d <= span * 2; d += step) {
+    ctx.beginPath();
+    ctx.moveTo(minX + d, minY);
+    ctx.lineTo(minX + d - (maxY - minY), maxY);
+    ctx.stroke();
+  }
   ctx.restore();
 
-  // ── Quad outline — thin crisp gold stroke, minimal glow ──
+  // ── Contour outline glow — brightens while dragging ──
   ctx.save();
-  ctx.shadowColor = 'rgba(232,213,163,0.35)'; ctx.shadowBlur = 4;
-  ctx.strokeStyle = GOLD_SOFT; ctx.lineWidth = 1; ctx.setLineDash([]);
-  quadPathRounded(ctx, quad, CORNER_R_SHAPE); ctx.stroke();
+  ctx.shadowColor = 'rgba(232,213,163,0.5)';
+  ctx.shadowBlur  = active ? 14 : 7;
+  ctx.strokeStyle = active ? 'rgba(232,213,163,0.88)' : GOLD_SOFT;
+  ctx.lineWidth   = active ? 1.8 : 1.2;
+  ctx.setLineDash([]);
+  taperContourPath(ctx, sb0, sb1, rr1, rr0);
+  ctx.stroke();
   ctx.restore();
 
-  // ── Line segments + premium handles ──────────────────────
+  // ── Handles & lines ──────────────────────────────────────
   const isActivePoint = (lk, pk) => active && active.lineKey === lk && active.pointKey === pk;
 
   const drawHandle = (p, lk, pk) => {
     const on = isActivePoint(lk, pk);
-    // Smaller logical radius — at dpr=3 these become 30-36px physical, still thumb-friendly
-    const R = on ? 10 : 8;
+    const R = on ? 11 : 9;
 
-    // Glow ring — tight blur, visible only when active
     if (on) {
+      // Outer pulse halo
       ctx.save();
-      ctx.strokeStyle = 'rgba(232,213,163,0.5)';
+      ctx.strokeStyle = 'rgba(232,213,163,0.22)';
+      ctx.lineWidth = 1;
+      ctx.shadowColor = 'rgba(232,213,163,0.6)';
+      ctx.shadowBlur = 18;
+      ctx.beginPath(); ctx.arc(p.x, p.y, R + 11, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+      // Inner ring
+      ctx.save();
+      ctx.strokeStyle = 'rgba(232,213,163,0.65)';
       ctx.lineWidth = 1.5;
-      ctx.shadowColor = 'rgba(232,213,163,0.8)'; ctx.shadowBlur = 8;
+      ctx.shadowColor = 'rgba(232,213,163,0.85)';
+      ctx.shadowBlur = 8;
       ctx.beginPath(); ctx.arc(p.x, p.y, R + 5, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     }
 
-    // Main disc — crisp fill, tight shadow
+    // Main disc
     ctx.save();
-    ctx.shadowColor = 'rgba(232,213,163,0.75)'; ctx.shadowBlur = on ? 8 : 5;
-    ctx.fillStyle = GOLD;
+    ctx.shadowColor = 'rgba(232,213,163,0.85)';
+    ctx.shadowBlur  = on ? 14 : 7;
+    ctx.fillStyle   = GOLD;
     ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
 
-    // Inner specular highlight
+    // Specular highlight
     ctx.save();
-    ctx.fillStyle = 'rgba(255,252,235,0.60)';
-    ctx.beginPath(); ctx.arc(p.x - R * 0.28, p.y - R * 0.30, R * 0.36, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,252,235,0.65)';
+    ctx.beginPath(); ctx.arc(p.x - R * 0.28, p.y - R * 0.32, R * 0.38, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   };
 
-  const drawLine = (p0, p1, lk, label) => {
-    const lineActive = active && active.lineKey === lk;
-    // Thin crisp line + tight glow — 1.5px logical = 4.5px physical at dpr=3
+  const drawSegment = (p0, p1, lk, label) => {
+    const lineOn = active && active.lineKey === lk;
     ctx.save();
-    ctx.shadowColor = 'rgba(232,213,163,0.6)'; ctx.shadowBlur = lineActive ? 6 : 3;
-    ctx.strokeStyle = lineActive ? GOLD : 'rgba(232,213,163,0.88)';
-    ctx.lineWidth = lineActive ? 2 : 1.5; ctx.lineCap = 'round';
+    ctx.shadowColor = 'rgba(232,213,163,0.65)';
+    ctx.shadowBlur  = lineOn ? 10 : 4;
+    ctx.strokeStyle = lineOn ? GOLD : 'rgba(232,213,163,0.88)';
+    ctx.lineWidth   = lineOn ? 2 : 1.5;
+    ctx.lineCap     = 'round';
+    ctx.setLineDash([]);
     ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
     ctx.restore();
 
     drawHandle(p0, lk, 'p0');
     drawHandle(p1, lk, 'p1');
 
-    // Label above top handle — tight shadow for clean legibility
+    // Label above top handle
     ctx.save();
     ctx.font = 'bold 11px sans-serif'; ctx.fillStyle = GOLD; ctx.textBaseline = 'bottom';
     ctx.shadowColor = 'rgba(0,0,0,1)'; ctx.shadowBlur = 5;
     const tw = ctx.measureText(label).width;
-    ctx.fillText(label, p1.x - tw / 2, Math.max(12, p1.y - 14));
+    ctx.fillText(label, p1.x - tw / 2, Math.max(14, p1.y - 15));
     ctx.restore();
   };
 
-  drawLine(sb0, sb1, 'sideburn', 'Sideburn');
-  drawLine(rr0, rr1, 'rear',     'Behind ear');
+  drawSegment(sb0, sb1, 'sideburn', 'Sideburn');
+  drawSegment(rr0, rr1, 'rear',     'Behind ear');
 
-  ctx.restore(); // undo translate(0.5, 0.5)
+  ctx.restore();
 }
 
-// Drag handling for the 4 taper-line endpoints. Large hit targets for
-// comfortable mobile use. Sets lines._active so drawTaperShapeOverlay
-// can highlight the active handle in real time.
-// side: 'left' (face facing right, sideburn.x > rear.x) or 'right' (face facing left, sideburn.x < rear.x)
-function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw) {
-  let dragging = null;
-  const HIT_R = 32;
+// Renders the zoom bubble: a magnified circular view of the photo around the active point.
+function updateZoomBubble(bubble, bubbleCanvas, img, lines, W, H, active, fingerCSS) {
+  if (!active || !fingerCSS) { bubble.style.display = 'none'; return; }
+
+  const BUBBLE_PX = 112; // matches CSS width/height
+  const ZOOM      = 3.2;
+  const p         = lines[active.lineKey][active.pointKey];
+
+  // Source rect in natural image coords
+  const srcW = img.naturalWidth  / ZOOM;
+  const srcH = img.naturalHeight / ZOOM;
+  const srcX = Math.max(0, Math.min(img.naturalWidth  - srcW, p.x * img.naturalWidth  - srcW / 2));
+  const srcY = Math.max(0, Math.min(img.naturalHeight - srcH, p.y * img.naturalHeight - srcH / 2));
+
+  const bctx = bubbleCanvas.getContext('2d');
+  bubbleCanvas.width = BUBBLE_PX; bubbleCanvas.height = BUBBLE_PX;
+
+  // Clip to circle and draw
+  bctx.save();
+  bctx.beginPath(); bctx.arc(BUBBLE_PX / 2, BUBBLE_PX / 2, BUBBLE_PX / 2, 0, Math.PI * 2);
+  bctx.clip();
+  bctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, BUBBLE_PX, BUBBLE_PX);
+
+  // Crosshair at center
+  bctx.strokeStyle = 'rgba(232,213,163,0.9)'; bctx.lineWidth = 1;
+  const cx = BUBBLE_PX / 2, cy = BUBBLE_PX / 2;
+  bctx.beginPath(); bctx.moveTo(cx - 10, cy); bctx.lineTo(cx + 10, cy); bctx.stroke();
+  bctx.beginPath(); bctx.moveTo(cx, cy - 10); bctx.lineTo(cx, cy + 10); bctx.stroke();
+
+  // Center dot
+  bctx.fillStyle = 'rgba(232,213,163,0.95)';
+  bctx.beginPath(); bctx.arc(cx, cy, 2.5, 0, Math.PI * 2); bctx.fill();
+  bctx.restore();
+
+  // Position bubble above finger, centered horizontally
+  bubble.style.left = fingerCSS.x + 'px';
+  bubble.style.top  = fingerCSS.y + 'px';
+  bubble.style.display = 'block';
+}
+
+// Drag handler for the 4 taper-line endpoints.
+// Features: large hit targets, finger offset (dot above finger), rAF-throttled redraw,
+// zoom bubble, and soft magnetic snapping near common taper positions.
+// side: 'left' = face right (sideburn.x > rear.x), 'right' = face left (sideburn.x < rear.x)
+function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubbleCanvas, img) {
+  let dragging    = null;
+  let isTouch     = false;
+  let rafPending  = false;
+  let fingerCSS   = null;
+  const HIT_R = 52; // large touch target radius in canvas-internal pixels
+  const FINGER_OFFSET_CSS = 46; // px above finger where dot appears (touch only)
+
+  // Gentle snap zones: common taper heights and edges. Strength = pull radius.
+  const SNAP_Y   = [0.25, 0.35, 0.45, 0.55, 0.65];
+  const SNAP_STR = 0.022;
+  const softSnap = (val, zones) => {
+    for (const z of zones) {
+      const d = val - z;
+      if (Math.abs(d) < SNAP_STR) return z + d * 0.25; // elastic pull toward zone
+    }
+    return val;
+  };
 
   const toCanvas = (clientX, clientY) => {
     const r = canvas.getBoundingClientRect();
-    return { x: (clientX - r.left) * (W / r.width), y: (clientY - r.top) * (H / r.height) };
+    return {
+      x: (clientX - r.left) * (W / r.width),
+      y: (clientY - r.top)  * (H / r.height),
+      cssX: clientX - r.left,
+      cssY: clientY - r.top,
+      scaleY: H / r.height,
+    };
   };
 
   const clampPoint = (lineKey, pointKey, x, y) => {
     let xFrac = x / W, yFrac = y / H;
 
-    // Full image bounds
+    // Apply gentle snap on Y
+    yFrac = softSnap(yFrac, SNAP_Y);
+
+    // Hard bounds
     xFrac = Math.max(0.01, Math.min(0.99, xFrac));
     yFrac = Math.max(0.02, Math.min(0.96, yFrac));
 
-    // Prevent top dot (p1) going below bottom dot (p0)
+    // Top dot stays above bottom dot
     const line = lines[lineKey];
-    if (pointKey === 'p1') {
-      yFrac = Math.min(yFrac, line.p0.y - 0.02);
-    } else {
-      yFrac = Math.max(yFrac, line.p1.y + 0.02);
-    }
+    if (pointKey === 'p1') yFrac = Math.min(yFrac, line.p0.y - 0.02);
+    else                   yFrac = Math.max(yFrac, line.p1.y + 0.02);
 
-    // Prevent lines from crossing — direction depends on which side of the head is shown.
-    // 'left' photo: sideburn is to the RIGHT of rear (sbX > reX)
-    // 'right' photo: sideburn is to the LEFT of rear (sbX < reX)
+    // Lines don't cross
     const other = lineKey === 'sideburn' ? lines.rear : lines.sideburn;
     if (side === 'left') {
       if (lineKey === 'sideburn') xFrac = Math.max(xFrac, other[pointKey].x + 0.01);
@@ -2511,12 +2628,10 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw) {
       if (lineKey === 'sideburn') xFrac = Math.min(xFrac, other[pointKey].x - 0.01);
       else                        xFrac = Math.max(xFrac, other[pointKey].x + 0.01);
     }
-
     return { x: xFrac, y: yFrac };
   };
 
   const findHandle = (x, y) => {
-    // Check nearest handle first so overlapping handles resolve naturally
     let best = null, bestDist = Infinity;
     for (const lineKey of ['sideburn', 'rear']) {
       for (const pointKey of ['p0', 'p1']) {
@@ -2529,31 +2644,54 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw) {
     return best;
   };
 
-  const onStart = (clientX, clientY) => {
-    const pt = toCanvas(clientX, clientY);
-    dragging = findHandle(pt.x, pt.y);
-    lines._active = dragging;
-    if (dragging) redraw();
+  const scheduleRedraw = () => {
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(() => {
+      rafPending = false;
+      redraw();
+      updateZoomBubble(bubble, bubbleCanvas, img, lines, W, H, dragging, fingerCSS);
+    });
   };
+
+  const onStart = (clientX, clientY, touch) => {
+    const pt = toCanvas(clientX, clientY);
+    dragging  = findHandle(pt.x, pt.y);
+    isTouch   = touch;
+    if (!dragging) return;
+    lines._active        = dragging;
+    lines._fingerOffsetY = touch ? FINGER_OFFSET_CSS * pt.scaleY : 0;
+    fingerCSS = { x: pt.cssX, y: pt.cssY };
+    scheduleRedraw();
+  };
+
   const onMove = (clientX, clientY) => {
     if (!dragging) return;
     const pt = toCanvas(clientX, clientY);
-    lines[dragging.lineKey][dragging.pointKey] = clampPoint(dragging.lineKey, dragging.pointKey, pt.x, pt.y);
-    redraw();
-  };
-  const onEnd = () => {
-    dragging = null;
-    lines._active = null;
-    redraw();
+    // Apply upward offset so the stored position (and thus the dot) appears above the finger
+    const adjustedY = pt.y - (isTouch ? FINGER_OFFSET_CSS * pt.scaleY : 0);
+    lines[dragging.lineKey][dragging.pointKey] = clampPoint(dragging.lineKey, dragging.pointKey, pt.x, adjustedY);
+    lines._fingerOffsetY = isTouch ? FINGER_OFFSET_CSS * pt.scaleY : 0;
+    fingerCSS = { x: pt.cssX, y: pt.cssY };
+    scheduleRedraw();
   };
 
-  canvas.addEventListener('mousedown', e => { e.preventDefault(); onStart(e.clientX, e.clientY); });
-  canvas.addEventListener('mousemove', e => { onMove(e.clientX, e.clientY); });
-  canvas.addEventListener('mouseup', onEnd);
+  const onEnd = () => {
+    if (!dragging) return;
+    dragging             = null;
+    lines._active        = null;
+    lines._fingerOffsetY = 0;
+    fingerCSS            = null;
+    scheduleRedraw();
+  };
+
+  canvas.addEventListener('mousedown',  e => { e.preventDefault(); onStart(e.clientX, e.clientY, false); });
+  canvas.addEventListener('mousemove',  e => { onMove(e.clientX, e.clientY); });
+  canvas.addEventListener('mouseup',    onEnd);
   canvas.addEventListener('mouseleave', onEnd);
-  canvas.addEventListener('touchstart', e => { e.preventDefault(); const t = e.touches[0]; onStart(t.clientX, t.clientY); }, { passive: false });
-  canvas.addEventListener('touchmove', e => { e.preventDefault(); const t = e.touches[0]; onMove(t.clientX, t.clientY); }, { passive: false });
-  canvas.addEventListener('touchend', onEnd);
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); const t = e.touches[0]; onStart(t.clientX, t.clientY, true); },  { passive: false });
+  canvas.addEventListener('touchmove',  e => { e.preventDefault(); const t = e.touches[0]; onMove(t.clientX, t.clientY); },          { passive: false });
+  canvas.addEventListener('touchend',   onEnd);
 }
 
 // Applies a named preset to the taper lines and redraws.
@@ -2583,26 +2721,34 @@ async function startTaperShaping() {
     rear:     { p0: { x: reX, y: botY }, p1: { x: reX, y: topY } },
   };
 
+  // Zoom bubble — a circular magnified overlay that appears above the finger while dragging
+  const bubble       = document.createElement('div');
+  bubble.className   = 'taper-zoom-bubble';
+  const bubbleCanvas = document.createElement('canvas');
+  bubble.appendChild(bubbleCanvas);
+
   const redraw = () => {
     ctx.clearRect(0, 0, W, H);
     ctx.drawImage(img, 0, 0, W, H);
     drawTaperShapeOverlay(ctx, W, H, lines);
   };
   redraw();
-  makeTaperLinesDraggable(canvas, lines, side, W, H, redraw);
+  makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubbleCanvas, img);
 
   const msg = document.createElement('div');
   msg.className = 'msg';
   msg.innerHTML = `${aiAvatar()}<div class="msg-body"><div class="msg-name">SelfHaircut.ai</div>
     <div class="msg-text">
       <p style="font-size:13.5px;line-height:1.6;margin:0 0 10px;color:var(--text);">Show me where you want your taper. Drag the four dots until the shape looks right for you.</p>
-      <div class="guide-img-wrap" style="position:relative;"></div>
+      <div class="guide-img-wrap" style="position:relative;overflow:visible;"></div>
       <div class="drag-hint" style="margin-top:8px;">↕ Drag any dot to adjust your taper</div>
       <button class="opt-btn" style="margin-top:12px;width:100%;font-size:15px;padding:14px;letter-spacing:0.02em;" onclick="finalizeTaperShape(this)">That's My Taper — Let's Build This Fade</button>
     </div></div>`;
   messagesWrap.appendChild(msg);
   canvas.style.width = '100%';
-  msg.querySelector('.guide-img-wrap').appendChild(canvas);
+  const wrap = msg.querySelector('.guide-img-wrap');
+  wrap.appendChild(canvas);
+  wrap.appendChild(bubble);
   msg._taperLines = lines;
   msg._taperCanvas = canvas;
 
