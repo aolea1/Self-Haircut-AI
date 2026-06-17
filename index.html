@@ -1036,6 +1036,56 @@ body {
 .fade-review-row strong.good { color: var(--accent); }
 .fade-review-row strong.warn { color: var(--text2); }
 
+/* ── MID-STEP DETAIL CHECK CARD ── */
+.detail-check-card {
+  background: rgba(255,175,50,0.07);
+  border: 1.5px solid rgba(255,185,60,0.35);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.detail-check-title {
+  font-size: 13px; font-weight: 700;
+  color: rgba(255,200,80,0.95);
+  margin-bottom: 8px; letter-spacing: 0.01em;
+}
+.detail-check-body {
+  font-size: 12.5px; line-height: 1.65; color: var(--text2);
+}
+
+/* ── LEVER TUTORIAL CARD ── */
+.lever-tutorial-wrap {
+  position: fixed;
+  bottom: 130px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9800;
+  pointer-events: none;
+  animation: leverIn 0.35s cubic-bezier(0.22,1,0.36,1) both;
+  width: max-content; max-width: 320px;
+}
+@keyframes leverIn  { from { opacity:0; transform:translateX(-50%) translateY(14px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+@keyframes leverOut { from { opacity:1; transform:translateX(-50%) translateY(0); }  to { opacity:0; transform:translateX(-50%) translateY(-10px); } }
+.lever-tutorial-wrap.dismissing { animation: leverOut 0.28s ease-in forwards; }
+.lever-tutorial-card {
+  background: #18180f;
+  border: 1.5px solid rgba(232,213,163,0.38);
+  border-radius: 16px;
+  padding: 14px 16px 14px 14px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  box-shadow: 0 10px 36px rgba(0,0,0,0.65), 0 0 0 1px rgba(232,213,163,0.08);
+}
+.lever-tutorial-copy {}
+.lever-tutorial-title {
+  font-size: 13.5px; font-weight: 700;
+  color: rgba(232,213,163,0.97);
+  margin-bottom: 5px;
+}
+.lever-tutorial-desc {
+  font-size: 12px; line-height: 1.6; color: rgba(255,255,255,0.6);
+}
+
 /* ── SIDEBAR OVERLAY ── */
 .sidebar-overlay {
   display: none; position: fixed; inset: 0;
@@ -3048,6 +3098,92 @@ function leverLabel(lever) {
   return { closed: 'Closed', 'half-open': 'Half-open', open: 'Open', 'half-closed': 'Half-closed', 'n/a': 'N/A' }[lever] || '';
 }
 
+// ── LEVER TUTORIAL CARDS ──────────────────────────────────────────────────
+// Shown once per lever type, auto-dismissed after 4.5 s.
+const _seenLevers = new Set();
+let   _leverTutorialTimer = null;
+
+const LEVER_TUTORIALS = {
+  open: {
+    title: 'Lever Open',
+    desc:  'Cuts longer. Use this for blending — it\'s your main fade position.',
+    dotY:  62,
+  },
+  'half-closed': {
+    title: 'Lever Half Closed',
+    desc:  'Cuts slightly shorter. Helps knock out fade lines between guard sizes.',
+    dotY:  38,
+  },
+  closed: {
+    title: 'Lever Closed',
+    desc:  'Cuts shortest on this guard. Use carefully — small change, big difference.',
+    dotY:  15,
+  },
+};
+
+function _leverSVG(dotY) {
+  // Simplified front-profile clipper with lever track on the right side.
+  const teeth = [0,5,10,15,20,25,30].map(x =>
+    `<line x1="${7+x}" y1="66" x2="${7+x}" y2="72" stroke="#555" stroke-width="0.9"/>`).join('');
+  return `<svg viewBox="0 0 52 82" width="44" height="70" style="flex-shrink:0;display:block;">
+    <defs>
+      <filter id="lg"><feGaussianBlur stdDeviation="2.5"/></filter>
+    </defs>
+    <!-- Body -->
+    <rect x="4" y="2" width="32" height="62" rx="9" fill="#111" stroke="rgba(232,213,163,0.25)" stroke-width="1.5"/>
+    <!-- Internal detail lines -->
+    <rect x="10" y="9" width="20" height="7" rx="2" fill="none" stroke="rgba(232,213,163,0.1)" stroke-width="0.8"/>
+    <line x1="4" y1="48" x2="36" y2="48" stroke="rgba(232,213,163,0.1)" stroke-width="0.8"/>
+    <!-- Blade -->
+    <rect x="2" y="60" width="36" height="12" rx="3" fill="#1e1e1e" stroke="rgba(232,213,163,0.3)" stroke-width="1.2"/>
+    ${teeth}
+    <!-- Lever track -->
+    <rect x="40" y="10" width="8" height="58" rx="4" fill="#0a0a08" stroke="rgba(232,213,163,0.2)" stroke-width="1"/>
+    <!-- Track ticks -->
+    <line x1="40" y1="15" x2="48" y2="15" stroke="rgba(232,213,163,0.2)" stroke-width="0.7"/>
+    <line x1="40" y1="39" x2="48" y2="39" stroke="rgba(232,213,163,0.2)" stroke-width="0.7"/>
+    <line x1="40" y1="63" x2="48" y2="63" stroke="rgba(232,213,163,0.2)" stroke-width="0.7"/>
+    <!-- Glow halo -->
+    <circle cx="44" cy="${dotY}" r="7" fill="rgba(232,213,163,0.25)" filter="url(#lg)"/>
+    <!-- Lever dot -->
+    <circle cx="44" cy="${dotY}" r="5" fill="#e8d5a3"/>
+    <circle cx="44" cy="${dotY}" r="2.5" fill="#fffceb"/>
+  </svg>`;
+}
+
+function showLeverTutorial(lever) {
+  if (!lever || lever === 'n/a' || _seenLevers.has(lever)) return;
+  const info = LEVER_TUTORIALS[lever];
+  if (!info) return;
+  _seenLevers.add(lever);
+
+  if (_leverTutorialTimer) { clearTimeout(_leverTutorialTimer); _leverTutorialTimer = null; }
+  const old = document.getElementById('leverTutorialCard');
+  if (old) old.remove();
+
+  const wrap = document.createElement('div');
+  wrap.id = 'leverTutorialCard';
+  wrap.className = 'lever-tutorial-wrap';
+  wrap.innerHTML = `<div class="lever-tutorial-card">
+    ${_leverSVG(info.dotY)}
+    <div class="lever-tutorial-copy">
+      <div class="lever-tutorial-title">${info.title}</div>
+      <div class="lever-tutorial-desc">${info.desc}</div>
+    </div>
+  </div>`;
+  document.body.appendChild(wrap);
+
+  _leverTutorialTimer = setTimeout(_dismissLeverTutorial, 4500);
+}
+
+function _dismissLeverTutorial() {
+  const wrap = document.getElementById('leverTutorialCard');
+  if (!wrap) return;
+  wrap.classList.add('dismissing');
+  setTimeout(() => wrap.remove(), 290);
+  if (_leverTutorialTimer) { clearTimeout(_leverTutorialTimer); _leverTutorialTimer = null; }
+}
+
 // ── STEP OVERLAY — one highlighted zone per fade-plan step ──
 // `offset` ({x, y} fractions) translates the LOCKED zone geometry onto a
 // new progress photo without recomputing any of the zones themselves —
@@ -3263,6 +3399,41 @@ function drawStepOverlay(ctx, W, H, step, guideLine, offset) {
     ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 6;
     ctx.fillText('Detail trim here', startX - pad, Math.max(14, topY - pad - 6));
     ctx.restore();
+
+  } else if (zone.type === 'detail-mini') {
+    // Mid-step detail check: amber glow on the bottom edge of the completed zone.
+    // Signals "check here" rather than "cut here" — different color from the main gold.
+    const AMBER = 'rgba(255,195,70,0.95)';
+    const pts = zone.points.map(p => ({ x: (p.x + off.x) * W, y: (p.y + off.y) * H }));
+    const hxs = pts.map(p => p.x), hys = pts.map(p => p.y);
+    const bStartX = Math.min(...hxs), bEndX = Math.max(...hxs);
+    const bTopY   = Math.min(...hys), bBotY = Math.max(...hys);
+    const CR = Math.min(10, (bEndX - bStartX) * 0.12, (bBotY - bTopY) * 0.3);
+
+    // Warm amber fill inside zone
+    ctx.save();
+    quadPathRounded(ctx, pts, CR); ctx.clip();
+    ctx.globalAlpha = 0.20;
+    ctx.fillStyle = 'rgba(255,160,40,1)';
+    ctx.fillRect(bStartX, bTopY, bEndX - bStartX, bBotY - bTopY);
+    ctx.restore();
+
+    // Pulsing dashed amber border
+    ctx.save();
+    ctx.strokeStyle = AMBER; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+    ctx.shadowColor = 'rgba(255,180,50,0.7)'; ctx.shadowBlur = 14;
+    quadPathRounded(ctx, pts, CR); ctx.stroke();
+    ctx.restore();
+
+    // "✦ Detail Trim Here" label
+    ctx.save();
+    ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = AMBER;
+    ctx.shadowColor = 'rgba(0,0,0,0.95)'; ctx.shadowBlur = 7;
+    const lbl = '✶ Detail Trim Here';
+    const tw = ctx.measureText(lbl).width;
+    ctx.fillText(lbl, bStartX + (bEndX - bStartX) / 2 - tw / 2, Math.max(16, bTopY - 8));
+    ctx.restore();
+    return; // skip the badge for mid-step detail zones
   }
 
   // Corner badge: guard + lever (or "Detail trimmer")
@@ -3302,6 +3473,50 @@ function addStepMessage(html, canvas) {
 }
 
 // Presents fade-plan step i: overlay + guard/lever/start/height/flick + "Mark step done".
+// Shows an amber "detail trim here" check between quad fade steps.
+// Highlights the bottom 38% of the just-completed zone — where faint
+// lines most commonly hide after the main pass.
+async function showMidStepDetailCheck(i) {
+  const plan = state.fadePlan;
+  const step = plan[i];
+  if (!step || step.zone.type !== 'quad') { presentFadePlanStep(i + 1); return; }
+
+  const pts = step.zone.points; // [sb_bottom, sb_top, rr_top, rr_bottom]
+  const lp = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+  const detailStep = {
+    ...step,
+    zone: {
+      type: 'detail-mini',
+      points: [pts[0], lp(pts[0], pts[1], 0.38), lp(pts[3], pts[2], 0.38), pts[3]],
+    },
+    dimZone: step.dimZone, // keep the already-completed area dimmed
+  };
+
+  addTyping('');
+  const offset = { x: state.fadeOffsetXFrac, y: state.fadeOffsetYFrac };
+  const { canvas, ctx, W, H } = await loadScaledCanvas(state.lastPhotoFile);
+  // Draw image, dim completed-below area, then the amber detail zone
+  if (detailStep.dimZone) {
+    ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.40)';
+    const dz = detailStep.dimZone;
+    if (dz.type === 'quad') {
+      const dpts = dz.points.map(p => ({ x: (p.x + offset.x) * W, y: (p.y + offset.y) * H }));
+      quadPath(ctx, dpts); ctx.fill();
+    }
+    ctx.restore();
+  }
+  drawStepOverlay(ctx, W, H, detailStep, state.guideLine, offset);
+  removeTyping();
+
+  addStepMessage(`<div class="detail-check-card">
+    <div class="detail-check-title">✶ Check this area before moving on</div>
+    <div class="detail-check-body">The bottom edge of this zone is where faint lines hide after the main pass. Look in the highlighted area — any dark spots or hard lines? A couple of light corner-of-blade flicks right there will knock them out. If it looks clean, you're good.</div>
+    <button class="opt-btn" style="margin-top:10px;width:100%;background:rgba(255,185,60,0.12);border-color:rgba(255,185,60,0.4);color:rgba(255,200,80,0.95);" onclick="presentFadePlanStep(${i + 1})">Looks Clean — Keep Going</button>
+  </div>`, canvas);
+
+  scrollBottom();
+}
+
 async function presentFadePlanStep(i) {
   const plan = state.fadePlan;
   if (!plan || !plan[i]) return;
@@ -3358,6 +3573,11 @@ async function presentFadePlanStep(i) {
     ${vidLink}
     ${doneBtn}
   </div>`, canvas);
+
+  // Show lever tutorial the first time this lever position appears.
+  if (step.lever && step.lever !== 'n/a') {
+    setTimeout(() => showLeverTutorial(step.lever), 700);
+  }
 }
 
 // Marks step i done. Either moves to a progress-photo check (with a skip
@@ -3415,7 +3635,13 @@ function completeFadeStep(i) {
     return;
   }
 
-  presentFadePlanStep(i + 1);
+  // For quad blend steps, inject a mid-step detail check before advancing.
+  const step = plan[i];
+  if (step && step.zone && step.zone.type === 'quad') {
+    showMidStepDetailCheck(i);
+  } else {
+    presentFadePlanStep(i + 1);
+  }
 }
 
 // Re-marks the ear on a progress photo and aligns the LOCKED fade geometry
