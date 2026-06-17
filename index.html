@@ -607,8 +607,17 @@ body {
   display: none;
   max-width: 720px; margin: 0 auto; width: 100%;
   padding: 8px 0 60px;
+  opacity: 0;
+  transform: translateY(18px);
 }
-.messages-wrap.visible { display: block; }
+.messages-wrap.visible {
+  display: block;
+  animation: messagesReveal 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes messagesReveal {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
 .msg {
   display: flex; gap: 14px; padding: 12px 0;
@@ -1184,8 +1193,12 @@ function scrollBottom(force) {
 function showMessages() {
   if (!started) {
     started = true;
-    hero.style.display = 'none';
     messagesWrap.classList.add('visible');
+    // Let the browser paint the newly visible element, then smooth-scroll to it
+    setTimeout(() => {
+      const target = messagesWrap.offsetTop - 20;
+      chatArea.scrollTo({ top: target, behavior: 'smooth' });
+    }, 30);
   }
 }
 
@@ -3636,7 +3649,7 @@ function resetChat() {
   state.fadePlan = null; state.currentStep = 0; state.lastPhotoFile = null; state.nextFileHandler = null;
   state.guideLine = null; state.taperLines = null; state.profileSide = null; state.fadeGeometry = null; state.fadeOffsetXFrac = 0; state.fadeOffsetYFrac = 0;
   messagesWrap.innerHTML = ''; messagesWrap.classList.remove('visible');
-  hero.style.display = ''; uploadPreview.innerHTML = '';
+  chatArea.scrollTop = 0; uploadPreview.innerHTML = '';
   uploadPreview.classList.remove('has-files');
   chatInput.value = ''; chatInput.style.height = 'auto';
   sendBtn.disabled = true; closeSidebar();
