@@ -683,23 +683,32 @@ body {
 #cropHeader{padding:14px 20px 10px;text-align:center;flex-shrink:0;}
 #cropHeader h2{font-size:16px;font-weight:700;color:#e8d5a3;margin:0 0 3px;}
 #cropHeader p{font-size:12px;color:var(--text3);margin:0;}
+@keyframes cropTipPulse {
+  0%,100%{ box-shadow:0 0 0 0 rgba(232,213,163,0), inset 0 0 0 1px rgba(232,213,163,0.18); }
+  50%    { box-shadow:0 0 10px 2px rgba(232,213,163,0.10), inset 0 0 0 1px rgba(232,213,163,0.32); }
+}
 #cropTip{flex-shrink:0;margin:0;padding:10px 14px 8px;
-  border-top:1px solid rgba(232,213,163,0.10);}
+  border-top:1px solid rgba(232,213,163,0.10);
+  background:rgba(232,213,163,0.04);
+  border-radius:0 0 0 0; /* inherits from parent modal bottom */
+  animation:cropTipPulse 2.8s ease-in-out infinite;}
+#cropTip.tip-open{ animation:none; background:rgba(232,213,163,0.06);
+  box-shadow:inset 0 0 0 1px rgba(232,213,163,0.22); }
 #cropTipToggle{display:flex;align-items:center;justify-content:space-between;
   gap:8px;cursor:pointer;user-select:none;padding:2px 0;}
-#cropTipLabel{font-size:11.5px;font-weight:600;color:rgba(232,213,163,0.55);
-  letter-spacing:0.04em;text-transform:uppercase;}
-#cropTipChevron{font-size:10px;color:rgba(232,213,163,0.35);
-  transition:transform 0.22s ease;line-height:1;}
-#cropTipBody{overflow:hidden;max-height:0;transition:max-height 0.32s cubic-bezier(0.22,1,0.36,1);}
+#cropTipLabel{font-size:11.5px;font-weight:700;color:rgba(232,213,163,0.72);
+  letter-spacing:0.05em;text-transform:uppercase;}
+#cropTipChevron{font-size:10px;color:rgba(232,213,163,0.45);
+  transition:transform 0.28s cubic-bezier(0.22,1,0.36,1);line-height:1;}
+#cropTipBody{overflow:hidden;max-height:0;transition:max-height 0.38s cubic-bezier(0.22,1,0.36,1);}
 #cropTip.tip-open #cropTipBody{max-height:240px;}
 #cropTip.tip-open #cropTipChevron{transform:rotate(180deg);}
 #cropTipInner{display:flex;gap:10px;align-items:flex-start;padding:9px 0 10px;}
 #cropTip video{width:110px;min-width:110px;height:72px;object-fit:cover;
-  border-radius:8px;border:1px solid rgba(232,213,163,0.22);flex-shrink:0;display:block;}
-#cropTipText{font-size:11.5px;line-height:1.55;color:rgba(232,213,163,0.65);}
+  border-radius:8px;border:1px solid rgba(232,213,163,0.28);flex-shrink:0;display:block;}
+#cropTipText{font-size:11.5px;line-height:1.55;color:rgba(232,213,163,0.68);}
 #cropTipText strong{display:block;font-size:12px;font-weight:700;
-  color:rgba(232,213,163,0.88);margin-bottom:3px;}
+  color:rgba(232,213,163,0.92);margin-bottom:3px;}
 #cropCanvasWrap{flex:1;position:relative;overflow:hidden;touch-action:none;}
 #cropCanvas{display:block;width:100%;height:100%;cursor:crosshair;}
 #cropFooter{padding:14px 20px 28px;display:flex;gap:10px;flex-shrink:0;}
@@ -1488,7 +1497,7 @@ function _easedScroll(container, targetTop, duration) {
 
 function scrollBottom(force) {
   if (force || !userScrolledUp) {
-    requestAnimationFrame(() => { _easedScroll(chatArea, chatArea.scrollHeight, 1400); });
+    requestAnimationFrame(() => { _easedScroll(chatArea, chatArea.scrollHeight, 1800); });
   }
 }
 
@@ -1499,7 +1508,7 @@ function scrollToMsg(el) {
   requestAnimationFrame(() => requestAnimationFrame(() => {
     const chatRect = chatArea.getBoundingClientRect();
     const elTop    = el.getBoundingClientRect().top - chatRect.top + chatArea.scrollTop;
-    _easedScroll(chatArea, elTop - 32, 1400);
+    _easedScroll(chatArea, elTop - 32, 1800);
   }));
 }
 
@@ -1510,7 +1519,7 @@ function showMessages() {
     messagesWrap.classList.add('visible');
     // Let the browser paint the newly visible element, then smooth-scroll to it
     setTimeout(() => {
-      _easedScroll(chatArea, messagesWrap.offsetTop - 20, 1400);
+      _easedScroll(chatArea, messagesWrap.offsetTop - 20, 1800);
     }, 30);
   }
 }
