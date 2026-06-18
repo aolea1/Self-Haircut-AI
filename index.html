@@ -1471,11 +1471,12 @@ function handleKey(e) {
 let _scrollRaf = null;
 function _easedScroll(container, targetTop, duration) {
   if (_scrollRaf) cancelAnimationFrame(_scrollRaf);
-  const start    = container.scrollTop;
-  const dist     = targetTop - start;
-  const t0       = performance.now();
-  // cubic ease-in-out
-  function ease(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2; }
+  const start = container.scrollTop;
+  const dist  = targetTop - start;
+  const t0    = performance.now();
+  // Quintic ease-out: starts at full speed, decelerates gracefully to a complete stop.
+  // No acceleration phase means the content never feels like it's rushing away.
+  function ease(t) { return 1 - Math.pow(1 - t, 5); }
   function step(now) {
     const elapsed = Math.min((now - t0) / duration, 1);
     container.scrollTop = start + dist * ease(elapsed);
@@ -1487,17 +1488,18 @@ function _easedScroll(container, targetTop, duration) {
 
 function scrollBottom(force) {
   if (force || !userScrolledUp) {
-    requestAnimationFrame(() => { _easedScroll(chatArea, chatArea.scrollHeight, 700); });
+    requestAnimationFrame(() => { _easedScroll(chatArea, chatArea.scrollHeight, 1400); });
   }
 }
 
-// Smooth-scroll chatArea so `el` sits near the top of the viewport.
-// Double-rAF ensures the browser has fully laid out the element.
+// Smooth-scroll chatArea so `el` sits near the top of the viewport with
+// comfortable breathing room above the step title.
+// Double-rAF ensures the browser has fully laid out the element before measuring.
 function scrollToMsg(el) {
   requestAnimationFrame(() => requestAnimationFrame(() => {
     const chatRect = chatArea.getBoundingClientRect();
     const elTop    = el.getBoundingClientRect().top - chatRect.top + chatArea.scrollTop;
-    _easedScroll(chatArea, elTop - 14, 700);
+    _easedScroll(chatArea, elTop - 32, 1400);
   }));
 }
 
@@ -1508,7 +1510,7 @@ function showMessages() {
     messagesWrap.classList.add('visible');
     // Let the browser paint the newly visible element, then smooth-scroll to it
     setTimeout(() => {
-      _easedScroll(chatArea, messagesWrap.offsetTop - 20, 700);
+      _easedScroll(chatArea, messagesWrap.offsetTop - 20, 1400);
     }, 30);
   }
 }
