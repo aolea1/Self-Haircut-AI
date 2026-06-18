@@ -1104,21 +1104,29 @@ body {
 @keyframes coachFlick3 { 0%,65%,100%{transform:translate(0,0)} 35%{transform:translate(0,-36px)} 50%{transform:translate(7px,-40px) rotate(-6deg)} }
 @keyframes coachFlick4 { 0%,65%,100%{transform:translate(0,0)} 35%{transform:translate(0,-30px)} 50%{transform:translate(6px,-33px) rotate(-5deg)} }
 @keyframes coachFlick5 { 0%,65%,100%{transform:translate(0,0)} 35%{transform:translate(0,-20px)} 50%{transform:translate(4px,-23px) rotate(-3deg)} }
-/* Lever teaching animation: Open → pulse → Half → pulse → Closed → pulse → quick return.
-   Dot group is centered at track mid-point (y=36). Offsets: Open=-24, Half=0, Closed=+24. */
+/* Lever teaching animation: Open → glow/pulse → Half → glow/pulse → Closed → glow/pulse → quick reset.
+   Dot group centered at track mid-point (y=36). Position offsets: Open=-24, Half=0, Closed=+24.
+   Pulse = scale bloom + gold drop-shadow so the glow is unmistakably visible. */
 @keyframes leverTeach {
-  0%           { transform: translateY(-24px) scale(1);   }  /* Open */
-  5%           { transform: translateY(-24px) scale(1.4); }  /* pulse at Open */
-  10%          { transform: translateY(-24px) scale(1);   }  /* settle */
-  30%          { transform: translateY(0px)   scale(1);   }  /* arrive Half */
-  35%          { transform: translateY(0px)   scale(1.4); }  /* pulse at Half */
-  40%          { transform: translateY(0px)   scale(1);   }  /* settle */
-  60%          { transform: translateY(24px)  scale(1);   }  /* arrive Closed */
-  65%          { transform: translateY(24px)  scale(1.4); }  /* pulse at Closed */
-  70%          { transform: translateY(24px)  scale(1);   }  /* settle */
-  74%          { transform: translateY(24px)  scale(1);   }  /* brief hold */
-  88%          { transform: translateY(-24px) scale(1);   }  /* quick return to Open */
-  100%         { transform: translateY(-24px) scale(1);   }  /* hold at Open for next loop */
+  /* ── Open: arrive, hold, then pulse ── */
+  0%    { transform: translateY(-24px) scale(1);    filter: none; }
+  4%    { transform: translateY(-24px) scale(1);    filter: none; }
+  8%    { transform: translateY(-24px) scale(1.75); filter: drop-shadow(0 0 7px rgba(232,213,163,0.95)) drop-shadow(0 0 14px rgba(232,213,163,0.55)); }
+  13%   { transform: translateY(-24px) scale(1);    filter: none; }
+  /* ── travel to Half ── */
+  33%   { transform: translateY(0px)   scale(1);    filter: none; }
+  /* ── Half: pulse ── */
+  38%   { transform: translateY(0px)   scale(1.75); filter: drop-shadow(0 0 7px rgba(232,213,163,0.95)) drop-shadow(0 0 14px rgba(232,213,163,0.55)); }
+  43%   { transform: translateY(0px)   scale(1);    filter: none; }
+  /* ── travel to Closed ── */
+  63%   { transform: translateY(24px)  scale(1);    filter: none; }
+  /* ── Closed: pulse ── */
+  68%   { transform: translateY(24px)  scale(1.75); filter: drop-shadow(0 0 7px rgba(232,213,163,0.95)) drop-shadow(0 0 14px rgba(232,213,163,0.55)); }
+  73%   { transform: translateY(24px)  scale(1);    filter: none; }
+  /* ── brief hold, then quick reset to Open (no pulse) ── */
+  76%   { transform: translateY(24px)  scale(1);    filter: none; }
+  89%   { transform: translateY(-24px) scale(1);    filter: none; }
+  100%  { transform: translateY(-24px) scale(1);    filter: none; }
 }
 
 /* Active step zone pulse — applied to .guide-img-wrap on fade plan steps */
@@ -1497,9 +1505,9 @@ function _easedScroll(container, targetTop, duration) {
   const start = container.scrollTop;
   const dist  = targetTop - start;
   const t0    = performance.now();
-  // Quintic ease-in-out: gentle ramp up AND gentle deceleration to a full stop.
-  // No quick start, no abrupt end — the scroll feels calm and intentional throughout.
-  function ease(t) { return t < 0.5 ? 16*t*t*t*t*t : 1 - Math.pow(-2*t+2,5)/2; }
+  // Cubic ease-in-out: smooth, consistent pace — builds gently, flows evenly,
+  // decelerates softly. No lag at the start, no rush in the middle, no snap at the end.
+  function ease(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2; }
   function step(now) {
     const elapsed = Math.min((now - t0) / duration, 1);
     container.scrollTop = start + dist * ease(elapsed);
@@ -1511,7 +1519,7 @@ function _easedScroll(container, targetTop, duration) {
 
 function scrollBottom(force) {
   if (force || !userScrolledUp) {
-    requestAnimationFrame(() => { _easedScroll(chatArea, chatArea.scrollHeight, 2400); });
+    requestAnimationFrame(() => { _easedScroll(chatArea, chatArea.scrollHeight, 1400); });
   }
 }
 
@@ -1522,7 +1530,7 @@ function scrollToMsg(el) {
   requestAnimationFrame(() => requestAnimationFrame(() => {
     const chatRect = chatArea.getBoundingClientRect();
     const elTop    = el.getBoundingClientRect().top - chatRect.top + chatArea.scrollTop;
-    _easedScroll(chatArea, elTop - 32, 2400);
+    _easedScroll(chatArea, elTop - 32, 1400);
   }));
 }
 
@@ -1533,7 +1541,7 @@ function showMessages() {
     messagesWrap.classList.add('visible');
     // Let the browser paint the newly visible element, then smooth-scroll to it
     setTimeout(() => {
-      _easedScroll(chatArea, messagesWrap.offsetTop - 20, 2400);
+      _easedScroll(chatArea, messagesWrap.offsetTop - 20, 1400);
     }, 30);
   }
 }
@@ -3986,9 +3994,9 @@ function _coachLeverSVG(lever) {
     <!-- Dot group centered at track midpoint (y=36).
          leverTeach moves it: Open(-24) → pulse → Half(0) → pulse → Closed(+24) → pulse → quick return. -->
     <g style="transform-box:fill-box;transform-origin:50% 50%;animation:leverTeach 5s ease-in-out infinite">
-      <circle cx="23" cy="36" r="9"   fill="rgba(232,213,163,0.13)"/>
-      <circle cx="23" cy="36" r="5.5" fill="#e8d5a3" stroke="rgba(255,252,230,0.3)" stroke-width="0.8"/>
-      <circle cx="23" cy="36" r="2"   fill="#fffceb"/>
+      <circle cx="23" cy="36" r="11"  fill="rgba(232,213,163,0.12)"/>
+      <circle cx="23" cy="36" r="6"   fill="#e8d5a3" stroke="rgba(255,252,230,0.35)" stroke-width="1"/>
+      <circle cx="23" cy="36" r="2.5" fill="#fffceb"/>
     </g>
   </svg>`;
 }
