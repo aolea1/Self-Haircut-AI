@@ -1077,14 +1077,13 @@ body {
   font-size: 17px; font-weight: 800; color: rgba(232,213,163,0.97);
   margin: 2px 0;
 }
-/* Motion animation keyframes */
-@keyframes coachSweep  { 0%,100%{transform:translateX(-18px)} 50%{transform:translateX(18px)} }
-@keyframes coachFlick1 { 0%,75%,100%{transform:translate(0,0) rotate(0deg)} 25%,50%{transform:translate(3px,-18px) rotate(-12deg)} }
-@keyframes coachFlick2 { 0%,75%,100%{transform:translate(0,0) rotate(0deg)} 25%,50%{transform:translate(4px,-27px) rotate(-16deg)} }
-@keyframes coachFlick3 { 0%,75%,100%{transform:translate(0,0) rotate(0deg)} 25%,50%{transform:translate(5px,-34px) rotate(-19deg)} }
-@keyframes coachFlick4 { 0%,75%,100%{transform:translate(0,0) rotate(0deg)} 25%,50%{transform:translate(3px,-22px) rotate(-13deg)} }
-@keyframes coachFlick5 { 0%,75%,100%{transform:translate(0,0) rotate(0deg)} 25%,50%{transform:translate(2px,-13px) rotate(-8deg)} }
-@keyframes coachJab    { 0%,70%,100%{transform:translate(0,0) rotate(0deg)} 25%,50%{transform:translate(6px,-13px) rotate(-22deg)} }
+/* Motion animation keyframes — all steps use a straight upward flick */
+@keyframes coachSweep   { 0%,100%{transform:translateY(0)}  50%{transform:translateY(-26px)} }
+@keyframes coachFlick1  { 0%,70%,100%{transform:translateY(0)} 28%,52%{transform:translateY(-16px)} }
+@keyframes coachFlick2  { 0%,70%,100%{transform:translateY(0)} 28%,52%{transform:translateY(-22px)} }
+@keyframes coachFlick3  { 0%,70%,100%{transform:translateY(0)} 28%,52%{transform:translateY(-28px)} }
+@keyframes coachFlick4  { 0%,70%,100%{transform:translateY(0)} 28%,52%{transform:translateY(-20px)} }
+@keyframes coachFlick5  { 0%,70%,100%{transform:translateY(0)} 28%,52%{transform:translateY(-14px)} }
 
 /* Active step zone pulse — applied to .guide-img-wrap on fade plan steps */
 @keyframes stepZonePulse {
@@ -1454,6 +1453,16 @@ function scrollBottom(force) {
   }
 }
 
+// Smooth-scroll chatArea so `el` sits near the top of the viewport.
+// Double-rAF ensures the browser has fully laid out the element.
+function scrollToMsg(el) {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const chatRect = chatArea.getBoundingClientRect();
+    const elTop    = el.getBoundingClientRect().top - chatRect.top + chatArea.scrollTop;
+    chatArea.scrollTo({ top: elTop - 14, behavior: 'smooth' });
+  }));
+}
+
 // ── SHOW CHAT ──
 function showMessages() {
   if (!started) {
@@ -1518,6 +1527,7 @@ function addAIMessage(html, options) {
   msg.innerHTML = `${aiAvatar()}<div class="msg-body"><div class="msg-name">SelfHaircut.ai</div><div class="msg-text">${html}${opts}</div></div>`;
   messagesWrap.appendChild(msg);
   scrollBottom();
+  return msg;
 }
 
 function addAIMessageWithCanvas(html, canvas) {
@@ -3073,7 +3083,7 @@ async function startTaperShaping() {
     redraw();
   };
 
-  scrollBottom();
+  scrollToMsg(msg);
 }
 
 function finalizeTaperShape(btn) {
@@ -3135,7 +3145,8 @@ function finalizeTaperShape(btn) {
   btn.textContent = '✓ That\'s your taper';
   btn.style.opacity = '0.6';
 
-  addAIMessage(`<p>That taper is yours. Every section below is built around the exact shape you just set — let's fade it in together.</p>`, null);
+  const confirmMsg = addAIMessage(`<p>That taper is yours. Every section below is built around the exact shape you just set — let's fade it in together.</p>`, null);
+  scrollToMsg(confirmMsg);
   buildFadePlan();
   state.currentStep = 0;
   presentFadePlanStep(0);
@@ -3740,12 +3751,7 @@ function addStepMessage(html, canvas, collapseBadge) {
   messagesWrap.appendChild(msg);
   canvas.style.width = '100%';
   msg.querySelector('.guide-img-wrap').appendChild(canvas);
-  // Smooth-scroll so the new step title is visible near the top of the viewport
-  requestAnimationFrame(() => {
-    const chatRect = chatArea.getBoundingClientRect();
-    const msgTop   = msg.getBoundingClientRect().top - chatRect.top + chatArea.scrollTop;
-    chatArea.scrollTo({ top: msgTop - 12, behavior: 'smooth' });
-  });
+  scrollToMsg(msg);
   return msg;
 }
 
@@ -3829,12 +3835,16 @@ function _coachClipperIcon(cx, baseY, highlightCorner) {
   return `${body}${guard}${cornerFill}${teeth}${spec}`;
 }
 
-function _coachMotionSVG(motionAnim, pathD, arrowPts, highlightCorner) {
-  const cx = 36, baseY = 50;
+function _coachMotionSVG(motionAnim, _pathD, _arrowPts, highlightCorner) {
+  const cx = 36, baseY = 48;
+  // Straight vertical guide line + arrowhead at top — replaces all curved paths
+  const guideLine = `<line x1="36" y1="52" x2="36" y2="10" stroke="rgba(232,213,163,0.14)" stroke-width="1.5" stroke-dasharray="3,3" stroke-linecap="round"/>`;
+  const arrowHead = `<polyline points="31,18 36,10 41,18" fill="none" stroke="rgba(232,213,163,0.55)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`;
+  // Clipper rotated 180° so guard faces upward — matches how you see your own clipper while cutting
   return `<svg viewBox="0 0 72 62" width="72" height="62" style="overflow:visible">
-    <path d="${pathD}" stroke="rgba(232,213,163,0.13)" stroke-width="1.5" fill="none" stroke-dasharray="3,3"/>
-    <polyline points="${arrowPts}" fill="none" stroke="rgba(232,213,163,0.45)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <g style="transform-box:fill-box;transform-origin:center 85%;animation:${motionAnim} 2.1s ease-in-out infinite">
+    ${guideLine}
+    ${arrowHead}
+    <g style="transform-box:fill-box;transform-origin:50% 50%;transform:rotate(180deg);animation:${motionAnim} 2.2s ease-in-out infinite">
       ${_coachClipperIcon(cx, baseY, highlightCorner)}
     </g>
   </svg>`;
@@ -3842,7 +3852,10 @@ function _coachMotionSVG(motionAnim, pathD, arrowPts, highlightCorner) {
 
 function _coachLeverSVG(lever) {
   // Lever dot Y within the track: closed=14, half=35, open=56
-  const targetY = { open: 56, 'half-open': 35, 'half-closed': 35, closed: 14, 'n/a': null }[lever] ?? null;
+  // Open = top of track (lever pushed away from body = more cutting length).
+  // Flipped from physical clipper because users see the lever facing them while
+  // cutting their own hair, making "open = up" the intuitive reading.
+  const targetY = { open: 14, 'half-open': 35, 'half-closed': 35, closed: 56, 'n/a': null }[lever] ?? null;
   if (targetY === null) {
     return `<div style="height:60px;display:flex;align-items:center;justify-content:center;font-size:20px;color:rgba(232,213,163,0.25)">—</div>`;
   }
@@ -3866,8 +3879,8 @@ function _coachLeverSVG(lever) {
     <line x1="32" y1="35" x2="40" y2="35" stroke="rgba(232,213,163,0.15)" stroke-width="0.8"/>
     <line x1="32" y1="56" x2="40" y2="56" stroke="rgba(232,213,163,0.3)" stroke-width="0.8"/>
     <!-- Labels -->
-    <text x="30" y="16" font-size="5.5" fill="rgba(232,213,163,0.35)" text-anchor="end" font-family="sans-serif">C</text>
-    <text x="30" y="58" font-size="5.5" fill="rgba(232,213,163,0.35)" text-anchor="end" font-family="sans-serif">O</text>
+    <text x="30" y="16" font-size="5.5" fill="rgba(232,213,163,0.35)" text-anchor="end" font-family="sans-serif">O</text>
+    <text x="30" y="58" font-size="5.5" fill="rgba(232,213,163,0.35)" text-anchor="end" font-family="sans-serif">C</text>
     <!-- Glow halo (animated) -->
     <circle cx="36" r="7" fill="rgba(232,213,163,0.18)">
       <animate attributeName="cy" from="35" to="${targetY}" dur="0.6s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
@@ -3883,22 +3896,15 @@ function _coachLeverSVG(lever) {
 }
 
 function buildCoachingCard(step, stepIndex) {
-  // Motion SVG config per step index
+  // Motion config — path/arrow unused (straight vertical drawn by _coachMotionSVG)
   const MOTION_CFG = [
-    // 0: bald line — horizontal sweep
-    { anim: 'coachSweep',  path: 'M12,50 L60,50', arrow: '56,46 62,50 56,54', label: 'Trace the line',     corner: false },
-    // 1: soften — short upward flick
-    { anim: 'coachFlick1', path: 'M36,52 C38,38 40,26 36,14', arrow: '32,18 36,11 40,18', label: 'Short upward flick', corner: false },
-    // 2: 0.5 blend — medium flick
-    { anim: 'coachFlick2', path: 'M36,52 C39,36 42,22 36,10', arrow: '32,14 36,7 40,14',  label: 'Upward flick',        corner: false },
-    // 3: 1 guard — full flick
-    { anim: 'coachFlick3', path: 'M36,52 C40,34 43,18 36,8',  arrow: '32,12 36,5 40,12',  label: 'Full upward flick',   corner: false },
-    // 4: 1.5 blend — light flick
-    { anim: 'coachFlick4', path: 'M36,52 C38,38 40,24 36,12', arrow: '32,16 36,9 40,16',  label: 'Light upward flick',  corner: false },
-    // 5: 2 guard — gentle pass
-    { anim: 'coachFlick5', path: 'M36,52 C37,42 38,32 36,20', arrow: '33,24 36,17 39,24', label: 'Gentle pass',          corner: false },
-    // 6: upper taper refinement — very light sweeping flicks, no corner blade
-    { anim: 'coachFlick5', path: 'M36,52 C37,42 38,30 36,18', arrow: '33,22 36,15 39,22', label: 'Feather pass',          corner: false },
+    { anim: 'coachSweep',  label: 'Trace the line',     corner: false },
+    { anim: 'coachFlick1', label: 'Short flick up',      corner: false },
+    { anim: 'coachFlick2', label: 'Flick upward',        corner: false },
+    { anim: 'coachFlick3', label: 'Full flick up',       corner: false },
+    { anim: 'coachFlick4', label: 'Light flick up',      corner: false },
+    { anim: 'coachFlick5', label: 'Gentle pass up',      corner: false },
+    { anim: 'coachFlick5', label: 'Feather pass up',     corner: false },
   ];
   const cfg = MOTION_CFG[stepIndex] ?? MOTION_CFG[3];
 
@@ -3925,7 +3931,7 @@ function buildCoachingCard(step, stepIndex) {
     </div>
     <div class="coaching-col">
       <div class="coaching-col-label">Motion</div>
-      ${_coachMotionSVG(cfg.anim, cfg.path, cfg.arrow, cfg.corner)}
+      ${_coachMotionSVG(cfg.anim, null, null, cfg.corner)}
       <div class="coaching-col-sub">${cfg.label}</div>
     </div>
     <div class="coaching-col">
@@ -4082,7 +4088,8 @@ function completeFadeStep(i) {
   }
 
   if (i === plan.length - 1) {
-    addAIMessage(`<p>That's your full fade — built around your taper. Take a final look in the mirror from both sides. If anything needs a touch-up, let me know and we'll fix it together.</p>`, null);
+    const wrapMsg = addAIMessage(`<p>That's your full fade — built around your taper. Take a final look in the mirror from both sides. If anything needs a touch-up, let me know and we'll fix it together.</p>`, null);
+    scrollToMsg(wrapMsg);
     addFadePlanWrapUp();
     return;
   }
