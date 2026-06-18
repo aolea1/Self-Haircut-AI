@@ -1078,6 +1078,18 @@ body {
 @keyframes coachFlick5 { 0%,75%,100%{transform:translate(0,0) rotate(0deg)} 25%,50%{transform:translate(2px,-13px) rotate(-8deg)} }
 @keyframes coachJab    { 0%,70%,100%{transform:translate(0,0) rotate(0deg)} 25%,50%{transform:translate(6px,-13px) rotate(-22deg)} }
 
+/* Active step zone pulse — applied to .guide-img-wrap on fade plan steps */
+@keyframes stepZonePulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(232,213,163,0), 0 0 0 1px rgba(232,213,163,0.08); }
+  50%     { box-shadow: 0 0 22px 3px rgba(232,213,163,0.22), 0 0 0 1px rgba(232,213,163,0.2); }
+}
+.step-glow {
+  animation: stepZonePulse 2.6s ease-in-out infinite;
+  border-color: rgba(232,213,163,0.18) !important;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
 /* ── MID-STEP DETAIL CHECK CARD ── */
 .detail-check-card {
   background: rgba(255,175,50,0.07);
@@ -2530,152 +2542,197 @@ function offerTaperShaping() {
 
 // Draws the natural taper contour path: straight sides, gently curved top edge.
 // The curve on the top edge mimics the natural hair growth arc — not a box.
+// Organic taper contour: cubic bezier on bottom (gentle jaw bow) and top (graceful arc).
+// Sides are straight — keeps the shape readable and barber-like.
 function taperContourPath(ctx, sb0, sb1, rr1, rr0) {
+  const spanX = Math.abs(rr0.x - sb0.x);
+  const spanY = Math.abs(sb0.y - sb1.y);
   ctx.beginPath();
   ctx.moveTo(sb0.x, sb0.y);
-  ctx.lineTo(rr0.x, rr0.y);
+  // Bottom: very slight convex bow downward (~2% of height)
+  ctx.bezierCurveTo(
+    sb0.x + spanX * 0.33, sb0.y + spanY * 0.022,
+    rr0.x - spanX * 0.33, rr0.y + spanY * 0.022,
+    rr0.x, rr0.y
+  );
+  // Rear side: straight
   ctx.lineTo(rr1.x, rr1.y);
-  // Top edge: quadratic arc that curves slightly above the two top points
-  const cpX = (sb1.x + rr1.x) / 2;
-  const cpY = Math.min(sb1.y, rr1.y) - Math.abs(rr1.x - sb1.x) * 0.10;
-  ctx.quadraticCurveTo(cpX, cpY, sb1.x, sb1.y);
+  // Top: graceful upward arc — the most visible curve, feels like a real fade end
+  ctx.bezierCurveTo(
+    rr1.x - spanX * 0.25, rr1.y - spanX * 0.10,
+    sb1.x + spanX * 0.25, sb1.y - spanX * 0.10,
+    sb1.x, sb1.y
+  );
+  // Front side: closes to sb0 (straight)
   ctx.closePath();
 }
 
-// Premium taper shape overlay. lines._active = { lineKey, pointKey } while dragging.
-// lines._fingerOffsetY = canvas-pixel amount the dot is shifted above the raw finger Y.
+// Premium taper shape overlay.
+// lines._active        = { lineKey, pointKey } while dragging
+// lines._fingerOffsetY = canvas-px amount the dot is shifted above the raw finger Y
+// lines._glowPhase     = float driven by idle rAF loop → makes the border breathe
 function drawTaperShapeOverlay(ctx, W, H, lines) {
-  const GOLD      = 'rgba(232,213,163,0.97)';
-  const GOLD_SOFT = 'rgba(232,213,163,0.55)';
-  const GOLD_DIM  = 'rgba(232,213,163,0.25)';
-  const active    = lines._active || null;
+  const GOLD     = 'rgba(232,213,163,0.97)';
+  const GOLD_DIM = 'rgba(232,213,163,0.22)';
+  const active   = lines._active || null;
+  const phase    = lines._glowPhase || 0;
 
   ctx.save(); ctx.translate(0.5, 0.5);
 
-  // Compute display positions: active handle is shifted up by _fingerOffsetY so dot
-  // appears above the finger. Other handles stay at their stored fractional position.
   const offsetY = lines._fingerOffsetY || 0;
-  const getPx = (lineKey, ptKey) => {
-    const p = lines[lineKey][ptKey];
-    const isActive = active && active.lineKey === lineKey && active.pointKey === ptKey;
-    return { x: p.x * W, y: p.y * H - (isActive ? offsetY : 0) };
+  const getPx = (lk, pk) => {
+    const p = lines[lk][pk];
+    const on = active && active.lineKey === lk && active.pointKey === pk;
+    return { x: p.x * W, y: p.y * H - (on ? offsetY : 0) };
   };
-
-  const sb0 = getPx('sideburn', 'p0'), sb1 = getPx('sideburn', 'p1');
-  const rr0 = getPx('rear', 'p0'),     rr1 = getPx('rear', 'p1');
+  const sb0 = getPx('sideburn','p0'), sb1 = getPx('sideburn','p1');
+  const rr0 = getPx('rear','p0'),     rr1 = getPx('rear','p1');
+  const allPts = [sb0, sb1, rr0, rr1];
+  const minX = Math.min(...allPts.map(p=>p.x)), maxX = Math.max(...allPts.map(p=>p.x));
+  const minY = Math.min(...allPts.map(p=>p.y)), maxY = Math.max(...allPts.map(p=>p.y));
+  const spanX = maxX - minX, spanY = maxY - minY;
 
   // ── Dashed bald-line reference ──
-  const refY      = ((lines.sideburn.p0.y + lines.rear.p0.y) / 2) * H;
-  const refStartX = Math.min(lines.sideburn.p0.x, lines.rear.p0.x) * W;
-  const refEndX   = Math.max(lines.sideburn.p0.x, lines.rear.p0.x) * W;
+  const refY = ((lines.sideburn.p0.y + lines.rear.p0.y) / 2) * H;
+  const refX0 = Math.min(lines.sideburn.p0.x, lines.rear.p0.x) * W;
+  const refX1 = Math.max(lines.sideburn.p0.x, lines.rear.p0.x) * W;
   ctx.save();
-  ctx.setLineDash([5, 5]); ctx.strokeStyle = GOLD_DIM; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(refStartX, refY); ctx.lineTo(refEndX, refY); ctx.stroke();
+  ctx.setLineDash([4,6]); ctx.strokeStyle = GOLD_DIM; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(refX0, refY); ctx.lineTo(refX1, refY); ctx.stroke();
   ctx.restore();
 
-  // ── Taper region: natural contour fill ──
-  const allPts = [sb0, sb1, rr0, rr1];
-  const minX = Math.min(...allPts.map(p => p.x)), maxX = Math.max(...allPts.map(p => p.x));
-  const minY = Math.min(...allPts.map(p => p.y)), maxY = Math.max(...allPts.map(p => p.y));
+  // ── Layer 1: soft ambient bleed OUTSIDE the taper (suggests aura around fade zone) ──
+  ctx.save();
+  ctx.shadowColor = 'rgba(232,213,163,0.28)';
+  ctx.shadowBlur  = 28;
+  ctx.strokeStyle = 'rgba(232,213,163,0.01)';
+  ctx.lineWidth   = 1;
+  taperContourPath(ctx, sb0, sb1, rr1, rr0);
+  ctx.stroke();
+  ctx.restore();
 
+  // ── Layer 2: multi-layer fill inside the taper ──
   ctx.save();
   taperContourPath(ctx, sb0, sb1, rr1, rr0);
   ctx.clip();
 
-  // Gradient: dense gold at bald line, dissolves toward crown
-  const grad = ctx.createLinearGradient(0, maxY, 0, minY);
-  grad.addColorStop(0,    'rgba(232,213,163,0.36)');
-  grad.addColorStop(0.45, 'rgba(232,213,163,0.18)');
-  grad.addColorStop(1,    'rgba(232,213,163,0.04)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(minX - 2, minY - 2, maxX - minX + 4, maxY - minY + 4);
+  // Base gradient: warm dense gold at bald line, dissolves to transparent at crown
+  const gBase = ctx.createLinearGradient(0, maxY, 0, minY);
+  gBase.addColorStop(0,    'rgba(232,213,163,0.42)');
+  gBase.addColorStop(0.35, 'rgba(232,213,163,0.22)');
+  gBase.addColorStop(0.75, 'rgba(232,213,163,0.09)');
+  gBase.addColorStop(1,    'rgba(232,213,163,0.02)');
+  ctx.fillStyle = gBase;
+  ctx.fillRect(minX - 2, minY - 2, spanX + 4, spanY + 4);
 
-  // Subtle diagonal grain — more barber-like than a grid
-  ctx.globalAlpha = 0.07;
-  ctx.strokeStyle = 'rgba(232,213,163,1)'; ctx.lineWidth = 0.7;
-  const step = 16;
-  const span = (maxX - minX) + (maxY - minY);
-  for (let d = -span; d <= span * 2; d += step) {
+  // Secondary radial glow near bald line — makes the starting point feel "hot"
+  const gRadial = ctx.createRadialGradient(
+    (minX + maxX) / 2, maxY, 0,
+    (minX + maxX) / 2, maxY, spanX * 0.7
+  );
+  gRadial.addColorStop(0,   'rgba(232,213,163,0.22)');
+  gRadial.addColorStop(0.6, 'rgba(232,213,163,0.06)');
+  gRadial.addColorStop(1,   'rgba(232,213,163,0)');
+  ctx.fillStyle = gRadial;
+  ctx.fillRect(minX - 2, minY - 2, spanX + 4, spanY + 4);
+
+  // Subtle diagonal grain — suggests graduated hair texture
+  ctx.globalAlpha = 0.065;
+  ctx.strokeStyle = 'rgba(232,213,163,1)'; ctx.lineWidth = 0.6;
+  const grainStep = 14;
+  for (let d = -(spanX + spanY); d <= (spanX + spanY) * 2; d += grainStep) {
     ctx.beginPath();
     ctx.moveTo(minX + d, minY);
-    ctx.lineTo(minX + d - (maxY - minY), maxY);
+    ctx.lineTo(minX + d - spanY, maxY);
     ctx.stroke();
   }
   ctx.restore();
 
-  // ── Contour outline glow — brightens while dragging ──
+  // ── Layer 3: breathing border (pulsing when idle, crisp when dragging) ──
+  const idlePulse  = active ? 0 : (Math.sin(phase) * 0.5 + 0.5); // 0..1
+  const glowAlpha  = active ? 0.72 : 0.38 + idlePulse * 0.32;    // 0.38..0.70
+  const glowBlur   = active ? 16   : 6   + idlePulse * 10;        // 6..16
+  const strokeW    = active ? 2    : 1.3 + idlePulse * 0.5;
+
   ctx.save();
-  ctx.shadowColor = 'rgba(232,213,163,0.5)';
-  ctx.shadowBlur  = active ? 14 : 7;
-  ctx.strokeStyle = active ? 'rgba(232,213,163,0.88)' : GOLD_SOFT;
-  ctx.lineWidth   = active ? 1.8 : 1.2;
+  ctx.shadowColor = `rgba(232,213,163,${glowAlpha * 0.7})`;
+  ctx.shadowBlur  = glowBlur;
+  ctx.strokeStyle = `rgba(232,213,163,${glowAlpha})`;
+  ctx.lineWidth   = strokeW;
   ctx.setLineDash([]);
   taperContourPath(ctx, sb0, sb1, rr1, rr0);
   ctx.stroke();
   ctx.restore();
 
-  // ── Handles & lines ──────────────────────────────────────
-  const isActivePoint = (lk, pk) => active && active.lineKey === lk && active.pointKey === pk;
+  // ── Layer 4: handles & segment lines ──
+  const isOn = (lk, pk) => active && active.lineKey === lk && active.pointKey === pk;
 
   const drawHandle = (p, lk, pk) => {
-    const on = isActivePoint(lk, pk);
-    const R = on ? 11 : 9;
+    const on = isOn(lk, pk);
+    const R  = on ? 11 : 9;
 
     if (on) {
-      // Outer pulse halo
+      // Outermost halo ring
       ctx.save();
-      ctx.strokeStyle = 'rgba(232,213,163,0.22)';
-      ctx.lineWidth = 1;
-      ctx.shadowColor = 'rgba(232,213,163,0.6)';
-      ctx.shadowBlur = 18;
-      ctx.beginPath(); ctx.arc(p.x, p.y, R + 11, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = 'rgba(232,213,163,0.18)'; ctx.lineWidth = 1;
+      ctx.shadowColor = 'rgba(232,213,163,0.5)';  ctx.shadowBlur = 22;
+      ctx.beginPath(); ctx.arc(p.x, p.y, R + 13, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
-      // Inner ring
+      // Mid ring
       ctx.save();
-      ctx.strokeStyle = 'rgba(232,213,163,0.65)';
-      ctx.lineWidth = 1.5;
-      ctx.shadowColor = 'rgba(232,213,163,0.85)';
-      ctx.shadowBlur = 8;
+      ctx.strokeStyle = 'rgba(232,213,163,0.55)'; ctx.lineWidth = 1.5;
+      ctx.shadowColor = 'rgba(232,213,163,0.85)'; ctx.shadowBlur = 10;
       ctx.beginPath(); ctx.arc(p.x, p.y, R + 5, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    } else if (!active) {
+      // Idle: gentle breathing halo driven by phase
+      const idleA = 0.12 + idlePulse * 0.14;
+      ctx.save();
+      ctx.strokeStyle = `rgba(232,213,163,${idleA})`; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(p.x, p.y, R + 8, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     }
 
-    // Main disc
+    // Main disc with shadow
     ctx.save();
-    ctx.shadowColor = 'rgba(232,213,163,0.85)';
-    ctx.shadowBlur  = on ? 14 : 7;
+    ctx.shadowColor = 'rgba(232,213,163,0.9)';
+    ctx.shadowBlur  = on ? 16 : (6 + idlePulse * 5);
     ctx.fillStyle   = GOLD;
     ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
 
-    // Specular highlight
+    // Depth ring (darker edge around disc)
     ctx.save();
-    ctx.fillStyle = 'rgba(255,252,235,0.65)';
-    ctx.beginPath(); ctx.arc(p.x - R * 0.28, p.y - R * 0.32, R * 0.38, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(120,95,40,0.4)'; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+
+    // Specular highlight — top-left bright spot
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,253,240,0.72)';
+    ctx.beginPath(); ctx.arc(p.x - R*0.28, p.y - R*0.32, R*0.36, 0, Math.PI*2); ctx.fill();
     ctx.restore();
   };
 
   const drawSegment = (p0, p1, lk, label) => {
     const lineOn = active && active.lineKey === lk;
     ctx.save();
-    ctx.shadowColor = 'rgba(232,213,163,0.65)';
-    ctx.shadowBlur  = lineOn ? 10 : 4;
-    ctx.strokeStyle = lineOn ? GOLD : 'rgba(232,213,163,0.88)';
-    ctx.lineWidth   = lineOn ? 2 : 1.5;
-    ctx.lineCap     = 'round';
-    ctx.setLineDash([]);
+    ctx.shadowColor = 'rgba(232,213,163,0.7)';
+    ctx.shadowBlur  = lineOn ? 12 : 4;
+    ctx.strokeStyle = lineOn ? GOLD : 'rgba(232,213,163,0.85)';
+    ctx.lineWidth   = lineOn ? 2.2 : 1.6;
+    ctx.lineCap     = 'round'; ctx.setLineDash([]);
     ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
     ctx.restore();
 
     drawHandle(p0, lk, 'p0');
     drawHandle(p1, lk, 'p1');
 
-    // Label above top handle
     ctx.save();
     ctx.font = 'bold 11px sans-serif'; ctx.fillStyle = GOLD; ctx.textBaseline = 'bottom';
-    ctx.shadowColor = 'rgba(0,0,0,1)'; ctx.shadowBlur = 5;
+    ctx.shadowColor = 'rgba(0,0,0,1)'; ctx.shadowBlur = 6;
     const tw = ctx.measureText(label).width;
-    ctx.fillText(label, p1.x - tw / 2, Math.max(14, p1.y - 15));
+    ctx.fillText(label, p1.x - tw/2, Math.max(14, p1.y - 16));
     ctx.restore();
   };
 
@@ -2814,6 +2871,7 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubb
     dragging  = findHandle(pt.x, pt.y);
     isTouch   = touch;
     if (!dragging) return;
+    if (lines._stopIdleAnim) lines._stopIdleAnim();
     lines._active        = dragging;
     lines._fingerOffsetY = touch ? FINGER_OFFSET_CSS * pt.scaleY : 0;
     fingerCSS = { x: pt.cssX, y: pt.cssY };
@@ -2838,6 +2896,7 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubb
     lines._fingerOffsetY = 0;
     fingerCSS            = null;
     scheduleRedraw();
+    if (lines._startIdleAnim) lines._startIdleAnim();
   };
 
   canvas.addEventListener('mousedown',  e => { e.preventDefault(); onStart(e.clientX, e.clientY, false); });
@@ -2882,12 +2941,31 @@ async function startTaperShaping() {
   const bubbleCanvas = document.createElement('canvas');
   bubble.appendChild(bubbleCanvas);
 
+  lines._glowPhase = 0;
+  let _idleRaf = null;
   const redraw = () => {
     ctx.clearRect(0, 0, W, H);
     ctx.drawImage(img, 0, 0, W, H);
     drawTaperShapeOverlay(ctx, W, H, lines);
   };
+
+  const startIdleAnim = () => {
+    if (_idleRaf) return;
+    const tick = () => {
+      lines._glowPhase = (lines._glowPhase || 0) + 0.038;
+      redraw();
+      _idleRaf = requestAnimationFrame(tick);
+    };
+    _idleRaf = requestAnimationFrame(tick);
+  };
+  const stopIdleAnim = () => {
+    if (_idleRaf) { cancelAnimationFrame(_idleRaf); _idleRaf = null; }
+  };
+  lines._startIdleAnim = startIdleAnim;
+  lines._stopIdleAnim  = stopIdleAnim;
+
   redraw();
+  startIdleAnim();
   makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubbleCanvas, img);
 
   const msg = document.createElement('div');
@@ -2933,6 +3011,7 @@ async function startTaperShaping() {
 function finalizeTaperShape(btn) {
   const msg = btn.closest('.msg');
   const lines = msg._taperLines;
+  if (lines._stopIdleAnim) lines._stopIdleAnim();
   const sb = lines.sideburn, re = lines.rear;
 
   // ── Shape validation ──────────────────────────────────────
@@ -3391,26 +3470,51 @@ function drawStepOverlay(ctx, W, H, step, guideLine, offset) {
     ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = GOLD_DIM; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(refStartX, refY); ctx.lineTo(refEndX, refY); ctx.stroke(); ctx.restore();
 
-    // Outer glow — radiating gold aura around the active zone
+    // Outer ambient bleed — wide soft halo draws the eye before the sharp border
     ctx.save();
-    ctx.shadowColor = 'rgba(232,213,163,0.55)'; ctx.shadowBlur = 22;
-    ctx.strokeStyle = 'rgba(232,213,163,0.6)'; ctx.lineWidth = 3; ctx.setLineDash([]);
+    ctx.shadowColor = 'rgba(232,213,163,0.45)'; ctx.shadowBlur = 32;
+    ctx.strokeStyle = 'rgba(232,213,163,0.05)'; ctx.lineWidth = 1; ctx.setLineDash([]);
     quadPathRounded(ctx, highlightPts, CORNER_R); ctx.stroke();
     ctx.restore();
 
-    // Shaded zone with grid, clipped to the rounded shape
+    // Fill: layered gradient + diagonal grain inside the active quad
     ctx.save();
     quadPathRounded(ctx, highlightPts, CORNER_R); ctx.clip();
-    ctx.globalAlpha = 0.18; ctx.fillStyle = 'rgba(232,213,163,0.25)';
+
+    // Linear gradient from bald-line bottom (dense gold) to top of zone (near-transparent)
+    const fillGrad = ctx.createLinearGradient(0, botY, 0, topY);
+    fillGrad.addColorStop(0,    'rgba(232,213,163,0.38)');
+    fillGrad.addColorStop(0.4,  'rgba(232,213,163,0.20)');
+    fillGrad.addColorStop(0.85, 'rgba(232,213,163,0.07)');
+    fillGrad.addColorStop(1,    'rgba(232,213,163,0.02)');
+    ctx.fillStyle = fillGrad;
     ctx.fillRect(startX, topY, endX - startX, botY - topY);
-    ctx.globalAlpha = 0.2; ctx.strokeStyle = 'rgba(232,213,163,0.5)'; ctx.lineWidth = 0.7;
-    for (let x = startX; x <= endX; x += 14) { ctx.beginPath(); ctx.moveTo(x, topY); ctx.lineTo(x, botY); ctx.stroke(); }
-    for (let y = topY; y <= botY; y += 14) { ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(endX, y); ctx.stroke(); }
+
+    // Radial warm glow near bottom center
+    const rdGlow = ctx.createRadialGradient(
+      (startX + endX) / 2, botY, 0,
+      (startX + endX) / 2, botY, (endX - startX) * 0.75
+    );
+    rdGlow.addColorStop(0,   'rgba(232,213,163,0.20)');
+    rdGlow.addColorStop(0.7, 'rgba(232,213,163,0.04)');
+    rdGlow.addColorStop(1,   'rgba(232,213,163,0)');
+    ctx.fillStyle = rdGlow;
+    ctx.fillRect(startX, topY, endX - startX, botY - topY);
+
+    // Diagonal grain — matches taper editor aesthetic
+    ctx.globalAlpha = 0.08; ctx.strokeStyle = 'rgba(232,213,163,1)'; ctx.lineWidth = 0.65;
+    const diagStep = 15;
+    for (let d = -(endX - startX + botY - topY); d <= (endX - startX + botY - topY) * 2; d += diagStep) {
+      ctx.beginPath();
+      ctx.moveTo(startX + d, topY);
+      ctx.lineTo(startX + d - (botY - topY), botY);
+      ctx.stroke();
+    }
     ctx.restore();
 
-    // Sharp gold border
-    ctx.save(); ctx.strokeStyle = GOLD; ctx.lineWidth = 1.8; ctx.setLineDash([]);
-    ctx.shadowColor = 'rgba(232,213,163,0.6)'; ctx.shadowBlur = 10;
+    // Crisp gold border with glow
+    ctx.save(); ctx.strokeStyle = GOLD; ctx.lineWidth = 2; ctx.setLineDash([]);
+    ctx.shadowColor = 'rgba(232,213,163,0.7)'; ctx.shadowBlur = 14;
     quadPathRounded(ctx, highlightPts, CORNER_R); ctx.stroke(); ctx.restore();
 
     // Upward arrow + "flick out here" near the top edge
@@ -3506,7 +3610,7 @@ function addStepMessage(html, canvas) {
   msg.className = 'msg';
   msg.innerHTML = `${aiAvatar()}<div class="msg-body"><div class="msg-name">SelfHaircut.ai</div>
     <div class="msg-text">${html}
-      <div class="guide-img-wrap" style="position:relative;"></div>
+      <div class="guide-img-wrap step-glow" style="position:relative;"></div>
     </div></div>`;
   messagesWrap.appendChild(msg);
   canvas.style.width = '100%';
@@ -3571,15 +3675,28 @@ async function showMidStepDetailCheck(i) {
 // stepIndex drives motion type (0=sweep, 1-5=flick, 6=jab).
 
 function _coachClipperIcon(cx, baseY, highlightCorner) {
-  const teeth = [-7,-3,1,5].map(dx =>
-    `<line x1="${cx+dx}" y1="${baseY+2}" x2="${cx+dx}" y2="${baseY+4}" stroke="${dx===-7&&highlightCorner?'#ffb840':'#555'}" stroke-width="0.9"/>`).join('');
+  // Body — three overlapping rects to fake a gradient from dark base to lighter face
+  const body = `
+    <rect x="${cx-8}" y="${baseY-19}" width="16" height="20" rx="4.5" fill="#1a1a1a"/>
+    <rect x="${cx-8}" y="${baseY-19}" width="9"  height="20" rx="4.5" fill="rgba(60,55,45,0.55)"/>
+    <rect x="${cx-7}" y="${baseY-18}" width="6"  height="7"  rx="2"   fill="rgba(232,213,163,0.07)"/>
+    <rect x="${cx-8}" y="${baseY-19}" width="16" height="20" rx="4.5" fill="none" stroke="rgba(232,213,163,0.52)" stroke-width="1.2"/>`;
+  // Guard bar with subtle depth
+  const guard = `
+    <rect x="${cx-10}" y="${baseY-1}" width="20" height="5" rx="2" fill="#181818" stroke="rgba(232,213,163,0.38)" stroke-width="0.9"/>
+    <rect x="${cx-10}" y="${baseY-1}" width="10" height="5" rx="2" fill="rgba(50,45,35,0.50)"/>`;
+  const teeth = [-7,-3,1,5].map(dx => {
+    const isCorner = dx === -7;
+    const col = isCorner && highlightCorner ? '#ffb840' : 'rgba(130,120,100,0.9)';
+    return `<line x1="${cx+dx}" y1="${baseY+2}" x2="${cx+dx}" y2="${baseY+4.5}" stroke="${col}" stroke-width="1" stroke-linecap="round"/>`;
+  }).join('');
   const cornerFill = highlightCorner
-    ? `<rect x="${cx-10}" y="${baseY-1}" width="7" height="5" rx="1.5" fill="rgba(255,185,60,0.35)" stroke="rgba(255,185,60,0.7)" stroke-width="0.8"/>`
+    ? `<rect x="${cx-10}" y="${baseY-1}" width="6" height="5" rx="1.5" fill="rgba(255,185,60,0.32)" stroke="rgba(255,185,60,0.75)" stroke-width="0.9"/>
+       <circle cx="${cx-7}" cy="${baseY+1.5}" r="2.5" fill="rgba(255,185,60,0.18)"/>`
     : '';
-  return `
-    <rect x="${cx-8}" y="${baseY-19}" width="16" height="20" rx="4.5" fill="#111" stroke="rgba(232,213,163,0.5)" stroke-width="1.2"/>
-    <rect x="${cx-10}" y="${baseY-1}" width="20" height="5" rx="2" fill="#1e1e1e" stroke="rgba(232,213,163,0.4)" stroke-width="1"/>
-    ${cornerFill}${teeth}`;
+  // Specular highlight — a thin bright sliver on the upper-left edge of body
+  const spec = `<line x1="${cx-6}" y1="${baseY-18}" x2="${cx-6}" y2="${baseY-8}" stroke="rgba(255,253,240,0.22)" stroke-width="1.4" stroke-linecap="round"/>`;
+  return `${body}${guard}${cornerFill}${teeth}${spec}`;
 }
 
 function _coachMotionSVG(motionAnim, pathD, arrowPts, highlightCorner) {
@@ -3599,10 +3716,18 @@ function _coachLeverSVG(lever) {
   if (targetY === null) {
     return `<div style="height:60px;display:flex;align-items:center;justify-content:center;font-size:20px;color:rgba(232,213,163,0.25)">—</div>`;
   }
-  const teeth = [0,5,10,15,20].map(x => `<line x1="${5+x}" y1="63" x2="${5+x}" y2="66" stroke="#555" stroke-width="0.9"/>`).join('');
+  const teeth = [0,5,10,15,20].map(x => `<line x1="${5+x}" y1="63" x2="${5+x}" y2="66.5" stroke="rgba(130,120,100,0.9)" stroke-width="0.9" stroke-linecap="round"/>`).join('');
   return `<svg viewBox="0 0 48 72" width="38" height="58">
-    <rect x="4" y="2" width="26" height="56" rx="8" fill="#111" stroke="rgba(232,213,163,0.22)" stroke-width="1.5"/>
-    <rect x="2" y="56" width="30" height="9" rx="2.5" fill="#1e1e1e" stroke="rgba(232,213,163,0.3)" stroke-width="1.2"/>
+    <!-- Body: layered rects for pseudo-gradient depth -->
+    <rect x="4" y="2" width="26" height="56" rx="8" fill="#1a1a1a"/>
+    <rect x="4" y="2" width="14" height="56" rx="8" fill="rgba(58,52,40,0.55)"/>
+    <rect x="5" y="3"  width="10" height="14" rx="4" fill="rgba(232,213,163,0.06)"/>
+    <rect x="4" y="2" width="26" height="56" rx="8" fill="none" stroke="rgba(232,213,163,0.22)" stroke-width="1.5"/>
+    <!-- Specular edge -->
+    <line x1="6" y1="4" x2="6" y2="54" stroke="rgba(255,253,240,0.18)" stroke-width="1.2" stroke-linecap="round"/>
+    <!-- Guard bar -->
+    <rect x="2" y="56" width="30" height="9" rx="2.5" fill="#181818" stroke="rgba(232,213,163,0.28)" stroke-width="1.2"/>
+    <rect x="2" y="56" width="14" height="9" rx="2.5" fill="rgba(50,45,35,0.45)"/>
     ${teeth}
     <!-- Lever track -->
     <rect x="32" y="11" width="8" height="46" rx="4" fill="#0a0a08" stroke="rgba(232,213,163,0.18)" stroke-width="1"/>

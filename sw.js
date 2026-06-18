@@ -1,4 +1,4 @@
-const CACHE = 'shc-v6';
+const CACHE = 'shc-v7';
 const ASSETS = ['/', '/index.html'];
 
 self.addEventListener('install', e => {
