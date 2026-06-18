@@ -1087,6 +1087,16 @@ body {
   font-size: 10.5px; font-weight: 600;
   color: rgba(232,213,163,0.78); margin-top: 6px; text-align: center;
 }
+/* Dynamic lever label — three spans, only one visible at a time,
+   each keyed to the leverTeach 5s animation so label tracks the dot. */
+.lever-label-wrap { position:relative; height:1.2em; }
+.lever-label-wrap span { position:absolute; left:50%; transform:translateX(-50%); white-space:nowrap; }
+/* Open: visible 0–20% and 85–100% of the 5s cycle */
+@keyframes leverLblOpen   { 0%,18%{opacity:1} 24%,82%{opacity:0} 88%,100%{opacity:1} }
+/* Half: visible 28–55% */
+@keyframes leverLblHalf   { 0%,24%{opacity:0} 30%,52%{opacity:1} 58%,100%{opacity:0} }
+/* Closed: visible 62–80% */
+@keyframes leverLblClosed { 0%,58%{opacity:0} 64%,78%{opacity:1} 84%,100%{opacity:0} }
 .coaching-guard-badge {
   width: 44px; height: 44px; border-radius: 11px;
   background: rgba(232,213,163,0.09);
@@ -2682,7 +2692,7 @@ function detectProfileSide(file) {
 // No ear markers needed — the four points ARE the source of truth.
 function offerTaperShaping() {
   addAIMessage(
-    `<p><strong>Set your taper shape first.</strong> Drag the two gold lines on your photo — one near your sideburn, one behind your ear — to match the taper shape you want. The highlighted area shows where the fade will happen.</p>
+    `<p><strong>Set your taper shape first.</strong> Drag the two gold lines on your photo — one near your sideburn, one near the top of your ear — to match the taper shape you want. The highlighted area shows where the fade will happen.</p>
      <button class="opt-btn" style="margin-top:8px;width:100%;" onclick="startTaperShaping()">Continue → Set my taper shape</button>`,
     null
   );
@@ -2885,7 +2895,7 @@ function drawTaperShapeOverlay(ctx, W, H, lines) {
   };
 
   drawSegment(sb0, sb1, 'sideburn', 'Sideburn');
-  drawSegment(rr0, rr1, 'rear',     'Behind ear');
+  drawSegment(rr0, rr1, 'rear',     'Near top of ear');
 
   ctx.restore();
 }
@@ -4026,13 +4036,21 @@ function buildCoachingCard(step, stepIndex) {
   const gd = step.guard ? (GUARD_DISPLAY[step.guard] || { badge: step.guard, sub: 'Guard' })
                         : { badge: '✂', sub: 'Trimmer' };
 
-  const leverSub = { open: 'Open', 'half-open': 'Half open', 'half-closed': 'Half open', closed: 'Closed', 'n/a': 'N/A' }[step.lever] || '—';
+  const leverIsAnimated = step.lever && step.lever !== 'n/a';
+  const leverSubStatic  = { 'n/a': 'N/A' }[step.lever] || '—';
+  const leverSubHTML = leverIsAnimated
+    ? `<div class="lever-label-wrap">
+        <span style="animation:leverLblOpen 5s ease-in-out infinite">Open</span>
+        <span style="animation:leverLblHalf 5s ease-in-out infinite;opacity:0">Half</span>
+        <span style="animation:leverLblClosed 5s ease-in-out infinite;opacity:0">Closed</span>
+       </div>`
+    : leverSubStatic;
 
   return `<div class="coaching-card">
     <div class="coaching-col">
       <div class="coaching-col-label">Lever</div>
       ${_coachLeverSVG(step.lever)}
-      <div class="coaching-col-sub">${leverSub}</div>
+      <div class="coaching-col-sub">${leverSubHTML}</div>
     </div>
     <div class="coaching-col">
       <div class="coaching-col-label">Motion</div>
