@@ -1157,21 +1157,29 @@ body {
 .msg.step-collapsed .msg-text > .detail-check-card { display: none; }
 .msg.step-collapsed .guide-img-wrap { display: none; }
 .step-collapse-badge {
-  display: none;
-  align-items: center; gap: 10px; padding: 10px 14px;
-  background: rgba(232,213,163,0.06); border: 1px solid rgba(232,213,163,0.18);
-  border-radius: 10px;
+  display: none; align-items: center; gap: 10px; padding: 11px 14px;
+  background: rgba(232,213,163,0.055); border: 1px solid rgba(232,213,163,0.16);
+  border-radius: 12px; cursor: pointer; user-select: none;
+  transition: background 0.18s, border-color 0.18s;
   animation: stepDoneIn 0.3s cubic-bezier(0.22,1,0.36,1) both;
 }
+.step-collapse-badge:hover { background: rgba(232,213,163,0.10); border-color: rgba(232,213,163,0.28); }
 .msg.step-collapsed .step-collapse-badge { display: flex; }
 .step-collapse-icon {
   width: 22px; height: 22px; border-radius: 50%;
-  background: rgba(232,213,163,0.15); border: 1px solid rgba(232,213,163,0.35);
+  background: rgba(232,213,163,0.15); border: 1px solid rgba(232,213,163,0.38);
   display: flex; align-items: center; justify-content: center;
-  font-size: 12px; color: rgba(232,213,163,0.9); flex-shrink: 0;
+  font-size: 11px; color: rgba(232,213,163,0.92); flex-shrink: 0;
 }
-.step-collapse-label {
-  font-size: 12px; font-weight: 600; color: rgba(232,213,163,0.65);
+.step-collapse-label { flex: 1; }
+.step-collapse-title {
+  font-size: 12px; font-weight: 700; color: rgba(232,213,163,0.82); display: block;
+}
+.step-collapse-meta {
+  font-size: 11px; color: rgba(232,213,163,0.45); display: block; margin-top: 1px;
+}
+.step-collapse-expand {
+  font-size: 11px; color: rgba(232,213,163,0.35); flex-shrink: 0;
 }
 
 /* ── LEVER TUTORIAL CARD ── */
@@ -3740,12 +3748,19 @@ async function renderStepCanvas(file, step, guideLine, offset) {
 }
 
 // Lightweight message with a static (non-draggable) canvas embedded.
-function addStepMessage(html, canvas, collapseBadge) {
+function addStepMessage(html, canvas) {
   const msg = document.createElement('div');
   msg.className = 'msg';
   msg.innerHTML = `${aiAvatar()}<div class="msg-body"><div class="msg-name">SelfHaircut.ai</div>
     <div class="msg-text">
-      ${collapseBadge ? `<div class="step-collapse-badge"><div class="step-collapse-icon">✓</div><div class="step-collapse-label">${collapseBadge}</div></div>` : ''}
+      <div class="step-collapse-badge">
+        <div class="step-collapse-icon">✓</div>
+        <div class="step-collapse-label">
+          <span class="step-collapse-title"></span>
+          <span class="step-collapse-meta"></span>
+        </div>
+        <span class="step-collapse-expand">Tap to review ›</span>
+      </div>
       ${html}
       <div class="guide-img-wrap step-glow" style="position:relative;"></div>
     </div></div>`;
@@ -3836,65 +3851,70 @@ function _coachClipperIcon(cx, baseY, highlightCorner) {
   return `${body}${guard}${cornerFill}${teeth}${spec}`;
 }
 
-function _coachMotionSVG(motionAnim, _pathD, _arrowPts, highlightCorner) {
-  const cx = 36, baseY = 48;
-  // Guide path: mostly straight up, then a subtle outward flick at the exit.
-  // Communicates "go up, then release away" — natural barber flick technique.
-  const guideLine = `<path d="M36,52 C36,32 36,20 42,11" stroke="rgba(232,213,163,0.20)" stroke-width="1.5" fill="none" stroke-dasharray="3,4" stroke-linecap="round"/>`;
-  // Arrowhead at the exit point, angled slightly outward to show the flick direction
-  const arrowHead = `<polyline points="37,18 42,11 48,16" fill="none" stroke="rgba(232,213,163,0.65)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`;
-  // Clipper rotated 180° (guard up) — matches how you see your own clipper while cutting
-  return `<svg viewBox="0 0 72 62" width="72" height="62" style="overflow:visible">
-    ${guideLine}
+function _coachMotionSVG(motionAnim, _a, _b, highlightCorner) {
+  // Path: straight up for most of the stroke, then a gentle outward flick at exit.
+  // Dashed line shows the full path; arrowhead shows the direction of release.
+  const path      = `<path d="M36,56 L36,22 C36,14 40,9 45,7" stroke="rgba(232,213,163,0.22)" stroke-width="1.6" fill="none" stroke-dasharray="3,4" stroke-linecap="round"/>`;
+  // Start dot — shows "begin here"
+  const startDot  = `<circle cx="36" cy="56" r="3" fill="rgba(232,213,163,0.55)"/>`;
+  // Arrowhead at the exit point, angled outward
+  const arrowHead = `<polyline points="39,14 45,7 50,13" fill="none" stroke="rgba(232,213,163,0.72)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+  // Simplified clipper body: just the essential shape — body + guard bar
+  const cx = 36, baseY = 52;
+  const clipper = `
+    <rect x="${cx-7}" y="${baseY-18}" width="14" height="19" rx="4" fill="#1c1c1a" stroke="rgba(232,213,163,0.45)" stroke-width="1.2"/>
+    <rect x="${cx-9}" y="${baseY}"    width="18" height="5"  rx="2" fill="#181816" stroke="rgba(232,213,163,0.32)" stroke-width="0.9"/>
+    <line x1="${cx-5}" y1="${baseY+1.5}" x2="${cx-5}" y2="${baseY+4}" stroke="rgba(150,140,110,0.9)" stroke-width="1" stroke-linecap="round"/>
+    <line x1="${cx-1}" y1="${baseY+1.5}" x2="${cx-1}" y2="${baseY+4}" stroke="rgba(150,140,110,0.9)" stroke-width="1" stroke-linecap="round"/>
+    <line x1="${cx+3}" y1="${baseY+1.5}" x2="${cx+3}" y2="${baseY+4}" stroke="rgba(150,140,110,0.9)" stroke-width="1" stroke-linecap="round"/>
+    <line x1="${cx+7}" y1="${baseY+1.5}" x2="${cx+7}" y2="${baseY+4}" stroke="rgba(150,140,110,0.9)" stroke-width="1" stroke-linecap="round"/>
+    <line x1="${cx-5}" y1="${baseY-14}"  x2="${cx-5}" y2="${baseY-7}"  stroke="rgba(255,252,235,0.14)" stroke-width="1.2" stroke-linecap="round"/>`;
+  return `<svg viewBox="0 0 72 66" width="72" height="66" style="overflow:visible">
+    ${path}
+    ${startDot}
     ${arrowHead}
-    <g style="transform-box:fill-box;transform-origin:50% 50%;animation:${motionAnim} 2.2s ease-in-out infinite">
-      ${_coachClipperIcon(cx, baseY, highlightCorner)}
+    <g style="transform-box:fill-box;transform-origin:50% 50%;animation:${motionAnim} 2.4s ease-in-out infinite">
+      ${clipper}
     </g>
   </svg>`;
 }
 
 function _coachLeverSVG(lever) {
-  // Lever dot Y within the track: closed=14, half=35, open=56
-  // Open = top of track (lever pushed away from body = more cutting length).
-  // Flipped from physical clipper because users see the lever facing them while
-  // cutting their own hair, making "open = up" the intuitive reading.
-  const targetY = { open: 14, 'half-open': 35, 'half-closed': 35, closed: 56, 'n/a': null }[lever] ?? null;
+  // Track positions: Open=top(12), Half=mid(34), Closed=bottom(56)
+  // Open at top matches self-cut perspective where lever faces the user.
+  const targetY = { open: 12, 'half-open': 34, 'half-closed': 34, closed: 56, 'n/a': null }[lever] ?? null;
   if (targetY === null) {
-    return `<div style="height:60px;display:flex;align-items:center;justify-content:center;font-size:20px;color:rgba(232,213,163,0.25)">—</div>`;
+    return `<div style="height:68px;display:flex;align-items:center;justify-content:center;font-size:18px;color:rgba(232,213,163,0.2)">—</div>`;
   }
-  const teeth = [0,5,10,15,20].map(x => `<line x1="${5+x}" y1="63" x2="${5+x}" y2="66.5" stroke="rgba(130,120,100,0.9)" stroke-width="0.9" stroke-linecap="round"/>`).join('');
-  return `<svg viewBox="0 0 48 72" width="38" height="58">
-    <!-- Body: layered rects for pseudo-gradient depth -->
-    <rect x="4" y="2" width="26" height="56" rx="8" fill="#1a1a1a"/>
-    <rect x="4" y="2" width="14" height="56" rx="8" fill="rgba(58,52,40,0.55)"/>
-    <rect x="5" y="3"  width="10" height="14" rx="4" fill="rgba(232,213,163,0.06)"/>
-    <rect x="4" y="2" width="26" height="56" rx="8" fill="none" stroke="rgba(232,213,163,0.22)" stroke-width="1.5"/>
-    <!-- Specular edge -->
-    <line x1="6" y1="4" x2="6" y2="54" stroke="rgba(255,253,240,0.18)" stroke-width="1.2" stroke-linecap="round"/>
-    <!-- Guard bar -->
-    <rect x="2" y="56" width="30" height="9" rx="2.5" fill="#181818" stroke="rgba(232,213,163,0.28)" stroke-width="1.2"/>
-    <rect x="2" y="56" width="14" height="9" rx="2.5" fill="rgba(50,45,35,0.45)"/>
-    ${teeth}
-    <!-- Lever track -->
-    <rect x="32" y="11" width="8" height="46" rx="4" fill="#0a0a08" stroke="rgba(232,213,163,0.18)" stroke-width="1"/>
-    <!-- Position ticks -->
-    <line x1="32" y1="14" x2="40" y2="14" stroke="rgba(232,213,163,0.3)" stroke-width="0.8"/>
-    <line x1="32" y1="35" x2="40" y2="35" stroke="rgba(232,213,163,0.15)" stroke-width="0.8"/>
-    <line x1="32" y1="56" x2="40" y2="56" stroke="rgba(232,213,163,0.3)" stroke-width="0.8"/>
-    <!-- Labels -->
-    <text x="30" y="16" font-size="5.5" fill="rgba(232,213,163,0.35)" text-anchor="end" font-family="sans-serif">O</text>
-    <text x="30" y="58" font-size="5.5" fill="rgba(232,213,163,0.35)" text-anchor="end" font-family="sans-serif">C</text>
-    <!-- Glow halo (animated) -->
-    <circle cx="36" r="7" fill="rgba(232,213,163,0.18)">
-      <animate attributeName="cy" from="35" to="${targetY}" dur="0.6s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
-    </circle>
-    <!-- Dot -->
-    <circle cx="36" r="4.5" fill="#e8d5a3">
-      <animate attributeName="cy" from="35" to="${targetY}" dur="0.6s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
-    </circle>
-    <circle cx="36" r="2" fill="#fffceb">
-      <animate attributeName="cy" from="35" to="${targetY}" dur="0.6s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
-    </circle>
+  const isOpen   = targetY <= 14;
+  const isClosed = targetY >= 54;
+  // Highlight whichever label is active
+  const oCol = isOpen   ? 'rgba(232,213,163,0.92)' : 'rgba(232,213,163,0.28)';
+  const cCol = isClosed ? 'rgba(232,213,163,0.92)' : 'rgba(232,213,163,0.28)';
+  const oW   = isOpen   ? '700' : '500';
+  const cW   = isClosed ? '700' : '500';
+  const anim = (attr, val) =>
+    `<animate attributeName="${attr}" from="34" to="${val}" dur="0.65s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>`;
+  return `<svg viewBox="0 0 64 72" width="60" height="68">
+    <!-- Lever track — the main visual element -->
+    <rect x="28" y="6"  width="8" height="60" rx="4" fill="#0e0e0c" stroke="rgba(232,213,163,0.14)" stroke-width="1.2"/>
+    <!-- Half-way tick (subtle) -->
+    <line x1="26" y1="34" x2="38" y2="34" stroke="rgba(232,213,163,0.10)" stroke-width="0.8"/>
+    <!-- OPEN label — top -->
+    <text x="24" y="15" font-size="9" fill="${oCol}" text-anchor="end"
+      font-family="system-ui,sans-serif" font-weight="${oW}">Open</text>
+    <!-- CLOSED label — bottom -->
+    <text x="24" y="60" font-size="9" fill="${cCol}" text-anchor="end"
+      font-family="system-ui,sans-serif" font-weight="${cW}">Clsd</text>
+    <!-- Glow halo -->
+    <circle cx="32" r="10" fill="rgba(232,213,163,0.14)">${anim('cy', targetY)}</circle>
+    <!-- Main dot -->
+    <circle cx="32" r="6"  fill="#e8d5a3" stroke="rgba(255,252,230,0.3)" stroke-width="0.8">${anim('cy', targetY)}</circle>
+    <!-- Bright centre -->
+    <circle cx="32" r="2.5" fill="#fffceb">${anim('cy', targetY)}</circle>
+    <!-- Indicator line from dot to label (open) -->
+    ${isOpen   ? `<line x1="22" y1="12" x2="26" y2="${targetY}" stroke="rgba(232,213,163,0.35)" stroke-width="0.8" stroke-dasharray="2,2"/>` : ''}
+    ${isClosed ? `<line x1="22" y1="58" x2="26" y2="${targetY}" stroke="rgba(232,213,163,0.35)" stroke-width="0.8" stroke-dasharray="2,2"/>` : ''}
   </svg>`;
 }
 
@@ -4011,10 +4031,6 @@ async function presentFadePlanStep(i) {
   }).join('');
   const progressTrack = plan.length > 1 ? `<div class="fade-progress-track">${progressPills}</div>` : '';
 
-  // Collapse badge text for the previous step (prepended to msg-text, shown when collapsed)
-  const prevStep = i > 0 ? plan[i - 1] : null;
-  const colBadge = prevStep ? `${stepShortLabel(prevStep, i - 1)} — Done` : null;
-
   const msg = addStepMessage(`<div class="fade-step-panel">
     ${progressTrack}
     <div class="steps-title">${step.title}</div>
@@ -4023,7 +4039,7 @@ async function presentFadePlanStep(i) {
     ${bodyRows}
     ${vidLink}
     ${doneBtn}
-  </div>`, canvas, colBadge);
+  </div>`, canvas);
   state._lastStepMsg = msg;
 
   // Show lever tutorial the first time this lever position appears.
@@ -4081,13 +4097,32 @@ function completeFadeStep(i) {
   const plan = state.fadePlan;
   if (!plan) return;
 
-  // Collapse the current step card to a compact "done" badge
+  // Collapse the current step card to a tappable summary badge
   const currentMsg = state._lastStepMsg;
   if (currentMsg) {
+    const step = plan[i];
+    const guardTxt = step.guard === 'None' ? 'No Guard'
+                   : step.guard ? step.guard
+                   : 'Trimmer';
+    const leverTxt = step.lever && step.lever !== 'n/a' ? leverLabel(step.lever) : null;
+    const badge = currentMsg.querySelector('.step-collapse-badge');
+    if (badge) {
+      badge.querySelector('.step-collapse-title').textContent =
+        `✓ Step ${i + 1} — ${guardTxt}${leverTxt ? ' · ' + leverTxt : ''}`;
+      badge.querySelector('.step-collapse-meta').textContent = step.title || '';
+      badge.onclick = () => {
+        const collapsed = currentMsg.classList.toggle('step-collapsed');
+        badge.querySelector('.step-collapse-expand').textContent = collapsed ? 'Tap to review ›' : 'Tap to collapse ‹';
+        if (!collapsed) {
+          // Re-enable the done button so user can re-advance if needed
+          const doneBtn = currentMsg.querySelector('button[onclick^="completeFadeStep"]');
+          if (doneBtn) doneBtn.disabled = false;
+        }
+      };
+    }
+    const doneBtn = currentMsg.querySelector('button[onclick^="completeFadeStep"]');
+    if (doneBtn) doneBtn.disabled = true;
     currentMsg.classList.add('step-collapsed');
-    // Disable the button inside to prevent double-tap
-    const btn = currentMsg.querySelector('button[onclick^="completeFadeStep"]');
-    if (btn) btn.disabled = true;
   }
 
   if (i === plan.length - 1) {
