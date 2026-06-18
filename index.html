@@ -1106,6 +1106,66 @@ body {
   font-size: 12.5px; line-height: 1.65; color: var(--text2);
 }
 
+/* ── FADE PROGRESS TRACKER ── */
+.fade-progress-track {
+  display: flex; gap: 4px; align-items: center; margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.prog-pill {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+  padding: 3px 8px; border-radius: 20px; white-space: nowrap;
+  transition: all 0.25s ease;
+}
+.prog-pill--done {
+  background: rgba(232,213,163,0.12); color: rgba(232,213,163,0.65);
+  border: 1px solid rgba(232,213,163,0.20);
+}
+.prog-pill--active {
+  background: rgba(232,213,163,0.18); color: rgba(232,213,163,0.97);
+  border: 1px solid rgba(232,213,163,0.50);
+  box-shadow: 0 0 8px rgba(232,213,163,0.18);
+}
+.prog-pill--future {
+  background: transparent; color: rgba(232,213,163,0.22);
+  border: 1px solid rgba(232,213,163,0.10);
+}
+.prog-pill-arrow {
+  color: rgba(232,213,163,0.18); font-size: 9px; flex-shrink: 0;
+}
+
+/* ── STEP COMPLETION STATE ── */
+@keyframes stepDoneIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+.step-done-flash {
+  display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+  background: rgba(232,213,163,0.08); border: 1px solid rgba(232,213,163,0.28);
+  border-radius: 10px; margin-bottom: 8px;
+  animation: stepDoneIn 0.3s cubic-bezier(0.22,1,0.36,1) both;
+}
+.step-done-flash-icon { font-size: 16px; color: rgba(232,213,163,0.95); }
+.step-done-flash-text { font-size: 12.5px; font-weight: 700; color: rgba(232,213,163,0.85); }
+
+/* ── COLLAPSED STEP CARD ── */
+.msg.step-collapsed .msg-text > .fade-step-panel,
+.msg.step-collapsed .msg-text > .detail-check-card { display: none; }
+.msg.step-collapsed .guide-img-wrap { display: none; }
+.step-collapse-badge {
+  display: none;
+  align-items: center; gap: 10px; padding: 10px 14px;
+  background: rgba(232,213,163,0.06); border: 1px solid rgba(232,213,163,0.18);
+  border-radius: 10px;
+  animation: stepDoneIn 0.3s cubic-bezier(0.22,1,0.36,1) both;
+}
+.msg.step-collapsed .step-collapse-badge { display: flex; }
+.step-collapse-icon {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: rgba(232,213,163,0.15); border: 1px solid rgba(232,213,163,0.35);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: rgba(232,213,163,0.9); flex-shrink: 0;
+}
+.step-collapse-label {
+  font-size: 12px; font-weight: 600; color: rgba(232,213,163,0.65);
+}
+
 /* ── LEVER TUTORIAL CARD ── */
 .lever-tutorial-wrap {
   position: fixed;
@@ -3130,19 +3190,18 @@ const FADE_STEP_TEXT_TAPER = [
     motion: 'One or two light flicks. Barely touching the hair.',
     mistake: "One pass is all you need. Don't keep going back over the same spot.",
     stopWhen: 'Your fade looks smooth from skin all the way to full length. No hard lines anywhere.' },
-  { title: "Let's clean it up.", lever: 'open', zoneLabel: 'Taper area — corner-of-blade touch-up',
-    goal: 'Knock out any remaining lines or patches with the corner of the blade.',
-    instructions: "Open the lever fully with no guard. Look for any spots that still look dark or have a faint line. Use only the corner of the blade — not the full width — to lightly flick at those spots only. Don't cut a full stroke. Just tap and flick.",
-    motion: 'Short corner-of-blade flicks directly on darker spots. Gentle upward taps only.',
-    mistake: "Only touch the areas that still look heavy. If a spot looks blended, leave it alone. Less is always more here.",
-    stopWhen: "The dark patches and faint lines are gone. Your taper blends clean from skin to full length — that's it, you're done.",
+  { title: "One last blend pass before we finish.", lever: 'open', zoneLabel: 'Upper taper — soften the transition into your bulk',
+    goal: 'Remove extra weight from the top of the taper so the fade flows naturally into the longer hair.',
+    instructions: "Switch to a 1.5 or 2 guard with the lever fully open. Work through the very top of your taper with light, sweeping upward flicks. You're not creating a new fade section — you're just helping the blend breathe naturally into the bulk above it. Think of this as a dusting pass.",
+    motion: 'Gentle upward flicks. Barely touching the surface. One or two passes is all you need.',
+    mistake: "Don't go over this more than twice. Too many passes will push your fade too high and lose the shape you built. Less is more here.",
+    stopWhen: "The taper melts cleanly into the longer hair above — no dark ridge, no visible weight line at the top of the fade.",
     finishingTouches: [
-      { label: 'Still seeing a line?', desc: 'Open the lever fully and use only the corner of the blade. Lightly flick upward at the darker area only. Do not press — just graze the surface.' },
+      { label: 'Still see a weight line?', desc: 'One light flick with the 1.5 guard open, right at that line only. Do not press — just graze the surface.' },
       { label: 'Around the ear', desc: 'Clean up any stray hairs around your ear for a sharp, finished look.' },
       { label: 'Sideburns', desc: 'Even out your sideburns so both sides match.' },
       { label: 'Neckline', desc: 'Clean your neckline — straight or rounded, whichever you prefer.' },
-    ],
-    video: 'https://www.youtube.com/results?search_query=how+to+edge+up+hairline+barber' },
+    ] },
 ];
 
 const FADE_STEP_TEXT = {
@@ -3208,9 +3267,9 @@ function buildFadePlan() {
     { ...text[3], guard: guards.s4, zone: { type: 'quad', points: taperQuad(T*2, T*3) }, dimZone: dimZone(T*2) },
     { ...text[4], guard: guards.s5, zone: { type: 'quad', points: taperQuad(T*3, T*4) }, dimZone: dimZone(T*3) },
     { ...text[5], guard: guards.s6, zone: { type: 'quad', points: taperQuad(T*4, 1) },   dimZone: dimZone(T*4) },
-    { ...text[6], guard: null,
-      zone: { type: 'detail', topFrac: gl.earTopFrac, bottomFrac: gl.lineYFrac, startXFrac: gl.startXFrac, endXFrac: gl.endXFrac },
-      dimZone: dimZone(1), adaptive: true },
+    { ...text[6], guard: (style === 'low' || style === 'skin') ? '#1.5' : '#2',
+      zone: { type: 'detail-top', points: taperQuad(0.6, 1) },
+      dimZone: dimZone(0.6), adaptive: false },
   ];
   return state.fadePlan;
 }
@@ -3531,6 +3590,62 @@ function drawStepOverlay(ctx, W, H, step, guideLine, offset) {
     ctx.fillText(flickLabel, Math.min(endX - ctx.measureText(flickLabel).width - 6, arrowX + 14), topY + 18);
     ctx.restore();
 
+  } else if (zone.type === 'detail-top') {
+    // Upper taper refinement — soft warm glow on the top portion of the taper.
+    // More subtle than the main quad zones: smooth gradient, no grid, breathing border.
+    const pts = zone.points.map(p => ({ x: (p.x + off.x) * W, y: (p.y + off.y) * H }));
+    const hxs = pts.map(p => p.x), hys = pts.map(p => p.y);
+    const dtStartX = Math.min(...hxs), dtEndX = Math.max(...hxs);
+    const dtTopY   = Math.min(...hys), dtBotY = Math.max(...hys);
+    const dtSpanX  = dtEndX - dtStartX, dtSpanY = dtBotY - dtTopY;
+    const dtCR     = Math.min(16, dtSpanX * 0.14, dtSpanY * 0.3);
+
+    // Soft outer glow — more diffuse than the hard quad zones
+    ctx.save();
+    ctx.shadowColor = 'rgba(220,200,140,0.40)'; ctx.shadowBlur = 36;
+    ctx.strokeStyle = 'rgba(220,200,140,0.04)'; ctx.lineWidth = 1;
+    quadPathRounded(ctx, pts, dtCR); ctx.stroke();
+    ctx.restore();
+
+    // Smooth gradient fill — warm amber at top, nearly invisible at bottom
+    // (reverse of main zones: intensity at TOP since that's where the weight sits)
+    ctx.save();
+    quadPathRounded(ctx, pts, dtCR); ctx.clip();
+    const dtGrad = ctx.createLinearGradient(0, dtTopY, 0, dtBotY);
+    dtGrad.addColorStop(0,    'rgba(220,195,120,0.32)');
+    dtGrad.addColorStop(0.5,  'rgba(220,195,120,0.16)');
+    dtGrad.addColorStop(1,    'rgba(220,195,120,0.04)');
+    ctx.fillStyle = dtGrad;
+    ctx.fillRect(dtStartX, dtTopY, dtSpanX, dtSpanY);
+    // Radial bloom centered at top-center
+    const dtRadial = ctx.createRadialGradient(
+      (dtStartX + dtEndX) / 2, dtTopY, 0,
+      (dtStartX + dtEndX) / 2, dtTopY, dtSpanX * 0.7
+    );
+    dtRadial.addColorStop(0,   'rgba(220,200,140,0.22)');
+    dtRadial.addColorStop(0.7, 'rgba(220,200,140,0.04)');
+    dtRadial.addColorStop(1,   'rgba(220,200,140,0)');
+    ctx.fillStyle = dtRadial;
+    ctx.fillRect(dtStartX, dtTopY, dtSpanX, dtSpanY);
+    ctx.restore();
+
+    // Smooth dashed-glow border
+    ctx.save();
+    ctx.strokeStyle = 'rgba(220,200,140,0.72)'; ctx.lineWidth = 1.8;
+    ctx.setLineDash([6, 5]);
+    ctx.shadowColor = 'rgba(220,200,140,0.55)'; ctx.shadowBlur = 16;
+    quadPathRounded(ctx, pts, dtCR); ctx.stroke();
+    ctx.restore();
+
+    // Label — top of the zone
+    const dtLabelX = dtStartX + dtSpanX / 2;
+    ctx.save();
+    ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = 'rgba(220,200,140,0.90)';
+    ctx.shadowColor = 'rgba(0,0,0,0.95)'; ctx.shadowBlur = 7;
+    const dtLbl = '↑ Light pass here';
+    ctx.fillText(dtLbl, dtLabelX - ctx.measureText(dtLbl).width / 2, Math.max(14, dtTopY - 10));
+    ctx.restore();
+
   } else if (zone.type === 'detail') {
     const topY = (zone.topFrac + off.y) * H, botY = (zone.bottomFrac + off.y) * H;
     const startX = (zone.startXFrac + off.x) * W, endX = (zone.endXFrac + off.x) * W;
@@ -3605,17 +3720,25 @@ async function renderStepCanvas(file, step, guideLine, offset) {
 }
 
 // Lightweight message with a static (non-draggable) canvas embedded.
-function addStepMessage(html, canvas) {
+function addStepMessage(html, canvas, collapseBadge) {
   const msg = document.createElement('div');
   msg.className = 'msg';
   msg.innerHTML = `${aiAvatar()}<div class="msg-body"><div class="msg-name">SelfHaircut.ai</div>
-    <div class="msg-text">${html}
+    <div class="msg-text">
+      ${collapseBadge ? `<div class="step-collapse-badge"><div class="step-collapse-icon">✓</div><div class="step-collapse-label">${collapseBadge}</div></div>` : ''}
+      ${html}
       <div class="guide-img-wrap step-glow" style="position:relative;"></div>
     </div></div>`;
   messagesWrap.appendChild(msg);
   canvas.style.width = '100%';
   msg.querySelector('.guide-img-wrap').appendChild(canvas);
-  scrollBottom();
+  // Smooth-scroll so the new step title is visible near the top of the viewport
+  requestAnimationFrame(() => {
+    const chatRect = chatArea.getBoundingClientRect();
+    const msgTop   = msg.getBoundingClientRect().top - chatRect.top + chatArea.scrollTop;
+    chatArea.scrollTo({ top: msgTop - 12, behavior: 'smooth' });
+  });
+  return msg;
 }
 
 // Presents fade-plan step i: overlay + guard/lever/start/height/flick + "Mark step done".
@@ -3661,13 +3784,12 @@ async function showMidStepDetailCheck(i) {
   };
   const { title: ckTitle, body: ckBody } = checkCopy[i] || { title: 'Quick check:', body: 'Look at the highlighted area for any remaining lines or dark patches before moving on.' };
 
-  addStepMessage(`<div class="detail-check-card">
+  const detailMsg = addStepMessage(`<div class="detail-check-card">
     <div class="detail-check-title">${ckTitle}</div>
     <div class="detail-check-body">${ckBody}</div>
-    <button class="opt-btn" style="margin-top:10px;width:100%;background:rgba(255,185,60,0.12);border-color:rgba(255,185,60,0.4);color:rgba(255,200,80,0.95);" onclick="presentFadePlanStep(${i + 1})">Looks Good — Keep Going</button>
+    <button class="opt-btn" style="margin-top:10px;width:100%;background:rgba(255,185,60,0.12);border-color:rgba(255,185,60,0.4);color:rgba(255,200,80,0.95);" onclick="this.closest('.msg').classList.add('step-collapsed');presentFadePlanStep(${i + 1})">Looks Good — Keep Going</button>
   </div>`, canvas);
-
-  scrollBottom();
+  state._lastStepMsg = detailMsg;
 }
 
 // ── VISUAL COACHING CARD BUILDER ──────────────────────────────────────────
@@ -3767,8 +3889,8 @@ function buildCoachingCard(step, stepIndex) {
     { anim: 'coachFlick4', path: 'M36,52 C38,38 40,24 36,12', arrow: '32,16 36,9 40,16',  label: 'Light upward flick',  corner: false },
     // 5: 2 guard — gentle pass
     { anim: 'coachFlick5', path: 'M36,52 C37,42 38,32 36,20', arrow: '33,24 36,17 39,24', label: 'Gentle pass',          corner: false },
-    // 6: detail — corner-of-blade jab
-    { anim: 'coachJab',    path: 'M32,52 C36,42 40,30 44,18', arrow: '40,22 44,15 48,22', label: 'Corner flick',         corner: true  },
+    // 6: upper taper refinement — very light sweeping flicks, no corner blade
+    { anim: 'coachFlick5', path: 'M36,52 C37,42 38,30 36,18', arrow: '33,22 36,15 39,22', label: 'Feather pass',          corner: false },
   ];
   const cfg = MOTION_CFG[stepIndex] ?? MOTION_CFG[3];
 
@@ -3856,15 +3978,36 @@ async function presentFadePlanStep(i) {
 
   const coachingCard = (step.goal !== undefined) ? buildCoachingCard(step, i) : '';
 
-  addStepMessage(`<div class="fade-step-panel">
+  // Build progress tracker pills
+  const stepShortLabel = (s, idx) => {
+    if (idx === 0) return 'Guide';
+    if (idx === plan.length - 1) return s.zone && s.zone.type === 'detail-top' ? 'Top' : 'Detail';
+    if (s.guard === 'None') return '∅';
+    return s.guard ? s.guard.replace('#', '') : String(idx);
+  };
+  const progressPills = plan.map((s, idx) => {
+    const done = idx < i;
+    const active = idx === i;
+    const cls = done ? 'prog-pill--done' : active ? 'prog-pill--active' : 'prog-pill--future';
+    const lbl = done ? `✓ ${stepShortLabel(s, idx)}` : stepShortLabel(s, idx);
+    return (idx > 0 ? `<span class="prog-pill-arrow">›</span>` : '') + `<span class="prog-pill ${cls}">${lbl}</span>`;
+  }).join('');
+  const progressTrack = plan.length > 1 ? `<div class="fade-progress-track">${progressPills}</div>` : '';
+
+  // Collapse badge text for the previous step (prepended to msg-text, shown when collapsed)
+  const prevStep = i > 0 ? plan[i - 1] : null;
+  const colBadge = prevStep ? `${stepShortLabel(prevStep, i - 1)} — Done` : null;
+
+  const msg = addStepMessage(`<div class="fade-step-panel">
+    ${progressTrack}
     <div class="steps-title">${step.title}</div>
-    <div style="font-size:11px;color:var(--text3);margin:-6px 0 10px;letter-spacing:0.04em;text-transform:uppercase;">Step ${i + 1} of ${plan.length}</div>
     ${coachingCard}
     ${zoneLabelHtml}
     ${bodyRows}
     ${vidLink}
     ${doneBtn}
-  </div>`, canvas);
+  </div>`, canvas, colBadge);
+  state._lastStepMsg = msg;
 
   // Show lever tutorial the first time this lever position appears.
   if (step.lever && step.lever !== 'n/a') {
@@ -3921,15 +4064,21 @@ function completeFadeStep(i) {
   const plan = state.fadePlan;
   if (!plan) return;
 
+  // Collapse the current step card to a compact "done" badge
+  const currentMsg = state._lastStepMsg;
+  if (currentMsg) {
+    currentMsg.classList.add('step-collapsed');
+    // Disable the button inside to prevent double-tap
+    const btn = currentMsg.querySelector('button[onclick^="completeFadeStep"]');
+    if (btn) btn.disabled = true;
+  }
+
   if (i === plan.length - 1) {
     addAIMessage(`<p>That's your full fade — built around your taper. Take a final look in the mirror from both sides. If anything needs a touch-up, let me know and we'll fix it together.</p>`, null);
     addFadePlanWrapUp();
     return;
   }
 
-  // Only inject a detail check at steps where it genuinely helps:
-  // step 1 (first blend — catching the bald-line edge) and
-  // step 4 (refinement — catching the seam into longer hair).
   const DETAIL_CHECK_STEPS = new Set([1, 4]);
   const step = plan[i];
   if (step && step.zone && step.zone.type === 'quad' && DETAIL_CHECK_STEPS.has(i)) {
