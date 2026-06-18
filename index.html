@@ -1036,6 +1036,48 @@ body {
 .fade-review-row strong.good { color: var(--accent); }
 .fade-review-row strong.warn { color: var(--text2); }
 
+/* ── VISUAL COACHING CARD ── */
+.coaching-card {
+  display: flex; gap: 0;
+  background: rgba(232,213,163,0.035);
+  border: 1px solid rgba(232,213,163,0.14);
+  border-radius: 14px;
+  margin-bottom: 14px;
+  overflow: hidden;
+  animation: coachCardIn 0.38s cubic-bezier(0.22,1,0.36,1) both;
+}
+@keyframes coachCardIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+.coaching-col {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; padding: 11px 6px 10px; gap: 0;
+}
+.coaching-col + .coaching-col { border-left: 1px solid rgba(232,213,163,0.09); }
+.coaching-col-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: rgba(232,213,163,0.38);
+  margin-bottom: 7px;
+}
+.coaching-col-sub {
+  font-size: 10.5px; font-weight: 600;
+  color: rgba(232,213,163,0.78); margin-top: 6px; text-align: center;
+}
+.coaching-guard-badge {
+  width: 44px; height: 44px; border-radius: 11px;
+  background: rgba(232,213,163,0.09);
+  border: 1.5px solid rgba(232,213,163,0.28);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; font-weight: 800; color: rgba(232,213,163,0.97);
+  margin: 2px 0;
+}
+/* Motion animation keyframes */
+@keyframes coachSweep  { 0%,100%{transform:translateX(-18px)} 50%{transform:translateX(18px)} }
+@keyframes coachFlick1 { 0%,75%,100%{transform:translate(0,0) rotate(0deg)} 25%,50%{transform:translate(3px,-18px) rotate(-12deg)} }
+@keyframes coachFlick2 { 0%,75%,100%{transform:translate(0,0) rotate(0deg)} 25%,50%{transform:translate(4px,-27px) rotate(-16deg)} }
+@keyframes coachFlick3 { 0%,75%,100%{transform:translate(0,0) rotate(0deg)} 25%,50%{transform:translate(5px,-34px) rotate(-19deg)} }
+@keyframes coachFlick4 { 0%,75%,100%{transform:translate(0,0) rotate(0deg)} 25%,50%{transform:translate(3px,-22px) rotate(-13deg)} }
+@keyframes coachFlick5 { 0%,75%,100%{transform:translate(0,0) rotate(0deg)} 25%,50%{transform:translate(2px,-13px) rotate(-8deg)} }
+@keyframes coachJab    { 0%,70%,100%{transform:translate(0,0) rotate(0deg)} 25%,50%{transform:translate(6px,-13px) rotate(-22deg)} }
+
 /* ── MID-STEP DETAIL CHECK CARD ── */
 .detail-check-card {
   background: rgba(255,175,50,0.07);
@@ -3524,6 +3566,121 @@ async function showMidStepDetailCheck(i) {
   scrollBottom();
 }
 
+// ── VISUAL COACHING CARD BUILDER ──────────────────────────────────────────
+// Returns HTML for a 3-column animated card: lever | motion | guard.
+// stepIndex drives motion type (0=sweep, 1-5=flick, 6=jab).
+
+function _coachClipperIcon(cx, baseY, highlightCorner) {
+  const teeth = [-7,-3,1,5].map(dx =>
+    `<line x1="${cx+dx}" y1="${baseY+2}" x2="${cx+dx}" y2="${baseY+4}" stroke="${dx===-7&&highlightCorner?'#ffb840':'#555'}" stroke-width="0.9"/>`).join('');
+  const cornerFill = highlightCorner
+    ? `<rect x="${cx-10}" y="${baseY-1}" width="7" height="5" rx="1.5" fill="rgba(255,185,60,0.35)" stroke="rgba(255,185,60,0.7)" stroke-width="0.8"/>`
+    : '';
+  return `
+    <rect x="${cx-8}" y="${baseY-19}" width="16" height="20" rx="4.5" fill="#111" stroke="rgba(232,213,163,0.5)" stroke-width="1.2"/>
+    <rect x="${cx-10}" y="${baseY-1}" width="20" height="5" rx="2" fill="#1e1e1e" stroke="rgba(232,213,163,0.4)" stroke-width="1"/>
+    ${cornerFill}${teeth}`;
+}
+
+function _coachMotionSVG(motionAnim, pathD, arrowPts, highlightCorner) {
+  const cx = 36, baseY = 50;
+  return `<svg viewBox="0 0 72 62" width="72" height="62" style="overflow:visible">
+    <path d="${pathD}" stroke="rgba(232,213,163,0.13)" stroke-width="1.5" fill="none" stroke-dasharray="3,3"/>
+    <polyline points="${arrowPts}" fill="none" stroke="rgba(232,213,163,0.45)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <g style="transform-box:fill-box;transform-origin:center 85%;animation:${motionAnim} 2.1s ease-in-out infinite">
+      ${_coachClipperIcon(cx, baseY, highlightCorner)}
+    </g>
+  </svg>`;
+}
+
+function _coachLeverSVG(lever) {
+  // Lever dot Y within the track: closed=14, half=35, open=56
+  const targetY = { open: 56, 'half-open': 35, 'half-closed': 35, closed: 14, 'n/a': null }[lever] ?? null;
+  if (targetY === null) {
+    return `<div style="height:60px;display:flex;align-items:center;justify-content:center;font-size:20px;color:rgba(232,213,163,0.25)">—</div>`;
+  }
+  const teeth = [0,5,10,15,20].map(x => `<line x1="${5+x}" y1="63" x2="${5+x}" y2="66" stroke="#555" stroke-width="0.9"/>`).join('');
+  return `<svg viewBox="0 0 48 72" width="38" height="58">
+    <rect x="4" y="2" width="26" height="56" rx="8" fill="#111" stroke="rgba(232,213,163,0.22)" stroke-width="1.5"/>
+    <rect x="2" y="56" width="30" height="9" rx="2.5" fill="#1e1e1e" stroke="rgba(232,213,163,0.3)" stroke-width="1.2"/>
+    ${teeth}
+    <!-- Lever track -->
+    <rect x="32" y="11" width="8" height="46" rx="4" fill="#0a0a08" stroke="rgba(232,213,163,0.18)" stroke-width="1"/>
+    <!-- Position ticks -->
+    <line x1="32" y1="14" x2="40" y2="14" stroke="rgba(232,213,163,0.3)" stroke-width="0.8"/>
+    <line x1="32" y1="35" x2="40" y2="35" stroke="rgba(232,213,163,0.15)" stroke-width="0.8"/>
+    <line x1="32" y1="56" x2="40" y2="56" stroke="rgba(232,213,163,0.3)" stroke-width="0.8"/>
+    <!-- Labels -->
+    <text x="30" y="16" font-size="5.5" fill="rgba(232,213,163,0.35)" text-anchor="end" font-family="sans-serif">C</text>
+    <text x="30" y="58" font-size="5.5" fill="rgba(232,213,163,0.35)" text-anchor="end" font-family="sans-serif">O</text>
+    <!-- Glow halo (animated) -->
+    <circle cx="36" r="7" fill="rgba(232,213,163,0.18)">
+      <animate attributeName="cy" from="35" to="${targetY}" dur="0.6s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
+    </circle>
+    <!-- Dot -->
+    <circle cx="36" r="4.5" fill="#e8d5a3">
+      <animate attributeName="cy" from="35" to="${targetY}" dur="0.6s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
+    </circle>
+    <circle cx="36" r="2" fill="#fffceb">
+      <animate attributeName="cy" from="35" to="${targetY}" dur="0.6s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
+    </circle>
+  </svg>`;
+}
+
+function buildCoachingCard(step, stepIndex) {
+  // Motion SVG config per step index
+  const MOTION_CFG = [
+    // 0: bald line — horizontal sweep
+    { anim: 'coachSweep',  path: 'M12,50 L60,50', arrow: '56,46 62,50 56,54', label: 'Trace the line',     corner: false },
+    // 1: soften — short upward flick
+    { anim: 'coachFlick1', path: 'M36,52 C38,38 40,26 36,14', arrow: '32,18 36,11 40,18', label: 'Short upward flick', corner: false },
+    // 2: 0.5 blend — medium flick
+    { anim: 'coachFlick2', path: 'M36,52 C39,36 42,22 36,10', arrow: '32,14 36,7 40,14',  label: 'Upward flick',        corner: false },
+    // 3: 1 guard — full flick
+    { anim: 'coachFlick3', path: 'M36,52 C40,34 43,18 36,8',  arrow: '32,12 36,5 40,12',  label: 'Full upward flick',   corner: false },
+    // 4: 1.5 blend — light flick
+    { anim: 'coachFlick4', path: 'M36,52 C38,38 40,24 36,12', arrow: '32,16 36,9 40,16',  label: 'Light upward flick',  corner: false },
+    // 5: 2 guard — gentle pass
+    { anim: 'coachFlick5', path: 'M36,52 C37,42 38,32 36,20', arrow: '33,24 36,17 39,24', label: 'Gentle pass',          corner: false },
+    // 6: detail — corner-of-blade jab
+    { anim: 'coachJab',    path: 'M32,52 C36,42 40,30 44,18', arrow: '40,22 44,15 48,22', label: 'Corner flick',         corner: true  },
+  ];
+  const cfg = MOTION_CFG[stepIndex] ?? MOTION_CFG[3];
+
+  // Guard badge
+  const GUARD_DISPLAY = {
+    'None': { badge: '∅',   sub: 'Bare blade' },
+    '#0.5': { badge: '½',   sub: 'Guard ½' },
+    '#1':   { badge: '1',   sub: 'Guard 1' },
+    '#1.5': { badge: '1½',  sub: 'Guard 1½' },
+    '#2':   { badge: '2',   sub: 'Guard 2' },
+    '#2.5': { badge: '2½',  sub: 'Guard 2½' },
+    '#3':   { badge: '3',   sub: 'Guard 3' },
+  };
+  const gd = step.guard ? (GUARD_DISPLAY[step.guard] || { badge: step.guard, sub: 'Guard' })
+                        : { badge: '✂', sub: 'Trimmer' };
+
+  const leverSub = { open: 'Open', 'half-open': 'Half open', 'half-closed': 'Half open', closed: 'Closed', 'n/a': 'N/A' }[step.lever] || '—';
+
+  return `<div class="coaching-card">
+    <div class="coaching-col">
+      <div class="coaching-col-label">Lever</div>
+      ${_coachLeverSVG(step.lever)}
+      <div class="coaching-col-sub">${leverSub}</div>
+    </div>
+    <div class="coaching-col">
+      <div class="coaching-col-label">Motion</div>
+      ${_coachMotionSVG(cfg.anim, cfg.path, cfg.arrow, cfg.corner)}
+      <div class="coaching-col-sub">${cfg.label}</div>
+    </div>
+    <div class="coaching-col">
+      <div class="coaching-col-label">Guard</div>
+      <div class="coaching-guard-badge">${gd.badge}</div>
+      <div class="coaching-col-sub">${gd.sub}</div>
+    </div>
+  </div>`;
+}
+
 async function presentFadePlanStep(i) {
   const plan = state.fadePlan;
   if (!plan || !plan[i]) return;
@@ -3572,9 +3729,12 @@ async function presentFadePlanStep(i) {
        <div class="fade-step-row"><span class="fade-step-icon">📏</span><div><strong>How high:</strong> ${step.heightDesc}</div></div>
        <div class="fade-step-row"><span class="fade-step-icon">👉</span><div><strong>Flick out:</strong> ${step.flickDesc}</div></div>`;
 
+  const coachingCard = (step.goal !== undefined) ? buildCoachingCard(step, i) : '';
+
   addStepMessage(`<div class="fade-step-panel">
     <div class="steps-title">${step.title}</div>
     <div style="font-size:11px;color:var(--text3);margin:-6px 0 10px;letter-spacing:0.04em;text-transform:uppercase;">Step ${i + 1} of ${plan.length}</div>
+    ${coachingCard}
     ${zoneLabelHtml}
     ${bodyRows}
     ${vidLink}
