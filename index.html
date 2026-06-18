@@ -683,14 +683,15 @@ body {
 #cropHeader{padding:14px 20px 10px;text-align:center;flex-shrink:0;}
 #cropHeader h2{font-size:16px;font-weight:700;color:#e8d5a3;margin:0 0 3px;}
 #cropHeader p{font-size:12px;color:var(--text3);margin:0;}
-#cropTip{display:flex;align-items:flex-start;gap:10px;margin:10px 0 0;padding:10px 12px;
-  background:rgba(232,213,163,0.07);border:1px solid rgba(232,213,163,0.18);
-  border-radius:12px;text-align:left;}
-#cropTip video{width:72px;min-width:72px;height:54px;object-fit:cover;
-  border-radius:8px;border:1px solid rgba(232,213,163,0.25);flex-shrink:0;}
-#cropTipText{font-size:11.5px;line-height:1.55;color:rgba(232,213,163,0.78);}
-#cropTipText strong{display:block;font-size:12px;font-weight:700;
-  color:rgba(232,213,163,0.95);margin-bottom:3px;}
+#cropTip{flex-shrink:0;display:flex;flex-direction:column;gap:9px;
+  margin:0;padding:12px 16px 10px;
+  background:rgba(232,213,163,0.06);border-top:1px solid rgba(232,213,163,0.13);
+  text-align:left;}
+#cropTip video{width:100%;max-height:180px;object-fit:cover;
+  border-radius:10px;border:1px solid rgba(232,213,163,0.28);display:block;}
+#cropTipText{font-size:12px;line-height:1.6;color:rgba(232,213,163,0.72);}
+#cropTipText strong{display:block;font-size:12.5px;font-weight:700;
+  color:rgba(232,213,163,0.92);margin-bottom:2px;}
 #cropCanvasWrap{flex:1;position:relative;overflow:hidden;touch-action:none;}
 #cropCanvas{display:block;width:100%;height:100%;cursor:crosshair;}
 #cropFooter{padding:14px 20px 28px;display:flex;gap:10px;flex-shrink:0;}
@@ -1456,9 +1457,26 @@ function handleKey(e) {
 }
 
 // ── SCROLL ──
+let _scrollRaf = null;
+function _easedScroll(container, targetTop, duration) {
+  if (_scrollRaf) cancelAnimationFrame(_scrollRaf);
+  const start    = container.scrollTop;
+  const dist     = targetTop - start;
+  const t0       = performance.now();
+  // cubic ease-in-out
+  function ease(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2; }
+  function step(now) {
+    const elapsed = Math.min((now - t0) / duration, 1);
+    container.scrollTop = start + dist * ease(elapsed);
+    if (elapsed < 1) _scrollRaf = requestAnimationFrame(step);
+    else _scrollRaf = null;
+  }
+  _scrollRaf = requestAnimationFrame(step);
+}
+
 function scrollBottom(force) {
   if (force || !userScrolledUp) {
-    requestAnimationFrame(() => { chatArea.scrollTop = chatArea.scrollHeight; });
+    requestAnimationFrame(() => { _easedScroll(chatArea, chatArea.scrollHeight, 700); });
   }
 }
 
@@ -1468,7 +1486,7 @@ function scrollToMsg(el) {
   requestAnimationFrame(() => requestAnimationFrame(() => {
     const chatRect = chatArea.getBoundingClientRect();
     const elTop    = el.getBoundingClientRect().top - chatRect.top + chatArea.scrollTop;
-    chatArea.scrollTo({ top: elTop - 14, behavior: 'smooth' });
+    _easedScroll(chatArea, elTop - 14, 700);
   }));
 }
 
@@ -1479,8 +1497,7 @@ function showMessages() {
     messagesWrap.classList.add('visible');
     // Let the browser paint the newly visible element, then smooth-scroll to it
     setTimeout(() => {
-      const target = messagesWrap.offsetTop - 20;
-      chatArea.scrollTo({ top: target, behavior: 'smooth' });
+      _easedScroll(chatArea, messagesWrap.offsetTop - 20, 700);
     }, 30);
   }
 }
@@ -4926,16 +4943,16 @@ if ('serviceWorker' in navigator) {
     <div id="cropHeader">
       <h2>Focus on your taper area</h2>
       <p>Drag the corners to zoom in — closer = more precise</p>
-      <div id="cropTip">
-        <video src="crop_example.mp4" autoplay loop muted playsinline></video>
-        <div id="cropTipText">
-          <strong>Crop it like this.</strong>
-          The closer the sideburn and taper fill the frame, the more precise your fade will be.
-        </div>
-      </div>
     </div>
     <div id="cropCanvasWrap">
       <canvas id="cropCanvas"></canvas>
+    </div>
+    <div id="cropTip">
+      <video src="crop_example.mp4" autoplay loop muted playsinline></video>
+      <div id="cropTipText">
+        <strong>Crop it like this.</strong>
+        For the most accurate taper, crop your photo so the sideburn and taper area fill most of the frame.
+      </div>
     </div>
     <div id="cropFooter">
       <button class="crop-btn-primary" onclick="applyCrop()">Use This Crop</button>
