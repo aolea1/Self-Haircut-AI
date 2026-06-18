@@ -3508,10 +3508,17 @@ async function showMidStepDetailCheck(i) {
   drawStepOverlay(ctx, W, H, detailStep, state.guideLine, offset);
   removeTyping();
 
+  // Step-specific conversational copy — each checkpoint has its own reason for being there.
+  const checkCopy = {
+    1: { title: 'Before we continue —', body: "That bottom edge is the trickiest part of the whole fade. If you still see a faint line right where the bald section ends, a couple of light corner-of-blade flicks will close it out. If it's already blending into skin, you're ready." },
+    4: { title: 'One thing to look for:', body: "Check where your fade meets the longer hair above it. There's sometimes a faint ridge right at that seam. One light pass along that line with the 1.5 guard is usually all it takes. If the transition already feels smooth, move on." },
+  };
+  const { title: ckTitle, body: ckBody } = checkCopy[i] || { title: 'Quick check:', body: 'Look at the highlighted area for any remaining lines or dark patches before moving on.' };
+
   addStepMessage(`<div class="detail-check-card">
-    <div class="detail-check-title">✶ Check this area before moving on</div>
-    <div class="detail-check-body">The bottom edge of this zone is where faint lines hide after the main pass. Look in the highlighted area — any dark spots or hard lines? A couple of light corner-of-blade flicks right there will knock them out. If it looks clean, you're good.</div>
-    <button class="opt-btn" style="margin-top:10px;width:100%;background:rgba(255,185,60,0.12);border-color:rgba(255,185,60,0.4);color:rgba(255,200,80,0.95);" onclick="presentFadePlanStep(${i + 1})">Looks Clean — Keep Going</button>
+    <div class="detail-check-title">${ckTitle}</div>
+    <div class="detail-check-body">${ckBody}</div>
+    <button class="opt-btn" style="margin-top:10px;width:100%;background:rgba(255,185,60,0.12);border-color:rgba(255,185,60,0.4);color:rgba(255,200,80,0.95);" onclick="presentFadePlanStep(${i + 1})">Looks Good — Keep Going</button>
   </div>`, canvas);
 
   scrollBottom();
@@ -3635,9 +3642,12 @@ function completeFadeStep(i) {
     return;
   }
 
-  // For quad blend steps, inject a mid-step detail check before advancing.
+  // Only inject a detail check at steps where it genuinely helps:
+  // step 1 (first blend — catching the bald-line edge) and
+  // step 4 (refinement — catching the seam into longer hair).
+  const DETAIL_CHECK_STEPS = new Set([1, 4]);
   const step = plan[i];
-  if (step && step.zone && step.zone.type === 'quad') {
+  if (step && step.zone && step.zone.type === 'quad' && DETAIL_CHECK_STEPS.has(i)) {
     showMidStepDetailCheck(i);
   } else {
     presentFadePlanStep(i + 1);
