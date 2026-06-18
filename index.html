@@ -1088,12 +1088,15 @@ body {
 }
 /* Motion animation keyframes — clipper goes straight up then flicks outward at exit.
    rotate(180deg) is baked into every frame so the guard stays facing up. */
-@keyframes coachSweep  { 0%,100%{transform:translateX(-14px) rotate(180deg)} 50%{transform:translateX(14px) rotate(180deg)} }
+@keyframes coachHorizSweep { 0%,100%{transform:translateX(-14px)} 50%{transform:translateX(14px)} }
 @keyframes coachFlick1 { 0%,62%,100%{transform:translate(0,0) rotate(180deg)} 30%{transform:translate(0,-14px) rotate(180deg)} 48%{transform:translate(4px,-16px) rotate(176deg)} }
 @keyframes coachFlick2 { 0%,62%,100%{transform:translate(0,0) rotate(180deg)} 30%{transform:translate(0,-20px) rotate(180deg)} 48%{transform:translate(5px,-23px) rotate(175deg)} }
 @keyframes coachFlick3 { 0%,62%,100%{transform:translate(0,0) rotate(180deg)} 30%{transform:translate(0,-26px) rotate(180deg)} 48%{transform:translate(6px,-30px) rotate(174deg)} }
 @keyframes coachFlick4 { 0%,62%,100%{transform:translate(0,0) rotate(180deg)} 30%{transform:translate(0,-20px) rotate(180deg)} 48%{transform:translate(5px,-23px) rotate(175deg)} }
 @keyframes coachFlick5 { 0%,62%,100%{transform:translate(0,0) rotate(180deg)} 30%{transform:translate(0,-12px) rotate(180deg)} 48%{transform:translate(3px,-14px) rotate(177deg)} }
+@keyframes leverGoOpen   { 0%,8%{transform:translateY(24px)} 42%,76%{transform:translateY(-24px)} 100%{transform:translateY(24px)} }
+@keyframes leverGoHalf   { 0%,8%{transform:translateY(24px)} 42%,76%{transform:translateY(0px)}   100%{transform:translateY(24px)} }
+@keyframes leverGoClosed { 0%,8%{transform:translateY(-24px)}42%,76%{transform:translateY(24px)}  100%{transform:translateY(-24px)} }
 
 /* Active step zone pulse — applied to .guide-img-wrap on fade plan steps */
 @keyframes stepZonePulse {
@@ -3876,15 +3879,40 @@ function _coachClipperIcon(cx, baseY, highlightCorner) {
   return `${body}${guard}${cornerFill}${teeth}${spec}`;
 }
 
-function _coachMotionSVG(motionAnim, _a, _b, highlightCorner) {
-  // Path: straight up for most of the stroke, then a gentle outward flick at exit.
-  // Dashed line shows the full path; arrowhead shows the direction of release.
-  const path      = `<path d="M36,56 L36,22 C36,14 40,9 45,7" stroke="rgba(232,213,163,0.22)" stroke-width="1.6" fill="none" stroke-dasharray="3,4" stroke-linecap="round"/>`;
-  // Start dot — shows "begin here"
+function _coachMotionSVG(motionAnim, _a, _b, _c, mode) {
+  if (mode === 'sweep') {
+    // ── HORIZONTAL SWEEP (bald guideline step) ──
+    // Clipper held horizontally, moves left → right along the guideline.
+    const py = 44; // path y — where the blade meets the skin
+    const path      = `<path d="M10,${py} L60,${py}" stroke="rgba(232,213,163,0.28)" stroke-width="1.6" fill="none" stroke-dasharray="3,4" stroke-linecap="round"/>`;
+    const startDot  = `<circle cx="10" cy="${py}" r="3" fill="rgba(232,213,163,0.55)"/>`;
+    // Arrow sits right at the end of the path — immediately readable
+    const arrowHead = `<polyline points="54,${py-5} 60,${py} 54,${py+5}" fill="none" stroke="rgba(232,213,163,0.85)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+    // Horizontal clipper: body on top, guard bar below, teeth pointing down toward the line
+    const bx = 35, by = 28; // clipper body center
+    const clipper = `
+      <rect x="${bx-14}" y="${by-9}"  width="28" height="12" rx="3" fill="#1c1c1a" stroke="rgba(232,213,163,0.45)" stroke-width="1.2"/>
+      <rect x="${bx-16}" y="${by+3}"  width="32" height="4"  rx="2" fill="#181816" stroke="rgba(232,213,163,0.32)" stroke-width="0.9"/>
+      <line x1="${bx-11}" y1="${by+7}"  x2="${bx-11}" y2="${by+10}" stroke="rgba(150,140,110,0.9)" stroke-width="1" stroke-linecap="round"/>
+      <line x1="${bx-5}"  y1="${by+7}"  x2="${bx-5}"  y2="${by+10}" stroke="rgba(150,140,110,0.9)" stroke-width="1" stroke-linecap="round"/>
+      <line x1="${bx+1}"  y1="${by+7}"  x2="${bx+1}"  y2="${by+10}" stroke="rgba(150,140,110,0.9)" stroke-width="1" stroke-linecap="round"/>
+      <line x1="${bx+7}"  y1="${by+7}"  x2="${bx+7}"  y2="${by+10}" stroke="rgba(150,140,110,0.9)" stroke-width="1" stroke-linecap="round"/>
+      <line x1="${bx+13}" y1="${by+7}"  x2="${bx+13}" y2="${by+10}" stroke="rgba(150,140,110,0.9)" stroke-width="1" stroke-linecap="round"/>
+      <line x1="${bx-10}" y1="${by-7}"  x2="${bx-10}" y2="${by-2}"  stroke="rgba(255,252,235,0.12)" stroke-width="1.2" stroke-linecap="round"/>`;
+    return `<svg viewBox="0 0 72 66" width="72" height="66" style="overflow:visible">
+      ${path}${startDot}${arrowHead}
+      <g style="transform-box:fill-box;transform-origin:50% 50%;animation:${motionAnim} 2.4s ease-in-out infinite">
+        ${clipper}
+      </g>
+    </svg>`;
+  }
+
+  // ── VERTICAL FLICK (all taper steps) ──
+  // Straight up with a gentle outward flick at exit. Arrow sits at the flick tip.
+  const path      = `<path d="M36,56 L36,22 C36,14 40,10 44,8" stroke="rgba(232,213,163,0.28)" stroke-width="1.6" fill="none" stroke-dasharray="3,4" stroke-linecap="round"/>`;
   const startDot  = `<circle cx="36" cy="56" r="3" fill="rgba(232,213,163,0.55)"/>`;
-  // Arrowhead at the exit point, angled outward
-  const arrowHead = `<polyline points="39,14 45,7 50,13" fill="none" stroke="rgba(232,213,163,0.72)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
-  // Simplified clipper body: just the essential shape — body + guard bar
+  // Arrow attached directly to the path tip at (44,8)
+  const arrowHead = `<polyline points="38,13 44,8 49,14" fill="none" stroke="rgba(232,213,163,0.85)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
   const cx = 36, baseY = 52;
   const clipper = `
     <rect x="${cx-7}" y="${baseY-18}" width="14" height="19" rx="4" fill="#1c1c1a" stroke="rgba(232,213,163,0.45)" stroke-width="1.2"/>
@@ -3895,9 +3923,7 @@ function _coachMotionSVG(motionAnim, _a, _b, highlightCorner) {
     <line x1="${cx+7}" y1="${baseY+1.5}" x2="${cx+7}" y2="${baseY+4}" stroke="rgba(150,140,110,0.9)" stroke-width="1" stroke-linecap="round"/>
     <line x1="${cx-5}" y1="${baseY-14}"  x2="${cx-5}" y2="${baseY-7}"  stroke="rgba(255,252,235,0.14)" stroke-width="1.2" stroke-linecap="round"/>`;
   return `<svg viewBox="0 0 72 66" width="72" height="66" style="overflow:visible">
-    ${path}
-    ${startDot}
-    ${arrowHead}
+    ${path}${startDot}${arrowHead}
     <g style="transform-box:fill-box;transform-origin:50% 50%;animation:${motionAnim} 2.4s ease-in-out infinite">
       ${clipper}
     </g>
@@ -3905,54 +3931,53 @@ function _coachMotionSVG(motionAnim, _a, _b, highlightCorner) {
 }
 
 function _coachLeverSVG(lever) {
-  // Track positions: Open=top(12), Half=mid(34), Closed=bottom(56)
-  // Open at top matches self-cut perspective where lever faces the user.
-  const targetY = { open: 12, 'half-open': 34, 'half-closed': 34, closed: 56, 'n/a': null }[lever] ?? null;
-  if (targetY === null) {
+  // Track: y=6 (top) to y=66 (bottom), center y=36
+  // Positions relative to center: Open=-24 (y=12), Half=0 (y=36), Closed=+24 (y=60)
+  if (lever === 'n/a' || !lever) {
     return `<div style="height:68px;display:flex;align-items:center;justify-content:center;font-size:18px;color:rgba(232,213,163,0.2)">—</div>`;
   }
-  const isOpen   = targetY <= 14;
-  const isClosed = targetY >= 54;
-  // Highlight whichever label is active
-  const oCol = isOpen   ? 'rgba(232,213,163,0.92)' : 'rgba(232,213,163,0.28)';
-  const cCol = isClosed ? 'rgba(232,213,163,0.92)' : 'rgba(232,213,163,0.28)';
-  const oW   = isOpen   ? '700' : '500';
-  const cW   = isClosed ? '700' : '500';
-  const anim = (attr, val) =>
-    `<animate attributeName="${attr}" from="34" to="${val}" dur="0.65s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>`;
-  return `<svg viewBox="0 0 64 72" width="60" height="68">
-    <!-- Lever track — the main visual element -->
-    <rect x="28" y="6"  width="8" height="60" rx="4" fill="#0e0e0c" stroke="rgba(232,213,163,0.14)" stroke-width="1.2"/>
-    <!-- Half-way tick (subtle) -->
-    <line x1="26" y1="34" x2="38" y2="34" stroke="rgba(232,213,163,0.10)" stroke-width="0.8"/>
-    <!-- OPEN label — top -->
-    <text x="24" y="15" font-size="9" fill="${oCol}" text-anchor="end"
-      font-family="system-ui,sans-serif" font-weight="${oW}">Open</text>
-    <!-- CLOSED label — bottom -->
-    <text x="24" y="60" font-size="9" fill="${cCol}" text-anchor="end"
-      font-family="system-ui,sans-serif" font-weight="${cW}">Clsd</text>
-    <!-- Glow halo -->
-    <circle cx="32" r="10" fill="rgba(232,213,163,0.14)">${anim('cy', targetY)}</circle>
-    <!-- Main dot -->
-    <circle cx="32" r="6"  fill="#e8d5a3" stroke="rgba(255,252,230,0.3)" stroke-width="0.8">${anim('cy', targetY)}</circle>
-    <!-- Bright centre -->
-    <circle cx="32" r="2.5" fill="#fffceb">${anim('cy', targetY)}</circle>
-    <!-- Indicator line from dot to label (open) -->
-    ${isOpen   ? `<line x1="22" y1="12" x2="26" y2="${targetY}" stroke="rgba(232,213,163,0.35)" stroke-width="0.8" stroke-dasharray="2,2"/>` : ''}
-    ${isClosed ? `<line x1="22" y1="58" x2="26" y2="${targetY}" stroke="rgba(232,213,163,0.35)" stroke-width="0.8" stroke-dasharray="2,2"/>` : ''}
+  const isOpen   = lever === 'open';
+  const isHalf   = lever === 'half-open' || lever === 'half-closed';
+  const isClosed = lever === 'closed';
+  // Continuous looping animation: always starts from the opposite end so user
+  // sees the lever visibly move to the target — reinforces "adjust your lever here".
+  const animName = isOpen ? 'leverGoOpen' : isClosed ? 'leverGoClosed' : 'leverGoHalf';
+  // Active label is bright; inactive labels are dim
+  const oCol = isOpen   ? 'rgba(232,213,163,0.92)' : 'rgba(232,213,163,0.22)';
+  const hCol = isHalf   ? 'rgba(232,213,163,0.92)' : 'rgba(232,213,163,0.22)';
+  const cCol = isClosed ? 'rgba(232,213,163,0.92)' : 'rgba(232,213,163,0.22)';
+  const oW   = isOpen   ? '700' : '400';
+  const hW   = isHalf   ? '700' : '400';
+  const cW   = isClosed ? '700' : '400';
+  return `<svg viewBox="0 0 72 72" width="64" height="68">
+    <!-- Track -->
+    <rect x="20" y="6" width="6" height="60" rx="3" fill="#0e0e0c" stroke="rgba(232,213,163,0.14)" stroke-width="1.2"/>
+    <!-- Tick marks -->
+    <line x1="18" y1="12" x2="26" y2="12" stroke="rgba(232,213,163,0.18)" stroke-width="0.8"/>
+    <line x1="18" y1="36" x2="26" y2="36" stroke="rgba(232,213,163,0.12)" stroke-width="0.8"/>
+    <line x1="18" y1="60" x2="26" y2="60" stroke="rgba(232,213,163,0.18)" stroke-width="0.8"/>
+    <!-- Labels — right side of track, aligned to tick positions -->
+    <text x="30" y="15"  font-size="9" fill="${oCol}" font-family="system-ui,sans-serif" font-weight="${oW}">Open</text>
+    <text x="30" y="39"  font-size="9" fill="${hCol}" font-family="system-ui,sans-serif" font-weight="${hW}">Half</text>
+    <text x="30" y="63"  font-size="9" fill="${cCol}" font-family="system-ui,sans-serif" font-weight="${cW}">Closed</text>
+    <!-- Animated dot group — centered at y=36 (track midpoint), CSS translateY moves it to target -->
+    <g style="transform-box:fill-box;transform-origin:50% 50%;animation:${animName} 3s ease-in-out infinite">
+      <circle cx="23" cy="36" r="9"   fill="rgba(232,213,163,0.13)"/>
+      <circle cx="23" cy="36" r="5.5" fill="#e8d5a3" stroke="rgba(255,252,230,0.3)" stroke-width="0.8"/>
+      <circle cx="23" cy="36" r="2"   fill="#fffceb"/>
+    </g>
   </svg>`;
 }
 
 function buildCoachingCard(step, stepIndex) {
-  // Motion config — path/arrow unused (straight vertical drawn by _coachMotionSVG)
   const MOTION_CFG = [
-    { anim: 'coachSweep',  label: 'Trace the line',     corner: false },
-    { anim: 'coachFlick1', label: 'Short flick up',      corner: false },
-    { anim: 'coachFlick2', label: 'Flick upward',        corner: false },
-    { anim: 'coachFlick3', label: 'Full flick up',       corner: false },
-    { anim: 'coachFlick4', label: 'Light flick up',      corner: false },
-    { anim: 'coachFlick5', label: 'Gentle pass up',      corner: false },
-    { anim: 'coachFlick5', label: 'Feather pass up',     corner: false },
+    { anim: 'coachHorizSweep', label: 'Trace the line',  mode: 'sweep' },
+    { anim: 'coachFlick1',     label: 'Short flick up',  mode: 'flick' },
+    { anim: 'coachFlick2',     label: 'Flick upward',    mode: 'flick' },
+    { anim: 'coachFlick3',     label: 'Full flick up',   mode: 'flick' },
+    { anim: 'coachFlick4',     label: 'Light flick up',  mode: 'flick' },
+    { anim: 'coachFlick5',     label: 'Gentle pass up',  mode: 'flick' },
+    { anim: 'coachFlick5',     label: 'Feather pass up', mode: 'flick' },
   ];
   const cfg = MOTION_CFG[stepIndex] ?? MOTION_CFG[3];
 
@@ -3979,7 +4004,7 @@ function buildCoachingCard(step, stepIndex) {
     </div>
     <div class="coaching-col">
       <div class="coaching-col-label">Motion</div>
-      ${_coachMotionSVG(cfg.anim, null, null, cfg.corner)}
+      ${_coachMotionSVG(cfg.anim, null, null, null, cfg.mode)}
       <div class="coaching-col-sub">${cfg.label}</div>
     </div>
     <div class="coaching-col">
