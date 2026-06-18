@@ -1077,13 +1077,14 @@ body {
   font-size: 17px; font-weight: 800; color: rgba(232,213,163,0.97);
   margin: 2px 0;
 }
-/* Motion animation keyframes — all steps use a straight upward flick */
-@keyframes coachSweep   { 0%,100%{transform:translateY(0)}  50%{transform:translateY(-26px)} }
-@keyframes coachFlick1  { 0%,70%,100%{transform:translateY(0)} 28%,52%{transform:translateY(-16px)} }
-@keyframes coachFlick2  { 0%,70%,100%{transform:translateY(0)} 28%,52%{transform:translateY(-22px)} }
-@keyframes coachFlick3  { 0%,70%,100%{transform:translateY(0)} 28%,52%{transform:translateY(-28px)} }
-@keyframes coachFlick4  { 0%,70%,100%{transform:translateY(0)} 28%,52%{transform:translateY(-20px)} }
-@keyframes coachFlick5  { 0%,70%,100%{transform:translateY(0)} 28%,52%{transform:translateY(-14px)} }
+/* Motion animation keyframes — clipper goes straight up then flicks outward at exit.
+   rotate(180deg) is baked into every frame so the guard stays facing up. */
+@keyframes coachSweep  { 0%,100%{transform:translateX(-14px) rotate(180deg)} 50%{transform:translateX(14px) rotate(180deg)} }
+@keyframes coachFlick1 { 0%,62%,100%{transform:translate(0,0) rotate(180deg)} 30%{transform:translate(0,-14px) rotate(180deg)} 48%{transform:translate(4px,-16px) rotate(176deg)} }
+@keyframes coachFlick2 { 0%,62%,100%{transform:translate(0,0) rotate(180deg)} 30%{transform:translate(0,-20px) rotate(180deg)} 48%{transform:translate(5px,-23px) rotate(175deg)} }
+@keyframes coachFlick3 { 0%,62%,100%{transform:translate(0,0) rotate(180deg)} 30%{transform:translate(0,-26px) rotate(180deg)} 48%{transform:translate(6px,-30px) rotate(174deg)} }
+@keyframes coachFlick4 { 0%,62%,100%{transform:translate(0,0) rotate(180deg)} 30%{transform:translate(0,-20px) rotate(180deg)} 48%{transform:translate(5px,-23px) rotate(175deg)} }
+@keyframes coachFlick5 { 0%,62%,100%{transform:translate(0,0) rotate(180deg)} 30%{transform:translate(0,-12px) rotate(180deg)} 48%{transform:translate(3px,-14px) rotate(177deg)} }
 
 /* Active step zone pulse — applied to .guide-img-wrap on fade plan steps */
 @keyframes stepZonePulse {
@@ -3837,14 +3838,16 @@ function _coachClipperIcon(cx, baseY, highlightCorner) {
 
 function _coachMotionSVG(motionAnim, _pathD, _arrowPts, highlightCorner) {
   const cx = 36, baseY = 48;
-  // Straight vertical guide line + arrowhead at top — replaces all curved paths
-  const guideLine = `<line x1="36" y1="52" x2="36" y2="10" stroke="rgba(232,213,163,0.14)" stroke-width="1.5" stroke-dasharray="3,3" stroke-linecap="round"/>`;
-  const arrowHead = `<polyline points="31,18 36,10 41,18" fill="none" stroke="rgba(232,213,163,0.55)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`;
-  // Clipper rotated 180° so guard faces upward — matches how you see your own clipper while cutting
+  // Guide path: mostly straight up, then a subtle outward flick at the exit.
+  // Communicates "go up, then release away" — natural barber flick technique.
+  const guideLine = `<path d="M36,52 C36,32 36,20 42,11" stroke="rgba(232,213,163,0.20)" stroke-width="1.5" fill="none" stroke-dasharray="3,4" stroke-linecap="round"/>`;
+  // Arrowhead at the exit point, angled slightly outward to show the flick direction
+  const arrowHead = `<polyline points="37,18 42,11 48,16" fill="none" stroke="rgba(232,213,163,0.65)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`;
+  // Clipper rotated 180° (guard up) — matches how you see your own clipper while cutting
   return `<svg viewBox="0 0 72 62" width="72" height="62" style="overflow:visible">
     ${guideLine}
     ${arrowHead}
-    <g style="transform-box:fill-box;transform-origin:50% 50%;transform:rotate(180deg);animation:${motionAnim} 2.2s ease-in-out infinite">
+    <g style="transform-box:fill-box;transform-origin:50% 50%;animation:${motionAnim} 2.2s ease-in-out infinite">
       ${_coachClipperIcon(cx, baseY, highlightCorner)}
     </g>
   </svg>`;
