@@ -1,5 +1,5 @@
-const CACHE = 'shc-v8';
-const ASSETS = ['/', '/index.html'];
+const CACHE = 'shc-v9';
+const ASSETS = ['/', '/index.html', '/crop_example.mp4'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
