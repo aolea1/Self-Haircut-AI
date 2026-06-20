@@ -687,8 +687,8 @@ body {
 #cropHeader h2{font-size:16px;font-weight:700;color:#e8d5a3;margin:0 0 3px;}
 #cropHeader p{font-size:12px;color:var(--text3);margin:0;}
 @keyframes cropTipPulse {
-  0%,100%{ box-shadow:0 0 0 1px rgba(232,213,163,0.20), 0 0 0 0 rgba(232,213,163,0); }
-  50%    { box-shadow:0 0 0 1px rgba(232,213,163,0.45), 0 0 18px 5px rgba(232,213,163,0.16); }
+  0%,100%{ box-shadow:0 0 0 1.5px rgba(232,213,163,0.28), 0 0 0 0 rgba(232,213,163,0); }
+  50%    { box-shadow:0 0 0 1.5px rgba(232,213,163,0.60), 0 0 20px 6px rgba(232,213,163,0.20); }
 }
 /* The tip lives in the normal flex flow below the canvas.
    Collapsed → canvas gets all remaining space.
@@ -724,8 +724,8 @@ body {
 #cropTipCoachText{
   font-size:13.5px;font-weight:600;line-height:1.5;
   color:rgba(232,213,163,0.88);text-align:center;}
-#cropTip video{width:100%;height:220px;object-fit:cover;
-  border-radius:14px;border:1px solid rgba(232,213,163,0.28);display:block;}
+#cropTip video{width:100%;max-height:260px;object-fit:contain;
+  border-radius:14px;border:1px solid rgba(232,213,163,0.28);display:block;background:#000;}
 #cropTipText{font-size:12.5px;line-height:1.55;color:rgba(232,213,163,0.6);text-align:center;}
 #cropCanvasWrap{flex:1;position:relative;overflow:hidden;touch-action:none;}
 #cropCanvas{display:block;width:100%;height:100%;cursor:crosshair;}
@@ -3668,30 +3668,35 @@ function drawStepOverlay(ctx, W, H, step, guideLine, offset) {
     ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = GOLD_DIM; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(startX, refY); ctx.lineTo(endX, refY); ctx.stroke(); ctx.restore();
 
-    // Shaded zone with grid (matches the "fade up to here" zone styling)
-    ctx.save(); ctx.globalAlpha = 0.14; ctx.fillStyle = 'white';
+    // Shaded zone fill
+    ctx.save(); ctx.globalAlpha = 0.20; ctx.fillStyle = 'white';
     ctx.fillRect(startX, topY, endX - startX, botY - topY); ctx.restore();
 
-    ctx.save(); ctx.globalAlpha = 0.18; ctx.strokeStyle = 'white'; ctx.lineWidth = 0.7;
+    ctx.save(); ctx.globalAlpha = 0.22; ctx.strokeStyle = 'white'; ctx.lineWidth = 0.7;
     for (let x = startX; x <= endX; x += 14) { ctx.beginPath(); ctx.moveTo(x, topY); ctx.lineTo(x, botY); ctx.stroke(); }
     for (let y = topY; y <= botY; y += 14) { ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(endX, y); ctx.stroke(); }
     ctx.restore();
 
-    ctx.save(); ctx.strokeStyle = GOLD; ctx.lineWidth = 1.5; ctx.setLineDash([]);
+    // Gold border with glow
+    ctx.save(); ctx.strokeStyle = GOLD; ctx.lineWidth = 2; ctx.setLineDash([]);
+    ctx.shadowColor = 'rgba(232,213,163,0.6)'; ctx.shadowBlur = 10;
     ctx.strokeRect(startX, topY, endX - startX, botY - topY); ctx.restore();
 
-    // Upward arrow + "flick out here" near the top edge
+    // Arrow centered in the zone, pointing up
     const arrowX = startX + (endX - startX) / 2;
-    ctx.save(); ctx.strokeStyle = GOLD; ctx.fillStyle = GOLD; ctx.lineWidth = 2;
-    ctx.shadowColor = 'rgba(232,213,163,0.7)'; ctx.shadowBlur = 8;
-    ctx.beginPath(); ctx.moveTo(arrowX, botY - 6); ctx.lineTo(arrowX, topY + 16); ctx.stroke();
+    const arrowTop = topY + 10, arrowBot = botY - 10;
+    ctx.save(); ctx.strokeStyle = GOLD; ctx.fillStyle = GOLD; ctx.lineWidth = 2.5;
+    ctx.shadowColor = 'rgba(232,213,163,0.85)'; ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.moveTo(arrowX, arrowBot); ctx.lineTo(arrowX, arrowTop + 12); ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(arrowX, topY + 16); ctx.lineTo(arrowX - 5, topY + 24); ctx.lineTo(arrowX + 5, topY + 24); ctx.closePath(); ctx.fill();
+    ctx.moveTo(arrowX, arrowTop); ctx.lineTo(arrowX - 7, arrowTop + 14); ctx.lineTo(arrowX + 7, arrowTop + 14); ctx.closePath(); ctx.fill();
     ctx.restore();
 
-    ctx.save(); ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = GOLD;
-    ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 6;
-    ctx.fillText(flickLabel, Math.min(endX - ctx.measureText(flickLabel).width - 6, arrowX + 14), topY + 18);
+    // "flick out here" label — centered below arrow tip
+    ctx.save(); ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = GOLD;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.shadowColor = 'rgba(0,0,0,0.95)'; ctx.shadowBlur = 8;
+    ctx.fillText(flickLabel, arrowX, arrowTop + 18);
     ctx.restore();
 
   } else if (zone.type === 'quad') {
@@ -3772,18 +3777,21 @@ function drawStepOverlay(ctx, W, H, step, guideLine, offset) {
     ctx.shadowColor = 'rgba(232,213,163,0.7)'; ctx.shadowBlur = 14;
     quadPathRounded(ctx, highlightPts, CORNER_R); ctx.stroke(); ctx.restore();
 
-    // Upward arrow + "flick out here" near the top edge
+    // Arrow centered in the zone, pointing up
     const arrowX = startX + (endX - startX) / 2;
-    ctx.save(); ctx.strokeStyle = GOLD; ctx.fillStyle = GOLD; ctx.lineWidth = 2;
-    ctx.shadowColor = 'rgba(232,213,163,0.8)'; ctx.shadowBlur = 10;
-    ctx.beginPath(); ctx.moveTo(arrowX, botY - 6); ctx.lineTo(arrowX, topY + 16); ctx.stroke();
+    const arrowTop = topY + 10, arrowBot = botY - 10;
+    ctx.save(); ctx.strokeStyle = GOLD; ctx.fillStyle = GOLD; ctx.lineWidth = 2.5;
+    ctx.shadowColor = 'rgba(232,213,163,0.85)'; ctx.shadowBlur = 14;
+    ctx.beginPath(); ctx.moveTo(arrowX, arrowBot); ctx.lineTo(arrowX, arrowTop + 12); ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(arrowX, topY + 16); ctx.lineTo(arrowX - 5, topY + 24); ctx.lineTo(arrowX + 5, topY + 24); ctx.closePath(); ctx.fill();
+    ctx.moveTo(arrowX, arrowTop); ctx.lineTo(arrowX - 7, arrowTop + 14); ctx.lineTo(arrowX + 7, arrowTop + 14); ctx.closePath(); ctx.fill();
     ctx.restore();
 
-    ctx.save(); ctx.font = 'bold 12px sans-serif'; ctx.fillStyle = GOLD;
-    ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 6;
-    ctx.fillText(flickLabel, Math.min(endX - ctx.measureText(flickLabel).width - 6, arrowX + 14), topY + 18);
+    // "flick out here" label — centered below arrow tip
+    ctx.save(); ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = GOLD;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.shadowColor = 'rgba(0,0,0,0.95)'; ctx.shadowBlur = 8;
+    ctx.fillText(flickLabel, arrowX, arrowTop + 18);
     ctx.restore();
 
   } else if (zone.type === 'detail-top') {
