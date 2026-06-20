@@ -1109,11 +1109,12 @@ body {
 @keyframes coachHorizSweep { 0%,100%{transform:translateX(-14px)} 50%{transform:translateX(14px)} }
 /* Flick keyframes — clipper drawn with guard at bottom, no rotation needed.
    Travels up along the vertical path then flicks outward at the top. */
-@keyframes coachFlick1 { 0%,65%,100%{transform:translate(0,0)} 35%{transform:translate(0,-24px)} 50%{transform:translate(5px,-27px) rotate(-4deg)} }
-@keyframes coachFlick2 { 0%,65%,100%{transform:translate(0,0)} 35%{transform:translate(0,-30px)} 50%{transform:translate(6px,-34px) rotate(-5deg)} }
-@keyframes coachFlick3 { 0%,65%,100%{transform:translate(0,0)} 35%{transform:translate(0,-36px)} 50%{transform:translate(7px,-40px) rotate(-6deg)} }
-@keyframes coachFlick4 { 0%,65%,100%{transform:translate(0,0)} 35%{transform:translate(0,-30px)} 50%{transform:translate(6px,-33px) rotate(-5deg)} }
-@keyframes coachFlick5 { 0%,65%,100%{transform:translate(0,0)} 35%{transform:translate(0,-20px)} 50%{transform:translate(4px,-23px) rotate(-3deg)} }
+/* Flick keyframes — purely vertical, no sideways drift at any point. */
+@keyframes coachFlick1 { 0%,100%{transform:translateY(0)} 40%{transform:translateY(-24px)} }
+@keyframes coachFlick2 { 0%,100%{transform:translateY(0)} 40%{transform:translateY(-30px)} }
+@keyframes coachFlick3 { 0%,100%{transform:translateY(0)} 40%{transform:translateY(-36px)} }
+@keyframes coachFlick4 { 0%,100%{transform:translateY(0)} 40%{transform:translateY(-30px)} }
+@keyframes coachFlick5 { 0%,100%{transform:translateY(0)} 40%{transform:translateY(-20px)} }
 /* Lever teaching animation: Open → glow/pulse → Half → glow/pulse → Closed → glow/pulse → quick reset.
    Dot group centered at track mid-point (y=36). Position offsets: Open=-24, Half=0, Closed=+24.
    Pulse = scale bloom + gold drop-shadow so the glow is unmistakably visible. */
@@ -1121,17 +1122,17 @@ body {
   /* ── Open: arrive, hold, then pulse ── */
   0%    { transform: translateY(-24px) scale(1);    filter: none; }
   4%    { transform: translateY(-24px) scale(1);    filter: none; }
-  8%    { transform: translateY(-24px) scale(1.75); filter: drop-shadow(0 0 7px rgba(232,213,163,0.95)) drop-shadow(0 0 14px rgba(232,213,163,0.55)); }
+  8%    { transform: translateY(-24px) scale(1.35); filter: drop-shadow(0 0 5px rgba(232,213,163,0.70)) drop-shadow(0 0 10px rgba(232,213,163,0.30)); }
   13%   { transform: translateY(-24px) scale(1);    filter: none; }
   /* ── travel to Half ── */
   33%   { transform: translateY(0px)   scale(1);    filter: none; }
   /* ── Half: pulse ── */
-  38%   { transform: translateY(0px)   scale(1.75); filter: drop-shadow(0 0 7px rgba(232,213,163,0.95)) drop-shadow(0 0 14px rgba(232,213,163,0.55)); }
+  38%   { transform: translateY(0px)   scale(1.35); filter: drop-shadow(0 0 5px rgba(232,213,163,0.70)) drop-shadow(0 0 10px rgba(232,213,163,0.30)); }
   43%   { transform: translateY(0px)   scale(1);    filter: none; }
   /* ── travel to Closed ── */
   63%   { transform: translateY(24px)  scale(1);    filter: none; }
   /* ── Closed: pulse ── */
-  68%   { transform: translateY(24px)  scale(1.75); filter: drop-shadow(0 0 7px rgba(232,213,163,0.95)) drop-shadow(0 0 14px rgba(232,213,163,0.55)); }
+  68%   { transform: translateY(24px)  scale(1.35); filter: drop-shadow(0 0 5px rgba(232,213,163,0.70)) drop-shadow(0 0 10px rgba(232,213,163,0.30)); }
   73%   { transform: translateY(24px)  scale(1);    filter: none; }
   /* ── brief hold, then quick reset to Open (no pulse) ── */
   76%   { transform: translateY(24px)  scale(1);    filter: none; }
@@ -3042,6 +3043,11 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubb
     // Apply upward offset so the stored position (and thus the dot) appears above the finger
     const adjustedY = pt.y - (isTouch ? FINGER_OFFSET_CSS * pt.scaleY : 0);
     lines[dragging.lineKey][dragging.pointKey] = clampPoint(dragging.lineKey, dragging.pointKey, pt.x, adjustedY);
+    // p0 (bottom/bald-line) points stay at the same Y so the bald line stays horizontal.
+    if (dragging.pointKey === 'p0') {
+      const otherKey = dragging.lineKey === 'sideburn' ? 'rear' : 'sideburn';
+      lines[otherKey].p0 = { ...lines[otherKey].p0, y: lines[dragging.lineKey].p0.y };
+    }
     lines._fingerOffsetY = isTouch ? FINGER_OFFSET_CSS * pt.scaleY : 0;
     fingerCSS = { x: pt.cssX, y: pt.cssY };
     scheduleRedraw();
@@ -3951,16 +3957,13 @@ function _coachMotionSVG(motionAnim, _a, _b, _c, mode) {
   }
 
   // ── VERTICAL FLICK (all taper steps) ──
-  // Clipper drawn with guard at BOTTOM (blade faces down toward skin at path start).
-  // Animates upward along the path then flicks slightly outward at release.
-  // Path and arrow are both vertical so the diagram reads instantly as "move up, flick out".
+  // Clipper drawn with guard at BOTTOM. Moves straight up, returns straight down — no drift.
   const cx = 36;
-  // Path: starts at blade level (y=58), goes straight up then curves outward for the flick.
-  // Arrow sits directly at the path exit point so there is zero visual gap.
-  const path      = `<path d="M${cx},58 L${cx},20 C${cx},12 ${cx+6},7 ${cx+12},5" stroke="rgba(232,213,163,0.32)" stroke-width="1.8" fill="none" stroke-dasharray="3,4" stroke-linecap="round"/>`;
+  // Purely vertical path: M straight up to y=8, no curves.
+  const path      = `<path d="M${cx},58 L${cx},8" stroke="rgba(232,213,163,0.32)" stroke-width="1.8" fill="none" stroke-dasharray="3,4" stroke-linecap="round"/>`;
   const startDot  = `<circle cx="${cx}" cy="58" r="3.5" fill="rgba(232,213,163,0.55)"/>`;
-  // Arrow at exact path tip — angle matches the outward flick curve
-  const arrowHead = `<polyline points="${cx+6},10 ${cx+12},5 ${cx+16},12" fill="none" stroke="rgba(232,213,163,0.92)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
+  // Arrow pointing straight up, centered on the path at the top
+  const arrowHead = `<polyline points="${cx-5},16 ${cx},8 ${cx+5},16" fill="none" stroke="rgba(232,213,163,0.92)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
   // Clipper: body on top, guard bar immediately below body, teeth at very bottom (at blade/skin level).
   // This orientation places the blade (teeth) at the path start dot position.
   const baseY = 54; // bottom of guard bar = blade level, aligns with start dot at y=58 after teeth
