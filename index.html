@@ -3093,31 +3093,12 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubb
     };
   };
 
-  const clampPoint = (lineKey, pointKey, x, y) => {
-    let xFrac = x / W, yFrac = y / H;
-
-    yFrac = softSnap(yFrac);
-
-    // Hard bounds
-    xFrac = Math.max(0.01, Math.min(0.99, xFrac));
-    yFrac = Math.max(0.02, Math.min(0.96, yFrac));
-
-    // Top dot stays above bottom dot
-    const line = lines[lineKey];
-    if (pointKey === 'p1') yFrac = Math.min(yFrac, line.p0.y - 0.02);
-    else                   yFrac = Math.max(yFrac, line.p1.y + 0.02);
-
-    // Lines don't cross
-    const other = lineKey === 'sideburn' ? lines.rear : lines.sideburn;
-    if (side === 'left') {
-      if (lineKey === 'sideburn') xFrac = Math.max(xFrac, other[pointKey].x + 0.01);
-      else                        xFrac = Math.min(xFrac, other[pointKey].x - 0.01);
-    } else {
-      if (lineKey === 'sideburn') xFrac = Math.min(xFrac, other[pointKey].x - 0.01);
-      else                        xFrac = Math.max(xFrac, other[pointKey].x + 0.01);
-    }
-    return { x: xFrac, y: yFrac };
-  };
+  // Canvas-boundary clamping only — no hidden constraints, no auto-repositioning.
+  // The dot stays exactly where the user puts it.
+  const clampPoint = (_lk, _pk, x, y) => ({
+    x: Math.max(0.01, Math.min(0.99, x / W)),
+    y: Math.max(0.02, Math.min(0.96, y / H)),
+  });
 
   const findHandle = (x, y) => {
     let best = null, bestDist = Infinity;
