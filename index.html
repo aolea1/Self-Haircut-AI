@@ -1004,7 +1004,7 @@ body {
 .fade-step-panel {
   margin-top: 4px; padding: 16px;
   background: var(--surface2); border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 20px;
 }
 .fade-step-row {
   display: flex; gap: 10px; align-items: flex-start;
@@ -1021,18 +1021,18 @@ body {
 .fade-step-row.fade-step-mistake {
   background: rgba(255,95,61,0.08);
   border: 1px solid rgba(255,95,61,0.25);
-  border-radius: 8px; padding: 8px 10px; margin-top: 2px;
+  border-radius: 14px; padding: 8px 10px; margin-top: 2px;
 }
 .fade-step-row.fade-step-mistake strong { color: var(--red); }
 .fade-step-row.fade-step-stop {
   background: rgba(232,213,163,0.08);
   border: 1px solid rgba(232,213,163,0.2);
-  border-radius: 8px; padding: 8px 10px; margin-top: 2px;
+  border-radius: 14px; padding: 8px 10px; margin-top: 2px;
 }
 .fade-step-row.fade-step-stop strong { color: var(--accent); }
 .fade-finishing {
   margin-top: 10px; padding: 10px 12px;
-  background: var(--surface3); border-radius: 10px;
+  background: var(--surface3); border-radius: 16px;
 }
 .fade-finishing-title {
   font-size: 11.5px; font-weight: 700; color: var(--text2);
@@ -1051,7 +1051,7 @@ body {
 .fade-skip-link:hover { color: var(--text2); }
 .fade-review-card {
   padding: 12px; background: var(--surface2); border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 18px;
 }
 .fade-review-title { font-size: 12px; font-weight: 700; color: var(--text2); margin-bottom: 8px; }
 .fade-review-row {
@@ -1067,7 +1067,7 @@ body {
   display: flex; gap: 0;
   background: rgba(232,213,163,0.035);
   border: 1px solid rgba(232,213,163,0.14);
-  border-radius: 14px;
+  border-radius: 20px;
   margin-bottom: 14px;
   overflow: hidden;
   animation: coachCardIn 0.38s cubic-bezier(0.22,1,0.36,1) both;
@@ -1140,15 +1140,14 @@ body {
   100%  { transform: translateY(-24px) scale(1);    filter: none; }
 }
 
-/* Active step zone pulse — applied to .guide-img-wrap on fade plan steps */
+/* Active step zone pulse — warm gold glow around the canvas, breathing gently */
 @keyframes stepZonePulse {
-  0%,100% { box-shadow: 0 0 0 0 rgba(232,213,163,0), 0 0 0 1px rgba(232,213,163,0.08); }
-  50%     { box-shadow: 0 0 22px 3px rgba(232,213,163,0.22), 0 0 0 1px rgba(232,213,163,0.2); }
+  0%,100% { box-shadow: 0 0 0 1px rgba(232,213,163,0.10), 0 0 0 0 rgba(232,213,163,0); }
+  50%     { box-shadow: 0 0 0 1px rgba(232,213,163,0.28), 0 0 18px 6px rgba(232,213,163,0.14); }
 }
 .step-glow {
-  animation: stepZonePulse 2.6s ease-in-out infinite;
-  border-color: rgba(232,213,163,0.18) !important;
-  border-radius: 12px;
+  animation: stepZonePulse 3s ease-in-out infinite;
+  border-radius: 18px;
   overflow: hidden;
 }
 
@@ -1213,7 +1212,7 @@ body {
 .step-collapse-badge {
   display: none; align-items: center; gap: 10px; padding: 11px 14px;
   background: rgba(232,213,163,0.055); border: 1px solid rgba(232,213,163,0.16);
-  border-radius: 12px; cursor: pointer; user-select: none;
+  border-radius: 18px; cursor: pointer; user-select: none;
   transition: background 0.18s, border-color 0.18s;
   animation: stepDoneIn 0.3s cubic-bezier(0.22,1,0.36,1) both;
 }
@@ -3257,55 +3256,55 @@ const FADE_GUARDS = {
   skin: { s1: 'None', s2: 'None', s3: '#0.5', s4: '#1',   s5: '#1.5', s6: '#2' },
 };
 
-// 7-step taper content — realistic low-taper barber ladder.
+// 7-step taper content — concise barber-style cues.
 const FADE_STEP_TEXT_TAPER = [
-  { title: "Let's set your guideline.", lever: 'n/a', zoneLabel: 'Your bald line — everything builds from here',
-    goal: 'Trace one clean bald line where your taper starts.',
-    instructions: "Follow the highlighted line slowly with a bare blade. Stay right at this line and don't go above it — this is the foundation of your entire fade. Light, even pressure. One smooth pass from front to back.",
-    motion: 'Slow and controlled. Trace the line like you mean it.',
-    mistake: "Don't push above the guide. This pass is just about creating a clean starting line — everything else builds from here.",
-    stopWhen: 'One clean, even line all the way across. Once it looks good, stop — no need to go over it again.' },
-  { title: "Now let's soften that line.", lever: 'open', zoneLabel: 'Just above your bald line — open lever, no guard',
-    goal: 'Soften the harsh edge with light upward flicking.',
-    instructions: "Open the lever all the way and leave the guard off. Use gentle upward flicking motions in the highlighted area directly above your bald line. You're not cutting more — you're just softening the hard edge.",
-    motion: "Short, light upward flicks. The blade barely kisses the skin at the top of each flick.",
-    mistake: "Don't press hard or dig in. If the line is starting to blur into the skin, you're doing it right.",
-    stopWhen: 'The bald line starts to fade into the skin gradually — about half an inch of soft transition above it.' },
-  { title: "Good. Let's blend a little higher.", lever: 'open', zoneLabel: '0.5 guard — above the open-lever zone',
-    goal: 'Build the blend upward with a 0.5 guard.',
-    instructions: 'Snap on the 0.5 guard with the lever open. Start just above where you finished and use smooth upward flicks through the highlighted area. Your fade is starting to take shape.',
-    motion: 'Fluid upward flicks — rotate the clipper away from your head at the top of each stroke.',
-    mistake: "Don't go back into the bare-blade zone. Let that lower area settle and keep moving up.",
-    stopWhen: 'The 0.5 zone blends smoothly into what you did below it. No hard line between the two.' },
-  { title: "Now we build the main body.", lever: 'open', zoneLabel: '1 guard — the heart of your fade',
-    goal: 'Work the 1 guard through the core of your taper.',
-    instructions: "Switch to the 1 guard with the lever open. This is the main section of your taper — work through the highlighted zone with confident upward flicks. Your fade is really coming together now.",
-    motion: 'Smooth, overlapping upward strokes — flick out at the top of every pass.',
-    mistake: "Don't drop back down into the lower sections. Each guard builds cleanly on the one below it.",
-    stopWhen: 'The 1 guard section blends into the 0.5 zone below and the longer hair above. It should feel like one continuous fade.' },
-  { title: "Almost there — let's blend the top.", lever: 'open', zoneLabel: '1.5 guard — blending into your natural length',
-    goal: 'Smooth out the top of the fade into your longer hair.',
-    instructions: "Switch to the 1.5 guard with the lever open. Use light flicks through the top of your taper to blend into the natural hair above. Less is more here — a few passes is all you need.",
-    motion: 'Light flicking — less pressure as you move higher.',
-    mistake: "Too many passes here will push your fade too high. A couple of light passes is enough.",
-    stopWhen: 'There is a smooth, gradual transition from your fade into the longer hair above. No visible line.' },
-  { title: "Last blend — the finishing touch.", lever: 'open', zoneLabel: '2 guard — icing on the fade',
-    goal: 'One final light pass to polish the top edge.',
-    instructions: "Switch to the 2 guard with the lever open. Make one gentle flicking pass along the very top edge of your fade. This is just to soften the last bit of transition — think of it as the icing on the cake.",
-    motion: 'One or two light flicks. Barely touching the hair.',
-    mistake: "One pass is all you need. Don't keep going back over the same spot.",
-    stopWhen: 'Your fade looks smooth from skin all the way to full length. No hard lines anywhere.' },
-  { title: "One last blend pass before we finish.", lever: 'open', zoneLabel: 'Upper taper — soften the transition into your bulk',
-    goal: 'Remove extra weight from the top of the taper so the fade flows naturally into the longer hair.',
-    instructions: "Switch to a 1.5 or 2 guard with the lever fully open. Work through the very top of your taper with light, sweeping upward flicks. You're not creating a new fade section — you're just helping the blend breathe naturally into the bulk above it. Think of this as a dusting pass.",
-    motion: 'Gentle upward flicks. Barely touching the surface. One or two passes is all you need.',
-    mistake: "Don't go over this more than twice. Too many passes will push your fade too high and lose the shape you built. Less is more here.",
-    stopWhen: "The taper melts cleanly into the longer hair above — no dark ridge, no visible weight line at the top of the fade.",
+  { title: 'Set your guideline.', lever: 'n/a', zoneLabel: 'Bald line — your starting point',
+    goal: 'One clean pass along the highlighted line.',
+    instructions: 'Bare blade, lever off. Follow the line slowly from front to back. Light pressure — one smooth pass.',
+    motion: 'Slow and level. Trace it like a line.',
+    mistake: 'Stay on the line. Do not go above it.',
+    stopWhen: 'One clean, even line across.' },
+  { title: 'Soften the edge.', lever: 'open', zoneLabel: 'Just above the bald line — no guard, lever open',
+    goal: 'Blur the hard edge with short upward flicks.',
+    instructions: 'No guard, lever fully open. Flick upward through the zone just above your bald line.',
+    motion: 'Short, light upward flicks. Flick the clipper away at the top.',
+    mistake: 'Do not press hard. You are softening, not cutting more.',
+    stopWhen: 'The edge blurs gradually into the skin.' },
+  { title: 'Blend a little higher.', lever: 'open', zoneLabel: '½ guard, lever open',
+    goal: 'Build the blend upward.',
+    instructions: 'Snap on the ½ guard, lever open. Flick upward through the highlighted zone.',
+    motion: 'Fluid upward flicks. Rotate the clipper away at the top.',
+    mistake: 'Do not drop back into the bare-blade zone.',
+    stopWhen: 'No hard line between this and the zone below.' },
+  { title: 'Build the main body.', lever: 'open', zoneLabel: '1 guard, lever open',
+    goal: 'Work through the core of the taper.',
+    instructions: '1 guard, lever open. Confident upward flicks through the highlighted zone.',
+    motion: 'Smooth overlapping strokes. Flick out at the top of each pass.',
+    mistake: 'Do not go back down into lower zones.',
+    stopWhen: 'Blends into the ½ zone below and the longer hair above.' },
+  { title: 'Blend the top.', lever: 'open', zoneLabel: '1½ guard, lever open',
+    goal: 'Fade into your natural length.',
+    instructions: '1½ guard, lever open. A few light flicks through the top of the taper.',
+    motion: 'Light flicking. Less pressure as you move up.',
+    mistake: 'Two passes max. More will push the fade too high.',
+    stopWhen: 'Smooth transition into longer hair above. No visible line.' },
+  { title: 'Final blend.', lever: 'open', zoneLabel: '2 guard, lever open',
+    goal: 'Polish the top edge.',
+    instructions: '2 guard, lever open. One or two gentle flicks along the very top edge.',
+    motion: 'Barely touching the hair.',
+    mistake: 'One pass is enough.',
+    stopWhen: 'Smooth from skin to full length. No hard lines.' },
+  { title: 'Finishing pass.', lever: 'open', zoneLabel: 'Upper taper — dust the transition',
+    goal: 'Soften the top of the taper into your bulk.',
+    instructions: '1½ or 2 guard, lever open. One or two light dusting flicks at the very top.',
+    motion: 'Gentle upward flicks. Barely grazing.',
+    mistake: 'Two passes max. More will lose the shape.',
+    stopWhen: 'Taper melts into longer hair. No weight line.',
     finishingTouches: [
-      { label: 'Still see a weight line?', desc: 'One light flick with the 1.5 guard open, right at that line only. Do not press — just graze the surface.' },
-      { label: 'Around the ear', desc: 'Clean up any stray hairs around your ear for a sharp, finished look.' },
-      { label: 'Sideburns', desc: 'Even out your sideburns so both sides match.' },
-      { label: 'Neckline', desc: 'Clean your neckline — straight or rounded, whichever you prefer.' },
+      { label: 'Weight line still visible?', desc: 'One light flick with 1½ guard at that line only.' },
+      { label: 'Around the ear', desc: 'Clean up stray hairs around the ear.' },
+      { label: 'Sideburns', desc: 'Even out both sides.' },
+      { label: 'Neckline', desc: 'Clean your neckline — straight or rounded.' },
     ] },
 ];
 
