@@ -2919,20 +2919,14 @@ function drawTaperShapeOverlay(ctx, W, H, lines) {
 
   const drawHandle = (p, lk, pk) => {
     const on = isOn(lk, pk);
-    const R  = on ? 11 : 9;
+    const R  = 9; // consistent size — active state shown via glow only, not size jump
 
     if (on) {
-      // Outermost halo ring
+      // Soft gold halo — subtle, premium, not distracting
       ctx.save();
-      ctx.strokeStyle = 'rgba(232,213,163,0.18)'; ctx.lineWidth = 1;
-      ctx.shadowColor = 'rgba(232,213,163,0.5)';  ctx.shadowBlur = 22;
-      ctx.beginPath(); ctx.arc(p.x, p.y, R + 13, 0, Math.PI * 2); ctx.stroke();
-      ctx.restore();
-      // Mid ring
-      ctx.save();
-      ctx.strokeStyle = 'rgba(232,213,163,0.55)'; ctx.lineWidth = 1.5;
-      ctx.shadowColor = 'rgba(232,213,163,0.85)'; ctx.shadowBlur = 10;
-      ctx.beginPath(); ctx.arc(p.x, p.y, R + 5, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = 'rgba(232,213,163,0.28)'; ctx.lineWidth = 1.2;
+      ctx.shadowColor = 'rgba(232,213,163,0.55)'; ctx.shadowBlur = 18;
+      ctx.beginPath(); ctx.arc(p.x, p.y, R + 7, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     } else if (!active) {
       // Idle: gentle breathing halo driven by phase
@@ -3036,9 +3030,12 @@ function updateZoomBubble(bubble, bubbleCanvas, img, lines, W, H, active, finger
   bctx.beginPath(); bctx.arc(cx, cy, 2.5, 0, Math.PI * 2); bctx.fill();
   bctx.restore();
 
-  // Position bubble above finger, centered horizontally
-  bubble.style.left = fingerCSS.x + 'px';
-  bubble.style.top  = fingerCSS.y + 'px';
+  // Lerp bubble position so it glides rather than snapping to each finger movement
+  const BUBBLE_LERP = 0.22;
+  const curLeft = parseFloat(bubble.style.left) || fingerCSS.x;
+  const curTop  = parseFloat(bubble.style.top)  || fingerCSS.y;
+  bubble.style.left    = (curLeft + (fingerCSS.x - curLeft) * BUBBLE_LERP) + 'px';
+  bubble.style.top     = (curTop  + (fingerCSS.y - curTop)  * BUBBLE_LERP) + 'px';
   bubble.style.display = 'block';
 }
 
@@ -3173,11 +3170,21 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubb
     if (!dragging) return;
     const pt = toCanvas(clientX, clientY);
     const adjustedY = pt.y - (isTouch ? FINGER_OFFSET_CSS * pt.scaleY : 0);
-    // Compute clamped target; smooth loop will lerp toward it each frame.
-    _dragTarget = clampPoint(dragging.lineKey, dragging.pointKey, pt.x, adjustedY);
-    lines._fingerOffsetY = isTouch ? FINGER_OFFSET_CSS * pt.scaleY : 0;
     fingerCSS = { x: pt.cssX, y: pt.cssY };
-    if (!_smoothRunning) { _smoothRunning = true; requestAnimationFrame(_smoothStep); }
+    lines._fingerOffsetY = isTouch ? FINGER_OFFSET_CSS * pt.scaleY : 0;
+
+    if (dragging.pointKey === 'p0') {
+      // Bottom bald-line: no smoothing — both p0 points update instantly and stay perfectly level.
+      const clamped = clampPoint(dragging.lineKey, 'p0', pt.x, adjustedY);
+      const otherKey = dragging.lineKey === 'sideburn' ? 'rear' : 'sideburn';
+      lines[dragging.lineKey].p0 = { x: clamped.x, y: clamped.y };
+      lines[otherKey].p0         = { x: lines[otherKey].p0.x, y: clamped.y }; // lock Y
+      scheduleRedraw();
+    } else {
+      // Top taper points: smooth lerp toward target for premium glide feel.
+      _dragTarget = clampPoint(dragging.lineKey, dragging.pointKey, pt.x, adjustedY);
+      if (!_smoothRunning) { _smoothRunning = true; requestAnimationFrame(_smoothStep); }
+    }
   };
 
   const onEnd = () => {
