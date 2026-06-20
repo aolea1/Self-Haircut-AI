@@ -2980,8 +2980,8 @@ function drawTaperShapeOverlay(ctx, W, H, lines) {
     ctx.restore();
   };
 
-  drawSegment(sb0, sb1, 'sideburn', 'Sideburn');
-  drawSegment(rr0, rr1, 'rear',     'Near top of ear');
+  drawSegment(sb0, sb1, 'sideburn', 'Near top of ear');
+  drawSegment(rr0, rr1, 'rear',     'Sideburn');
 
   ctx.restore();
 }
@@ -3055,16 +3055,9 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubb
   const HIT_R             = 80;  // very generous touch radius — grab a dot from anywhere nearby
   const FINGER_OFFSET_CSS = 28;  // slight lift above finger (no magnifier, so minimal offset)
 
-  // Magnetic snap zones at common taper heights. Wider pull + stronger center.
-  const SNAP_Y   = [0.22, 0.30, 0.38, 0.46, 0.55, 0.64];
-  const SNAP_STR = 0.030; // pull radius (fraction of height)
-  const softSnap = (val, zones) => {
-    for (const z of zones) {
-      const d = val - z;
-      if (Math.abs(d) < SNAP_STR) return z + d * 0.18; // strong elastic pull
-    }
-    return val;
-  };
+  // No snapping — pure, consistent dragging everywhere.
+  // Snapping was creating invisible resistance zones that made movement feel uneven.
+  const softSnap = (val) => val;
 
   const toCanvas = (clientX, clientY) => {
     const r = canvas.getBoundingClientRect();
@@ -3080,8 +3073,7 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubb
   const clampPoint = (lineKey, pointKey, x, y) => {
     let xFrac = x / W, yFrac = y / H;
 
-    // Apply gentle snap on Y
-    yFrac = softSnap(yFrac, SNAP_Y);
+    yFrac = softSnap(yFrac);
 
     // Hard bounds
     xFrac = Math.max(0.01, Math.min(0.99, xFrac));
