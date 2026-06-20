@@ -717,18 +717,19 @@ body {
 #cropTipChevron{font-size:11px;color:rgba(232,213,163,0.45);
   transition:transform 0.28s cubic-bezier(0.22,1,0.36,1);line-height:1;}
 #cropTipBody{overflow:hidden;max-height:0;
-  transition:max-height 0.52s cubic-bezier(0.22,1,0.36,1);}
-#cropTip.tip-open #cropTipBody{max-height:520px;}
+  transition:max-height 0.60s cubic-bezier(0.22,1,0.36,1);}
+#cropTip.tip-open #cropTipBody{max-height:560px;}
 #cropTip.tip-open #cropTipChevron{transform:rotate(180deg);}
-/* Inner content fades + slides in after the container opens,
-   and fades out before the container closes — no snap or jump. */
+/* Inner content: fade + rise in after container starts opening (0.16s delay),
+   fade + fall out before container closes (0 delay so it exits first). */
 #cropTipInner{
   display:flex;flex-direction:column;gap:10px;padding:12px 14px 14px;
-  opacity:0;transform:translateY(10px);
-  transition:opacity 0.32s ease 0.14s, transform 0.36s cubic-bezier(0.22,1,0.36,1) 0.10s;
+  opacity:0;transform:translateY(12px);
+  transition:opacity 0.34s ease 0.16s, transform 0.40s cubic-bezier(0.22,1,0.36,1) 0.12s;
 }
 #cropTip.tip-open #cropTipInner{
   opacity:1;transform:translateY(0);
+  transition:opacity 0.34s ease 0.16s, transform 0.40s cubic-bezier(0.22,1,0.36,1) 0.12s;
 }
 #cropTipCoachText{
   font-size:13.5px;font-weight:600;line-height:1.5;
@@ -3043,20 +3044,24 @@ function updateZoomBubble(bubble, bubbleCanvas, img, lines, W, H, active, finger
 // zoom bubble, and soft magnetic snapping near common taper positions.
 // side: 'left' = face right (sideburn.x > rear.x), 'right' = face left (sideburn.x < rear.x)
 function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubbleCanvas, img) {
-  let dragging    = null;
-  let isTouch     = false;
-  let rafPending  = false;
-  let fingerCSS   = null;
-  const HIT_R = 52; // large touch target radius in canvas-internal pixels
-  const FINGER_OFFSET_CSS = 46; // px above finger where dot appears (touch only)
+  let dragging        = null;
+  let isTouch         = false;
+  let rafPending      = false;
+  let fingerCSS       = null;
+  // Smoothing state: onMove sets _dragTarget; _smoothRaf lerps toward it each frame
+  let _dragTarget     = null;
+  let _smoothRunning  = false;
 
-  // Gentle snap zones: common taper heights and edges. Strength = pull radius.
-  const SNAP_Y   = [0.25, 0.35, 0.45, 0.55, 0.65];
-  const SNAP_STR = 0.022;
+  const HIT_R             = 68;  // invisible touch radius — generous, never fight to grab a dot
+  const FINGER_OFFSET_CSS = 58;  // px above finger where dot appears (touch only)
+
+  // Magnetic snap zones at common taper heights. Wider pull + stronger center.
+  const SNAP_Y   = [0.22, 0.30, 0.38, 0.46, 0.55, 0.64];
+  const SNAP_STR = 0.030; // pull radius (fraction of height)
   const softSnap = (val, zones) => {
     for (const z of zones) {
       const d = val - z;
-      if (Math.abs(d) < SNAP_STR) return z + d * 0.25; // elastic pull toward zone
+      if (Math.abs(d) < SNAP_STR) return z + d * 0.18; // strong elastic pull
     }
     return val;
   };
@@ -3137,24 +3142,51 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubb
     scheduleRedraw();
   };
 
+  // Smoothing loop — lerps the stored position toward _dragTarget each frame.
+  // LERP = 0.30: reaches 95% of the way in ~9 frames (~150ms at 60fps).
+  // This makes points glide into place rather than instantly snapping to every
+  // micro-movement of the finger, giving a premium, controlled feel.
+  const LERP = 0.30;
+  const _smoothStep = () => {
+    if (!dragging || !_dragTarget) { _smoothRunning = false; return; }
+    const cur = lines[dragging.lineKey][dragging.pointKey];
+    const nx = cur.x + (_dragTarget.x - cur.x) * LERP;
+    const ny = cur.y + (_dragTarget.y - cur.y) * LERP;
+    lines[dragging.lineKey][dragging.pointKey] = { x: nx, y: ny };
+    // Keep bald line horizontal — mirror Y to the other p0.
+    if (dragging.pointKey === 'p0') {
+      const otherKey = dragging.lineKey === 'sideburn' ? 'rear' : 'sideburn';
+      lines[otherKey].p0 = { ...lines[otherKey].p0, y: ny };
+    }
+    redraw();
+    const showBubble = dragging.pointKey === 'p1' ? dragging : null;
+    updateZoomBubble(bubble, bubbleCanvas, img, lines, W, H, showBubble, fingerCSS);
+    requestAnimationFrame(_smoothStep);
+  };
+
   const onMove = (clientX, clientY) => {
     if (!dragging) return;
     const pt = toCanvas(clientX, clientY);
-    // Apply upward offset so the stored position (and thus the dot) appears above the finger
     const adjustedY = pt.y - (isTouch ? FINGER_OFFSET_CSS * pt.scaleY : 0);
-    lines[dragging.lineKey][dragging.pointKey] = clampPoint(dragging.lineKey, dragging.pointKey, pt.x, adjustedY);
-    // p0 (bottom/bald-line) points stay at the same Y so the bald line stays horizontal.
-    if (dragging.pointKey === 'p0') {
-      const otherKey = dragging.lineKey === 'sideburn' ? 'rear' : 'sideburn';
-      lines[otherKey].p0 = { ...lines[otherKey].p0, y: lines[dragging.lineKey].p0.y };
-    }
+    // Compute clamped target; smooth loop will lerp toward it each frame.
+    _dragTarget = clampPoint(dragging.lineKey, dragging.pointKey, pt.x, adjustedY);
     lines._fingerOffsetY = isTouch ? FINGER_OFFSET_CSS * pt.scaleY : 0;
     fingerCSS = { x: pt.cssX, y: pt.cssY };
-    scheduleRedraw();
+    if (!_smoothRunning) { _smoothRunning = true; requestAnimationFrame(_smoothStep); }
   };
 
   const onEnd = () => {
     if (!dragging) return;
+    // Snap to final target so position is exact on release.
+    if (_dragTarget) {
+      lines[dragging.lineKey][dragging.pointKey] = { ..._dragTarget };
+      if (dragging.pointKey === 'p0') {
+        const otherKey = dragging.lineKey === 'sideburn' ? 'rear' : 'sideburn';
+        lines[otherKey].p0 = { ...lines[otherKey].p0, y: _dragTarget.y };
+      }
+    }
+    _dragTarget          = null;
+    _smoothRunning       = false;
     dragging             = null;
     lines._active        = null;
     lines._fingerOffsetY = 0;
