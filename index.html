@@ -3651,7 +3651,7 @@ function drawStepOverlay(ctx, W, H, step, guideLine, offset) {
   } else if (zone.type === 'band') {
     let topY = (zone.topFrac + off.y) * H, botY = (zone.bottomFrac + off.y) * H;
     let startX = (zone.startXFrac + off.x) * W, endX = (zone.endXFrac + off.x) * W;
-    let flickLabel = '↑ flick out here';
+    let flickLabel = '↑ Flick Out Here';
 
     if (step.adaptive) {
       // Dim the full touch-up band, then narrow to just the rough sub-area
@@ -3660,7 +3660,7 @@ function drawStepOverlay(ctx, W, H, step, guideLine, offset) {
       ctx.fillRect(startX, topY, endX - startX, botY - topY); ctx.restore();
       const sub = findUnevenSubzone(ctx, { topY, botY, startX, endX }, W, H);
       if (sub) { topY = sub.topY; botY = sub.botY; startX = sub.startX; endX = sub.endX; }
-      flickLabel = '✓ touch up here';
+      flickLabel = '✓ Touch Up Here';
     }
 
     // Reference line — where the marked-ear guideline sits
@@ -3692,17 +3692,17 @@ function drawStepOverlay(ctx, W, H, step, guideLine, offset) {
     ctx.moveTo(arrowX, arrowTop); ctx.lineTo(arrowX - 7, arrowTop + 14); ctx.lineTo(arrowX + 7, arrowTop + 14); ctx.closePath(); ctx.fill();
     ctx.restore();
 
-    // "flick out here" label — centered below arrow tip
-    ctx.save(); ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = GOLD;
+    // "Flick Out Here" label — centered below arrow tip, large and bold
+    ctx.save(); ctx.font = 'bold 15px sans-serif'; ctx.fillStyle = GOLD;
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.shadowColor = 'rgba(0,0,0,0.95)'; ctx.shadowBlur = 8;
+    ctx.shadowColor = 'rgba(0,0,0,1)'; ctx.shadowBlur = 10;
     ctx.fillText(flickLabel, arrowX, arrowTop + 18);
     ctx.restore();
 
   } else if (zone.type === 'quad') {
     const pts = zone.points.map(p => ({ x: (p.x + off.x) * W, y: (p.y + off.y) * H }));
     let highlightPts = pts;
-    let flickLabel = '↑ flick out here';
+    let flickLabel = '↑ Flick Out Here';
 
     if (step.adaptive) {
       // Dim the full taper section, then narrow to just the rough sub-area
@@ -3715,7 +3715,7 @@ function drawStepOverlay(ctx, W, H, step, guideLine, offset) {
       const sub = findUnevenSubzone(ctx, { topY: bbTopY, botY: bbBotY, startX: bbStartX, endX: bbEndX }, W, H);
       if (sub) {
         highlightPts = [{ x: sub.startX, y: sub.topY }, { x: sub.endX, y: sub.topY }, { x: sub.endX, y: sub.botY }, { x: sub.startX, y: sub.botY }];
-        flickLabel = '✓ touch up here';
+        flickLabel = '✓ Touch Up Here';
       }
     }
 
@@ -3787,10 +3787,10 @@ function drawStepOverlay(ctx, W, H, step, guideLine, offset) {
     ctx.moveTo(arrowX, arrowTop); ctx.lineTo(arrowX - 7, arrowTop + 14); ctx.lineTo(arrowX + 7, arrowTop + 14); ctx.closePath(); ctx.fill();
     ctx.restore();
 
-    // "flick out here" label — centered below arrow tip
-    ctx.save(); ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = GOLD;
+    // "Flick Out Here" label — centered below arrow tip, large and bold
+    ctx.save(); ctx.font = 'bold 15px sans-serif'; ctx.fillStyle = GOLD;
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.shadowColor = 'rgba(0,0,0,0.95)'; ctx.shadowBlur = 8;
+    ctx.shadowColor = 'rgba(0,0,0,1)'; ctx.shadowBlur = 10;
     ctx.fillText(flickLabel, arrowX, arrowTop + 18);
     ctx.restore();
 
@@ -4458,8 +4458,8 @@ function showNeedHelp(btn, stepIndex) {
   panel.innerHTML = `<div class="need-help-label">Common questions</div>
     <div class="need-help-items">
       ${NEED_HELP_QA.map((item, qi) => `
-        <div class="need-help-item" id="nhItem_${qi}">
-          <button class="need-help-item-q" onclick="toggleNeedHelp(${qi})">
+        <div class="need-help-item">
+          <button class="need-help-item-q" onclick="toggleNeedHelp(this)">
             <span>${item.q}</span>
             <span class="need-help-item-chevron">▾</span>
           </button>
@@ -4472,8 +4472,8 @@ function showNeedHelp(btn, stepIndex) {
   scrollToMsg(panel);
 }
 
-function toggleNeedHelp(qi) {
-  const item = document.getElementById('nhItem_' + qi);
+function toggleNeedHelp(btn) {
+  const item = btn.closest('.need-help-item');
   if (!item) return;
   item.classList.toggle('open');
 }
@@ -5201,7 +5201,7 @@ if ('serviceWorker' in navigator) {
     </div>
     <div id="cropTip">
       <div id="cropTipToggle" onclick="this.closest('#cropTip').classList.toggle('tip-open')">
-        <span id="cropTipLabel">✨ Example Crop</span>
+        <span id="cropTipLabel">Example Crop</span>
         <span id="cropTipChevron">▾</span>
       </div>
       <div id="cropTipBody">
