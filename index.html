@@ -1639,8 +1639,22 @@ function showMessages() {
   if (!started) {
     started = true;
     messagesWrap.classList.add('visible');
+    // Dedicated sinusoidal ease for the Upload Photo reveal: zero velocity at both
+    // start and end so the page eases in and settles with no perceptible stopping point.
     setTimeout(() => {
-      _easedScroll(chatArea, messagesWrap.offsetTop - 20, 1800);
+      if (_scrollRaf) cancelAnimationFrame(_scrollRaf);
+      const start = chatArea.scrollTop;
+      const dist  = (messagesWrap.offsetTop - 20) - start;
+      const t0    = performance.now();
+      const dur   = 2200;
+      const ease  = t => -(Math.cos(Math.PI * t) - 1) / 2;
+      const step  = now => {
+        const p = Math.min((now - t0) / dur, 1);
+        chatArea.scrollTop = start + dist * ease(p);
+        if (p < 1) _scrollRaf = requestAnimationFrame(step);
+        else _scrollRaf = null;
+      };
+      _scrollRaf = requestAnimationFrame(step);
     }, 30);
   }
 }
