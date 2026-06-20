@@ -2919,7 +2919,7 @@ function drawTaperShapeOverlay(ctx, W, H, lines) {
 
   const drawHandle = (p, lk, pk) => {
     const on = isOn(lk, pk);
-    const R  = 9; // consistent size — active state shown via glow only, not size jump
+    const R  = on ? 13 : 11; // larger on mobile for easy grabbing; subtle size lift when active
 
     if (on) {
       // Soft gold halo — subtle, premium, not distracting
@@ -3052,8 +3052,8 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubb
   let _dragTarget     = null;
   let _smoothRunning  = false;
 
-  const HIT_R             = 68;  // invisible touch radius — generous, never fight to grab a dot
-  const FINGER_OFFSET_CSS = 58;  // px above finger where dot appears (touch only)
+  const HIT_R             = 80;  // very generous touch radius — grab a dot from anywhere nearby
+  const FINGER_OFFSET_CSS = 28;  // slight lift above finger (no magnifier, so minimal offset)
 
   // Magnetic snap zones at common taper heights. Wider pull + stronger center.
   const SNAP_Y   = [0.22, 0.30, 0.38, 0.46, 0.55, 0.64];
@@ -3123,10 +3123,6 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubb
     requestAnimationFrame(() => {
       rafPending = false;
       redraw();
-      // p0 = bottom bald-line handles: no magnifier needed, just smooth dragging.
-      // p1 = top taper points: show magnifier for precision placement.
-      const showBubble = dragging && dragging.pointKey === 'p1' ? dragging : null;
-      updateZoomBubble(bubble, bubbleCanvas, img, lines, W, H, showBubble, fingerCSS);
     });
   };
 
@@ -3159,10 +3155,6 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubb
       lines[otherKey].p0 = { ...lines[otherKey].p0, y: ny };
     }
     redraw();
-    // Pass _dragTarget as viewPoint so magnifier centres on where the finger IS,
-    // not the lagged smoothed position — eliminates the confusing view offset.
-    const showBubble = dragging.pointKey === 'p1' ? dragging : null;
-    updateZoomBubble(bubble, bubbleCanvas, img, lines, W, H, showBubble, fingerCSS, _dragTarget);
     requestAnimationFrame(_smoothStep);
   };
 
@@ -3246,11 +3238,7 @@ async function startTaperShaping() {
     rear:     { p0: { x: reX, y: botY }, p1: { x: reX, y: topY } },
   };
 
-  // Zoom bubble — a circular magnified overlay that appears above the finger while dragging
-  const bubble       = document.createElement('div');
-  bubble.className   = 'taper-zoom-bubble';
-  const bubbleCanvas = document.createElement('canvas');
-  bubble.appendChild(bubbleCanvas);
+  // Magnifier removed — interaction relies on larger dots + generous touch targets instead.
 
   lines._glowPhase = 0;
   let _idleRaf = null;
@@ -3277,7 +3265,7 @@ async function startTaperShaping() {
 
   redraw();
   startIdleAnim();
-  makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubbleCanvas, img);
+  makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, null, null, img);
 
   const msg = document.createElement('div');
   msg.className = 'msg';
@@ -3292,7 +3280,6 @@ async function startTaperShaping() {
   canvas.style.width = '100%';
   const wrap = msg.querySelector('.guide-img-wrap');
   wrap.appendChild(canvas);
-  wrap.appendChild(bubble);
   msg._taperLines = lines;
   msg._taperCanvas = canvas;
 
