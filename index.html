@@ -935,20 +935,20 @@ body {
 .guide-img-wrap canvas { width: 100%; display: block; cursor: ns-resize; touch-action: none; }
 .taper-zoom-bubble {
   position: absolute;
-  width: 160px; height: 160px;
-  border-radius: 50%;
-  border: 2.5px solid rgba(232,213,163,0.88);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.75), 0 0 0 1px rgba(0,0,0,0.5),
-              0 0 16px 2px rgba(232,213,163,0.18);
+  width: 120px; height: 120px;
+  border-radius: 16px;
+  border: 1.5px solid rgba(232,213,163,0.70);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.70), 0 0 0 1px rgba(0,0,0,0.4),
+              0 0 10px 1px rgba(232,213,163,0.14);
   pointer-events: none;
   display: none;
   z-index: 20;
   overflow: hidden;
-  /* Offset upper-left so it never covers the finger */
-  transform: translate(calc(-50% - 40px), calc(-100% - 28px));
+  /* Float above-left of the finger — stays clear of the active point */
+  transform: translate(calc(-100% - 16px), calc(-100% - 16px));
   background: #0d0d0b;
 }
-.taper-zoom-bubble canvas { width: 160px; height: 160px; display: block; }
+.taper-zoom-bubble canvas { width: 120px; height: 120px; display: block; }
 
 .drag-hint {
   text-align: center; font-size: 11px; color: var(--text3);
@@ -2919,14 +2919,14 @@ function drawTaperShapeOverlay(ctx, W, H, lines) {
 
   const drawHandle = (p, lk, pk) => {
     const on = isOn(lk, pk);
-    const R  = on ? 13 : 11; // larger on mobile for easy grabbing; subtle size lift when active
+    const R  = on ? 13 : 11;
 
     if (on) {
-      // Soft gold halo — subtle, premium, not distracting
+      // Outer halo glow — warm gold, clearly visible but not harsh
       ctx.save();
-      ctx.strokeStyle = 'rgba(232,213,163,0.28)'; ctx.lineWidth = 1.2;
-      ctx.shadowColor = 'rgba(232,213,163,0.55)'; ctx.shadowBlur = 18;
-      ctx.beginPath(); ctx.arc(p.x, p.y, R + 7, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = 'rgba(232,213,163,0.35)'; ctx.lineWidth = 1.5;
+      ctx.shadowColor = 'rgba(232,213,163,0.65)'; ctx.shadowBlur = 20;
+      ctx.beginPath(); ctx.arc(p.x, p.y, R + 8, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     } else if (!active) {
       // Idle: gentle breathing halo driven by phase
@@ -2992,8 +2992,8 @@ function drawTaperShapeOverlay(ctx, W, H, lines) {
 function updateZoomBubble(bubble, bubbleCanvas, img, lines, W, H, active, fingerCSS, viewPoint) {
   if (!active || !fingerCSS) { bubble.style.display = 'none'; return; }
 
-  const BUBBLE_PX = 160; // matches CSS width/height
-  const ZOOM      = 3.5; // slightly less than before — more context, less disorienting
+  const BUBBLE_PX = 120; // matches CSS width/height — compact, professional
+  const ZOOM      = 3.8; // sharp zoom in a smaller window
   // Use the passed viewPoint if available (finger target), otherwise fall back to stored point.
   const p         = viewPoint || lines[active.lineKey][active.pointKey];
 
@@ -3013,19 +3013,19 @@ function updateZoomBubble(bubble, bubbleCanvas, img, lines, W, H, active, finger
   bctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, BUBBLE_PX, BUBBLE_PX);
   bctx.restore();
 
-  // Reticle crosshair — full-span lines with a gap around center for clarity
+  // Clean reticle: short arms with center gap + bright center dot
   const cx = BUBBLE_PX / 2, cy = BUBBLE_PX / 2;
-  const GAP = 10, R = BUBBLE_PX / 2 - 4;
+  const ARM = 18, GAP = 7;
   bctx.save();
-  bctx.strokeStyle = 'rgba(0,0,0,0.55)'; bctx.lineWidth = 3; // shadow
-  [[cx-R,cy,cx-GAP,cy],[cx+GAP,cy,cx+R,cy],[cx,cy-R,cx,cy-GAP],[cx,cy+GAP,cx,cy+R]]
+  // Dark shadow layer for contrast on any photo
+  bctx.strokeStyle = 'rgba(0,0,0,0.6)'; bctx.lineWidth = 2.5;
+  [[cx-ARM,cy,cx-GAP,cy],[cx+GAP,cy,cx+ARM,cy],[cx,cy-ARM,cx,cy-GAP],[cx,cy+GAP,cx,cy+ARM]]
     .forEach(([x1,y1,x2,y2]) => { bctx.beginPath(); bctx.moveTo(x1,y1); bctx.lineTo(x2,y2); bctx.stroke(); });
-  bctx.strokeStyle = 'rgba(232,213,163,0.95)'; bctx.lineWidth = 1.5; // gold
-  [[cx-R,cy,cx-GAP,cy],[cx+GAP,cy,cx+R,cy],[cx,cy-R,cx,cy-GAP],[cx,cy+GAP,cx,cy+R]]
+  // Gold crosshair
+  bctx.strokeStyle = 'rgba(232,213,163,1)'; bctx.lineWidth = 1.2;
+  [[cx-ARM,cy,cx-GAP,cy],[cx+GAP,cy,cx+ARM,cy],[cx,cy-ARM,cx,cy-GAP],[cx,cy+GAP,cx,cy+ARM]]
     .forEach(([x1,y1,x2,y2]) => { bctx.beginPath(); bctx.moveTo(x1,y1); bctx.lineTo(x2,y2); bctx.stroke(); });
-  // Center target — outer ring + bright dot
-  bctx.strokeStyle = 'rgba(232,213,163,0.7)'; bctx.lineWidth = 1.2;
-  bctx.beginPath(); bctx.arc(cx, cy, 6, 0, Math.PI * 2); bctx.stroke();
+  // Center dot
   bctx.fillStyle = '#fffceb';
   bctx.beginPath(); bctx.arc(cx, cy, 2.5, 0, Math.PI * 2); bctx.fill();
   bctx.restore();
@@ -3115,6 +3115,7 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubb
     requestAnimationFrame(() => {
       rafPending = false;
       redraw();
+      if (bubble) bubble.style.display = 'none';
     });
   };
 
@@ -3147,6 +3148,8 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubb
       lines[otherKey].p0 = { ...lines[otherKey].p0, y: ny };
     }
     redraw();
+    if (dragging.pointKey === 'p1')
+      updateZoomBubble(bubble, bubbleCanvas, img, lines, W, H, dragging, fingerCSS, _dragTarget);
     requestAnimationFrame(_smoothStep);
   };
 
@@ -3190,6 +3193,7 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubb
     lines._active        = null;
     lines._fingerOffsetY = 0;
     fingerCSS            = null;
+    if (bubble) bubble.style.display = 'none';
     scheduleRedraw();
     if (lines._startIdleAnim) lines._startIdleAnim();
   };
@@ -3230,7 +3234,11 @@ async function startTaperShaping() {
     rear:     { p0: { x: reX, y: botY }, p1: { x: reX, y: topY } },
   };
 
-  // Magnifier removed — interaction relies on larger dots + generous touch targets instead.
+  // Compact precision magnifier — shown only when dragging p1 (top taper points).
+  const bubble       = document.createElement('div');
+  bubble.className   = 'taper-zoom-bubble';
+  const bubbleCanvas = document.createElement('canvas');
+  bubble.appendChild(bubbleCanvas);
 
   lines._glowPhase = 0;
   let _idleRaf = null;
@@ -3257,7 +3265,7 @@ async function startTaperShaping() {
 
   redraw();
   startIdleAnim();
-  makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, null, null, img);
+  makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubbleCanvas, img);
 
   const msg = document.createElement('div');
   msg.className = 'msg';
@@ -3272,6 +3280,7 @@ async function startTaperShaping() {
   canvas.style.width = '100%';
   const wrap = msg.querySelector('.guide-img-wrap');
   wrap.appendChild(canvas);
+  wrap.appendChild(bubble);
   msg._taperLines = lines;
   msg._taperCanvas = canvas;
 
