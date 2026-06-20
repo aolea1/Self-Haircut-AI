@@ -717,18 +717,18 @@ body {
 #cropTipChevron{font-size:11px;color:rgba(232,213,163,0.45);
   transition:transform 0.28s cubic-bezier(0.22,1,0.36,1);line-height:1;}
 #cropTipBody{overflow:hidden;max-height:0;
-  transition:max-height 0.65s cubic-bezier(0.22,1,0.36,1);}
+  transition:max-height 0.55s ease-in-out;}
 #cropTip.tip-open #cropTipBody{max-height:560px;}
 #cropTip.tip-open #cropTipChevron{transform:rotate(180deg);}
-/* Inner content glides in after container starts; exits before container closes */
+/* Content glides in after container starts opening; exits before container closes */
 #cropTipInner{
   display:flex;flex-direction:column;gap:10px;padding:12px 14px 14px;
-  opacity:0;transform:translateY(10px);
-  transition:opacity 0.28s ease 0.16s, transform 0.34s cubic-bezier(0.22,1,0.36,1) 0.12s;
+  opacity:0;transform:translateY(8px);
+  transition:opacity 0.25s ease 0.14s, transform 0.30s ease-out 0.10s;
 }
 #cropTip.tip-open #cropTipInner{
   opacity:1;transform:translateY(0);
-  transition:opacity 0.28s ease 0.16s, transform 0.34s cubic-bezier(0.22,1,0.36,1) 0.12s;
+  transition:opacity 0.25s ease 0.14s, transform 0.30s ease-out 0.10s;
 }
 #cropTipCoachText{
   font-size:13.5px;font-weight:600;line-height:1.5;
@@ -1617,29 +1617,30 @@ function _easedScroll(container, targetTop, duration) {
   _scrollRaf = requestAnimationFrame(step);
 }
 
-// Minor appends (typing indicator, message added) — fast and responsive.
+// Chat appends — fast and responsive, barely noticed.
 function scrollBottom(force) {
   if (force || !userScrolledUp) {
-    requestAnimationFrame(() => { _easedScroll(chatArea, chatArea.scrollHeight, 700); });
+    requestAnimationFrame(() => { _easedScroll(chatArea, chatArea.scrollHeight, 550); });
   }
 }
 
-// Major transitions (new step, new section) — smooth, guided, not rushed.
+// Major content transitions (new step, coaching card, need-help panel).
+// Noticeably smoother than scrollBottom — user feels guided to the new section.
 function scrollToMsg(el) {
   requestAnimationFrame(() => requestAnimationFrame(() => {
     const chatRect = chatArea.getBoundingClientRect();
     const elTop    = el.getBoundingClientRect().top - chatRect.top + chatArea.scrollTop;
-    _easedScroll(chatArea, elTop - 32, 1100);
+    _easedScroll(chatArea, elTop - 32, 950);
   }));
 }
 
-// ── SHOW CHAT ──
+// First reveal after Upload Photo / Take Photo — polished, unhurried entrance.
 function showMessages() {
   if (!started) {
     started = true;
     messagesWrap.classList.add('visible');
     setTimeout(() => {
-      _easedScroll(chatArea, messagesWrap.offsetTop - 20, 950);
+      _easedScroll(chatArea, messagesWrap.offsetTop - 20, 1100);
     }, 30);
   }
 }
@@ -2911,7 +2912,10 @@ function drawTaperShapeOverlay(ctx, W, H, lines) {
   ctx.restore();
 
   // ── Layer 4: handles & segment lines ──
-  const isOn = (lk, pk) => active && active.lineKey === lk && active.pointKey === pk;
+  // When dragging p0 (bald line), both p0 handles are active — they move as one unit.
+  const isOn = (lk, pk) =>
+    active && active.pointKey === pk &&
+    (active.lineKey === lk || pk === 'p0'); // p0: both sides light up together
 
   const drawHandle = (p, lk, pk) => {
     const on = isOn(lk, pk);
@@ -3170,11 +3174,14 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubb
     lines._fingerOffsetY = isTouch ? FINGER_OFFSET_CSS * pt.scaleY : 0;
 
     if (dragging.pointKey === 'p0') {
-      // Bottom bald-line: no smoothing — both p0 points update instantly and stay perfectly level.
-      const clamped = clampPoint(dragging.lineKey, 'p0', pt.x, adjustedY);
+      // Bottom bald-line: both p0 points update instantly at the same Y — perfectly level.
       const otherKey = dragging.lineKey === 'sideburn' ? 'rear' : 'sideburn';
-      lines[dragging.lineKey].p0 = { x: clamped.x, y: clamped.y };
-      lines[otherKey].p0         = { x: lines[otherKey].p0.x, y: clamped.y }; // lock Y
+      const clamped  = clampPoint(dragging.lineKey, 'p0', pt.x, adjustedY);
+      // Final Y must also respect the OTHER line's p1 constraint so neither p0
+      // can slip above its own top point regardless of which side is dragged.
+      const finalY = Math.max(clamped.y, lines[otherKey].p1.y + 0.025);
+      lines[dragging.lineKey].p0 = { x: clamped.x,                  y: finalY };
+      lines[otherKey].p0         = { x: lines[otherKey].p0.x, y: finalY };
       scheduleRedraw();
     } else {
       // Top taper points: smooth lerp toward target for premium glide feel.
