@@ -717,19 +717,18 @@ body {
 #cropTipChevron{font-size:11px;color:rgba(232,213,163,0.45);
   transition:transform 0.28s cubic-bezier(0.22,1,0.36,1);line-height:1;}
 #cropTipBody{overflow:hidden;max-height:0;
-  transition:max-height 0.60s cubic-bezier(0.22,1,0.36,1);}
+  transition:max-height 0.90s cubic-bezier(0.22,1,0.36,1);}
 #cropTip.tip-open #cropTipBody{max-height:560px;}
 #cropTip.tip-open #cropTipChevron{transform:rotate(180deg);}
-/* Inner content: fade + rise in after container starts opening (0.16s delay),
-   fade + fall out before container closes (0 delay so it exits first). */
+/* Inner content: glide in after container starts opening; exit before container closes */
 #cropTipInner{
   display:flex;flex-direction:column;gap:10px;padding:12px 14px 14px;
-  opacity:0;transform:translateY(12px);
-  transition:opacity 0.34s ease 0.16s, transform 0.40s cubic-bezier(0.22,1,0.36,1) 0.12s;
+  opacity:0;transform:translateY(14px);
+  transition:opacity 0.45s ease 0.22s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.18s;
 }
 #cropTip.tip-open #cropTipInner{
   opacity:1;transform:translateY(0);
-  transition:opacity 0.34s ease 0.16s, transform 0.40s cubic-bezier(0.22,1,0.36,1) 0.12s;
+  transition:opacity 0.45s ease 0.22s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.18s;
 }
 #cropTipCoachText{
   font-size:13.5px;font-weight:600;line-height:1.5;
@@ -1444,7 +1443,7 @@ body {
     <button class="menu-btn" onclick="openSidebar()">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
     </button>
-    <button class="topbar-title" onclick="_easedScroll(document.getElementById('chatArea'),0,1800)" style="font-family:'Manrope',sans-serif;font-weight:700;font-size:15px;letter-spacing:-0.2px;background:none;border:none;padding:6px 10px;border-radius:10px;cursor:pointer;color:inherit;-webkit-tap-highlight-color:transparent;">SelfHaircut<span style="color:var(--accent2)">.ai</span></button>
+    <button class="topbar-title" onclick="_easedScroll(document.getElementById('chatArea'),0,2600)" style="font-family:'Manrope',sans-serif;font-weight:700;font-size:15px;letter-spacing:-0.2px;background:none;border:none;padding:6px 10px;border-radius:10px;cursor:pointer;color:inherit;-webkit-tap-highlight-color:transparent;">SelfHaircut<span style="color:var(--accent2)">.ai</span></button>
     <div class="topbar-actions">
       <button class="icon-btn" title="Menu" onclick="openSidebar()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -1607,9 +1606,10 @@ function _easedScroll(container, targetTop, duration) {
   const start = container.scrollTop;
   const dist  = targetTop - start;
   const t0    = performance.now();
-  // Sinusoidal ease-in-out: the most natural deceleration curve — gradual start,
-  // even pace through the middle, very soft landing. No snap at end.
-  function ease(t) { return -(Math.cos(Math.PI * t) - 1) / 2; }
+  // Quartic ease-in-out: spends ~80% of duration in the deceleration phase.
+  // Builds velocity gently, peaks in the middle, then decelerates very slowly
+  // over a long tail — no abrupt stop, intentional luxury landing.
+  function ease(t) { return t < 0.5 ? 8*t*t*t*t : 1 - Math.pow(-2*t+2,4)/2; }
   function step(now) {
     const elapsed = Math.min((now - t0) / duration, 1);
     container.scrollTop = start + dist * ease(elapsed);
@@ -1621,7 +1621,7 @@ function _easedScroll(container, targetTop, duration) {
 
 function scrollBottom(force) {
   if (force || !userScrolledUp) {
-    requestAnimationFrame(() => { _easedScroll(chatArea, chatArea.scrollHeight, 1800); });
+    requestAnimationFrame(() => { _easedScroll(chatArea, chatArea.scrollHeight, 2600); });
   }
 }
 
@@ -1632,7 +1632,7 @@ function scrollToMsg(el) {
   requestAnimationFrame(() => requestAnimationFrame(() => {
     const chatRect = chatArea.getBoundingClientRect();
     const elTop    = el.getBoundingClientRect().top - chatRect.top + chatArea.scrollTop;
-    _easedScroll(chatArea, elTop - 32, 1800);
+    _easedScroll(chatArea, elTop - 32, 2600);
   }));
 }
 
@@ -1643,7 +1643,7 @@ function showMessages() {
     messagesWrap.classList.add('visible');
     // Let the browser paint the newly visible element, then smooth-scroll to it
     setTimeout(() => {
-      _easedScroll(chatArea, messagesWrap.offsetTop - 20, 1800);
+      _easedScroll(chatArea, messagesWrap.offsetTop - 20, 2600);
     }, 30);
   }
 }
