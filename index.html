@@ -1062,6 +1062,56 @@ body {
 .fade-review-row strong.good { color: var(--accent); }
 .fade-review-row strong.warn { color: var(--text2); }
 
+/* ── NEED HELP PANEL ── */
+.need-help-btn {
+  display: block; width: 100%; margin-top: 8px; padding: 10px 14px;
+  background: none; border: 1px solid rgba(232,213,163,0.16);
+  border-radius: 16px; font-size: 13px; font-weight: 500;
+  color: rgba(232,213,163,0.5); cursor: pointer; text-align: center;
+  transition: border-color 0.18s, color 0.18s;
+}
+.need-help-btn:hover { border-color: rgba(232,213,163,0.32); color: rgba(232,213,163,0.75); }
+.need-help-panel {
+  margin-top: 10px; padding: 14px;
+  background: rgba(232,213,163,0.04); border: 1px solid rgba(232,213,163,0.14);
+  border-radius: 20px; animation: coachCardIn 0.32s cubic-bezier(0.22,1,0.36,1) both;
+}
+.need-help-label {
+  font-size: 11px; font-weight: 600; color: rgba(232,213,163,0.4);
+  letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 10px;
+}
+.need-help-chips { display: flex; flex-direction: column; gap: 7px; }
+.need-help-chip {
+  padding: 9px 13px; background: rgba(232,213,163,0.055);
+  border: 1px solid rgba(232,213,163,0.14); border-radius: 14px;
+  font-size: 13px; color: rgba(232,213,163,0.78); cursor: pointer;
+  text-align: left; transition: background 0.15s, border-color 0.15s;
+}
+.need-help-chip:hover { background: rgba(232,213,163,0.10); border-color: rgba(232,213,163,0.26); }
+.need-help-answer {
+  margin-top: 10px; padding: 12px 14px;
+  background: rgba(232,213,163,0.07); border: 1px solid rgba(232,213,163,0.18);
+  border-radius: 16px; font-size: 13px; line-height: 1.6;
+  color: rgba(232,213,163,0.88); animation: coachCardIn 0.28s cubic-bezier(0.22,1,0.36,1) both;
+}
+/* ── END-OF-CUT FEEDBACK ── */
+.feedback-card {
+  margin-top: 14px; padding: 16px;
+  background: rgba(232,213,163,0.045); border: 1px solid rgba(232,213,163,0.16);
+  border-radius: 20px; text-align: center;
+  animation: coachCardIn 0.38s cubic-bezier(0.22,1,0.36,1) both;
+}
+.feedback-title { font-size: 14px; font-weight: 700; color: rgba(232,213,163,0.88); margin-bottom: 12px; }
+.feedback-btns { display: flex; gap: 10px; justify-content: center; }
+.feedback-btn {
+  flex: 1; max-width: 90px; padding: 11px 6px;
+  background: rgba(232,213,163,0.07); border: 1px solid rgba(232,213,163,0.18);
+  border-radius: 16px; cursor: pointer; font-size: 22px; line-height: 1;
+  transition: background 0.16s, border-color 0.16s, transform 0.12s;
+}
+.feedback-btn:hover { background: rgba(232,213,163,0.14); border-color: rgba(232,213,163,0.35); transform: scale(1.06); }
+.feedback-btn.selected { background: rgba(232,213,163,0.16); border-color: rgba(232,213,163,0.5); }
+.feedback-thanks { margin-top: 10px; font-size: 12.5px; color: rgba(232,213,163,0.55); }
 /* ── VISUAL COACHING CARD ── */
 .coaching-card {
   display: flex; gap: 0;
@@ -4089,7 +4139,8 @@ async function presentFadePlanStep(i) {
   const vidLink = step.video
     ? `<a href="${step.video}" target="_blank" rel="noopener" style="font-size:11px;color:var(--accent2);text-decoration:none;margin-top:8px;display:inline-block;">▶ Watch technique</a>`
     : '';
-  const doneBtn = `<button class="opt-btn" style="margin-top:10px;width:100%;" onclick="completeFadeStep(${i})">I'm Ready — Let's Keep Going</button>`;
+  const doneBtn = `<button class="opt-btn" style="margin-top:10px;width:100%;" onclick="completeFadeStep(${i})">I'm Ready — Let's Keep Going</button>
+  <button class="need-help-btn" onclick="showNeedHelp(this,${i})">Need help with this step?</button>`;
   const zoneLabelHtml = step.zoneLabel
     ? `<div class="fade-step-zone-label">${step.zoneLabel}</div>`
     : '';
@@ -4321,13 +4372,81 @@ function addFadePlanWrapUp() {
     }
   }, 60000);
 
-  // Completion message
+  // Feedback card
   setTimeout(() => {
-    addAIMessage(`<p>Your taper is done. Come back and let me know how it came out — or upload a new photo if you want a touch-up. Every cut gets easier.</p>`, null);
-    scrollBottom();
-  }, 200);
+    const fbMsg = addAIMessage(`<div class="feedback-card">
+      <div class="feedback-title">How did your taper come out?</div>
+      <div class="feedback-btns">
+        <button class="feedback-btn" onclick="submitFeedback(this,'great')" title="Great">👍</button>
+        <button class="feedback-btn" onclick="submitFeedback(this,'okay')" title="Okay">😐</button>
+        <button class="feedback-btn" onclick="submitFeedback(this,'needs-work')" title="Needs Work">👎</button>
+      </div>
+    </div>`, null);
+    scrollToMsg(fbMsg);
+  }, 300);
 }
 
+
+// ── NEED HELP ──
+const NEED_HELP_QA = [
+  { q: "I'm not sure what this step means.",
+    a: "Focus on the highlighted zone in the photo. Apply the guard shown, keep the lever open, and use short upward flicks through that area only. Don't worry about the rest of your head — just that zone." },
+  { q: "I still see a hard line.",
+    a: "That's normal — the line softens across multiple steps. Keep going upward with each guard. If the line persists after this step, the next guard up will blend it out." },
+  { q: "How high should I go?",
+    a: "Stay inside the highlighted zone on the photo. The zone shows exactly where this guard should go — don't push above it yet. Higher zones get blended in later steps." },
+  { q: "What if I went too high?",
+    a: "Don't panic. Go back to the guard you used in the step below and blend that area again with light upward flicks. Usually a couple of passes smooths it right out." },
+  { q: "My fade looks uneven.",
+    a: "Work one side at a time and compare in the mirror. If one side is lighter, do one more pass on the heavier side. Even barbers touch up — it's part of the process." },
+];
+
+function showNeedHelp(btn, stepIndex) {
+  btn.style.display = 'none';
+  const panel = document.createElement('div');
+  panel.className = 'need-help-panel';
+  panel.innerHTML = `<div class="need-help-label">Ask a question</div>
+    <div class="need-help-chips">
+      ${NEED_HELP_QA.map((item, qi) =>
+        `<button class="need-help-chip" onclick="sendNeedHelpQ(this,${qi})">${item.q}</button>`
+      ).join('')}
+    </div>`;
+  btn.parentNode.insertBefore(panel, btn.nextSibling);
+}
+
+function sendNeedHelpQ(chip, qi) {
+  const item = NEED_HELP_QA[qi];
+  chip.closest('.need-help-chips').querySelectorAll('.need-help-chip').forEach(c => {
+    c.style.opacity = c === chip ? '1' : '0.35';
+    c.disabled = true;
+  });
+  const panel = chip.closest('.need-help-panel');
+  const existing = panel.querySelector('.need-help-answer');
+  if (existing) existing.remove();
+  const ans = document.createElement('div');
+  ans.className = 'need-help-answer';
+  ans.textContent = item.a;
+  panel.appendChild(ans);
+  scrollToMsg(panel);
+}
+
+// ── END-OF-CUT FEEDBACK ──
+function submitFeedback(btn, rating) {
+  const card = btn.closest('.feedback-card');
+  card.querySelectorAll('.feedback-btn').forEach(b => {
+    b.classList.toggle('selected', b === btn);
+    b.disabled = true;
+  });
+  const responses = {
+    'great': "Love to hear it. Share a photo or come back any time for a touch-up.",
+    'okay': "Good start. Each cut gets better — come back and we'll tighten it up.",
+    'needs-work': "Noted. Upload a new photo and I'll help you fix any spots that need work.",
+  };
+  const thanks = document.createElement('div');
+  thanks.className = 'feedback-thanks';
+  thanks.textContent = responses[rating] || 'Thanks for the feedback.';
+  card.appendChild(thanks);
+}
 
 // ── COPY GUIDE STEPS ──
 function copyGuideSteps(btn, style) {
