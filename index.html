@@ -687,8 +687,8 @@ body {
 #cropHeader h2{font-size:16px;font-weight:700;color:#e8d5a3;margin:0 0 3px;}
 #cropHeader p{font-size:12px;color:var(--text3);margin:0;}
 @keyframes cropTipPulse {
-  0%,100%{ box-shadow:0 0 0 1.5px rgba(232,213,163,0.28), 0 0 0 0 rgba(232,213,163,0); }
-  50%    { box-shadow:0 0 0 1.5px rgba(232,213,163,0.60), 0 0 20px 6px rgba(232,213,163,0.20); }
+  0%,100%{ box-shadow:0 0 0 1.5px rgba(232,213,163,0.35), 0 0 8px 0 rgba(232,213,163,0); }
+  50%    { box-shadow:0 0 0 1.5px rgba(232,213,163,0.75), 0 0 22px 8px rgba(232,213,163,0.26); }
 }
 /* The tip lives in the normal flex flow below the canvas.
    Collapsed → canvas gets all remaining space.
@@ -1446,8 +1446,8 @@ body {
     </button>
     <button class="topbar-title" onclick="_easedScroll(document.getElementById('chatArea'),0,1800)" style="font-family:'Manrope',sans-serif;font-weight:700;font-size:15px;letter-spacing:-0.2px;background:none;border:none;padding:6px 10px;border-radius:10px;cursor:pointer;color:inherit;-webkit-tap-highlight-color:transparent;">SelfHaircut<span style="color:var(--accent2)">.ai</span></button>
     <div class="topbar-actions">
-      <button class="icon-btn" title="Settings">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      <button class="icon-btn" title="Menu" onclick="openSidebar()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       </button>
     </div>
   </header>
@@ -1607,9 +1607,9 @@ function _easedScroll(container, targetTop, duration) {
   const start = container.scrollTop;
   const dist  = targetTop - start;
   const t0    = performance.now();
-  // Cubic ease-in-out: smooth, consistent pace — builds gently, flows evenly,
-  // decelerates softly. No lag at the start, no rush in the middle, no snap at the end.
-  function ease(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2; }
+  // Sinusoidal ease-in-out: the most natural deceleration curve — gradual start,
+  // even pace through the middle, very soft landing. No snap at end.
+  function ease(t) { return -(Math.cos(Math.PI * t) - 1) / 2; }
   function step(now) {
     const elapsed = Math.min((now - t0) / duration, 1);
     container.scrollTop = start + dist * ease(elapsed);
@@ -2993,12 +2993,15 @@ function drawTaperShapeOverlay(ctx, W, H, lines) {
 }
 
 // Renders the zoom bubble: a magnified circular view of the photo around the active point.
-function updateZoomBubble(bubble, bubbleCanvas, img, lines, W, H, active, fingerCSS) {
+// viewPoint (optional {x,y} in fractional coords): if supplied, centres the view here
+// instead of the current stored (smoothed) point — keeps the view on the target, not the lag.
+function updateZoomBubble(bubble, bubbleCanvas, img, lines, W, H, active, fingerCSS, viewPoint) {
   if (!active || !fingerCSS) { bubble.style.display = 'none'; return; }
 
   const BUBBLE_PX = 160; // matches CSS width/height
-  const ZOOM      = 4.0;
-  const p         = lines[active.lineKey][active.pointKey];
+  const ZOOM      = 3.5; // slightly less than before — more context, less disorienting
+  // Use the passed viewPoint if available (finger target), otherwise fall back to stored point.
+  const p         = viewPoint || lines[active.lineKey][active.pointKey];
 
   // Source rect in natural image coords
   const srcW = img.naturalWidth  / ZOOM;
@@ -3146,7 +3149,7 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubb
   // LERP = 0.30: reaches 95% of the way in ~9 frames (~150ms at 60fps).
   // This makes points glide into place rather than instantly snapping to every
   // micro-movement of the finger, giving a premium, controlled feel.
-  const LERP = 0.30;
+  const LERP = 0.45; // tighter tracking — point stays close to finger, less lag
   const _smoothStep = () => {
     if (!dragging || !_dragTarget) { _smoothRunning = false; return; }
     const cur = lines[dragging.lineKey][dragging.pointKey];
@@ -3159,8 +3162,10 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubb
       lines[otherKey].p0 = { ...lines[otherKey].p0, y: ny };
     }
     redraw();
+    // Pass _dragTarget as viewPoint so magnifier centres on where the finger IS,
+    // not the lagged smoothed position — eliminates the confusing view offset.
     const showBubble = dragging.pointKey === 'p1' ? dragging : null;
-    updateZoomBubble(bubble, bubbleCanvas, img, lines, W, H, showBubble, fingerCSS);
+    updateZoomBubble(bubble, bubbleCanvas, img, lines, W, H, showBubble, fingerCSS, _dragTarget);
     requestAnimationFrame(_smoothStep);
   };
 
@@ -4643,34 +4648,42 @@ function updateUsageBar() {
 
 // ── SHARE GUIDE ──
 async function shareGuide(btn) {
-  const wrap = btn.closest('.msg-text').querySelector('.guide-img-wrap');
-  const canvas = wrap ? wrap.querySelector('canvas') : null;
-  if (!canvas) return;
+  const orig = btn.innerHTML;
   try {
-    canvas.toBlob(async blob => {
-      const file = new File([blob], 'selfhaircut-guide.png', { type: 'image/png' });
-      if (navigator.share && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'My SelfHaircut Guide', text: 'Check out my fade plan from SelfHaircut.ai!' });
-      } else {
-        // fallback: download
-        const link = document.createElement('a');
-        link.download = 'selfhaircut-guide.png';
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-      }
-    }, 'image/png');
-  } catch(e) { console.log('Share cancelled'); }
+    const url = window.location.href;
+    if (navigator.share) {
+      await navigator.share({ title: 'SelfHaircut.ai — My Fade Plan', text: 'Built my taper guide on SelfHaircut.ai — check it out.', url });
+    } else {
+      await navigator.clipboard.writeText(url);
+      btn.textContent = '✓ Link copied';
+      setTimeout(() => { btn.innerHTML = orig; }, 2200);
+    }
+  } catch(e) {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      btn.textContent = '✓ Link copied';
+      setTimeout(() => { btn.innerHTML = orig; }, 2200);
+    } catch(e2) {}
+  }
 }
 
 // ── SAVE GUIDE IMAGE ──
 function saveGuideImage(btn) {
-  const wrap = btn.closest('.msg-text').querySelector('.guide-img-wrap');
-  const canvas = wrap ? wrap.querySelector('canvas') : null;
-  if (!canvas) return;
+  // Find the most recent step canvas across all messages.
+  const canvases = document.querySelectorAll('.guide-img-wrap canvas');
+  const canvas   = canvases.length ? canvases[canvases.length - 1] : null;
+  if (!canvas) {
+    // Fallback: copy the guard steps as text
+    copyGuideSteps(btn, state.taperStyle || 'low');
+    return;
+  }
+  const orig = btn.innerHTML;
   const link = document.createElement('a');
   link.download = 'selfhaircut-guide.png';
   link.href = canvas.toDataURL('image/png');
   link.click();
+  btn.textContent = '✓ Saved';
+  setTimeout(() => { btn.innerHTML = orig; }, 2200);
 }
 
 // ── FILE UPLOAD ──
