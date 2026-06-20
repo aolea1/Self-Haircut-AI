@@ -1047,6 +1047,10 @@ body {
   font-size: 14px; font-weight: 700; color: var(--accent);
   letter-spacing: 0.2px; margin-bottom: 12px;
 }
+.fade-step-focus {
+  font-size: 17px; font-weight: 600; line-height: 1.5;
+  color: var(--text); margin-bottom: 14px;
+}
 .fade-step-row.fade-step-mistake {
   background: rgba(255,95,61,0.08);
   border: 1px solid rgba(255,95,61,0.25);
@@ -3406,55 +3410,27 @@ const FADE_GUARDS = {
   skin: { s1: 'None', s2: 'None', s3: '#0.5', s4: '#1',   s5: '#1.5', s6: '#2' },
 };
 
-// 7-step taper content — concise barber-style cues.
+// 7-step taper content — one "do" line per step. Guard/lever/motion are shown visually.
 const FADE_STEP_TEXT_TAPER = [
-  { title: 'Set your guideline.', lever: 'n/a', zoneLabel: 'Bald line — your starting point',
-    goal: 'One clean pass along the highlighted line.',
-    instructions: 'Bare blade, lever off. Follow the line slowly from front to back. Light pressure — one smooth pass.',
-    motion: 'Slow and level. Trace it like a line.',
-    mistake: 'Stay on the line. Do not go above it.',
-    stopWhen: 'One clean, even line across.' },
-  { title: 'Soften the edge.', lever: 'open', zoneLabel: 'Just above the bald line — no guard, lever open',
-    goal: 'Blur the hard edge with short upward flicks.',
-    instructions: 'No guard, lever fully open. Flick upward through the zone just above your bald line.',
-    motion: 'Short, light upward flicks. Flick the clipper away at the top.',
-    mistake: 'Do not press hard. You are softening, not cutting more.',
-    stopWhen: 'The edge blurs gradually into the skin.' },
-  { title: 'Blend a little higher.', lever: 'open', zoneLabel: '½ guard, lever open',
-    goal: 'Build the blend upward.',
-    instructions: 'Snap on the ½ guard, lever open. Flick upward through the highlighted zone.',
-    motion: 'Fluid upward flicks. Rotate the clipper away at the top.',
-    mistake: 'Do not drop back into the bare-blade zone.',
-    stopWhen: 'No hard line between this and the zone below.' },
-  { title: 'Build the main body.', lever: 'open', zoneLabel: '1 guard, lever open',
-    goal: 'Work through the core of the taper.',
-    instructions: '1 guard, lever open. Confident upward flicks through the highlighted zone.',
-    motion: 'Smooth overlapping strokes. Flick out at the top of each pass.',
-    mistake: 'Do not go back down into lower zones.',
-    stopWhen: 'Blends into the ½ zone below and the longer hair above.' },
-  { title: 'Blend the top.', lever: 'open', zoneLabel: '1½ guard, lever open',
-    goal: 'Fade into your natural length.',
-    instructions: '1½ guard, lever open. A few light flicks through the top of the taper.',
-    motion: 'Light flicking. Less pressure as you move up.',
-    mistake: 'Two passes max. More will push the fade too high.',
-    stopWhen: 'Smooth transition into longer hair above. No visible line.' },
-  { title: 'Final blend.', lever: 'open', zoneLabel: '2 guard, lever open',
-    goal: 'Polish the top edge.',
-    instructions: '2 guard, lever open. One or two gentle flicks along the very top edge.',
-    motion: 'Barely touching the hair.',
-    mistake: 'One pass is enough.',
-    stopWhen: 'Smooth from skin to full length. No hard lines.' },
-  { title: 'Finishing pass.', lever: 'open', zoneLabel: 'Upper taper — dust the transition',
-    goal: 'Soften the top of the taper into your bulk.',
-    instructions: '1½ or 2 guard, lever open. One or two light dusting flicks at the very top.',
-    motion: 'Gentle upward flicks. Barely grazing.',
-    mistake: 'Two passes max. More will lose the shape.',
-    stopWhen: 'Taper melts into longer hair. No weight line.',
+  { title: 'Set your guideline.',   lever: 'n/a',  zoneLabel: 'Bald line',
+    do: 'Trace the highlighted line once — slow, steady, light pressure.' },
+  { title: 'Soften the edge.',      lever: 'open', zoneLabel: 'Just above the bald line',
+    do: 'Short upward flicks just above the line. Barely touching.' },
+  { title: 'Blend a little higher.', lever: 'open', zoneLabel: 'Above the softened zone',
+    do: 'Flick upward through the highlighted area. Let the guard do the work.' },
+  { title: 'Build the main body.',  lever: 'open', zoneLabel: 'Core of the taper',
+    do: 'Overlapping upward strokes. Flick out at the top of every pass.' },
+  { title: 'Blend the top.',        lever: 'open', zoneLabel: 'Top of the taper',
+    do: 'Two or three light passes. Less pressure as you move higher.' },
+  { title: 'Final blend.',          lever: 'open', zoneLabel: 'Very top edge',
+    do: 'One or two gentle flicks right at the top edge. That\'s all.' },
+  { title: 'Finishing pass.',       lever: 'open', zoneLabel: 'Upper taper — dust pass',
+    do: 'One light dusting pass. Barely graze the surface.',
     finishingTouches: [
-      { label: 'Weight line still visible?', desc: 'One light flick with 1½ guard at that line only.' },
-      { label: 'Around the ear', desc: 'Clean up stray hairs around the ear.' },
-      { label: 'Sideburns', desc: 'Even out both sides.' },
-      { label: 'Neckline', desc: 'Clean your neckline — straight or rounded.' },
+      { label: 'Weight line?',  desc: 'One flick with 1½ guard right at the line.' },
+      { label: 'Around the ear', desc: 'Clean up stray hairs.' },
+      { label: 'Sideburns',    desc: 'Even out both sides.' },
+      { label: 'Neckline',     desc: 'Straight or rounded — your call.' },
     ] },
 ];
 
@@ -4254,20 +4230,13 @@ async function presentFadePlanStep(i) {
     ? `<div class="fade-step-zone-label">${step.zoneLabel}</div>`
     : '';
 
-  // Taper steps carry goal/instructions/motion/mistake/stopWhen (+ optional
-  // finishingTouches for step 5); buzz steps keep their original
-  // start/height/flick row layout.
-  const bodyRows = step.goal !== undefined
-    ? `<div class="fade-step-row"><span class="fade-step-icon">🎯</span><div><strong>Goal:</strong> ${step.goal}</div></div>
-       ${guardRow}
-       ${leverRow}
-       <div class="fade-step-row"><span class="fade-step-icon">📋</span><div>${step.instructions}</div></div>
-       <div class="fade-step-row"><span class="fade-step-icon">🌀</span><div><strong>Motion:</strong> ${step.motion}</div></div>
-       <div class="fade-step-row fade-step-mistake"><span class="fade-step-icon">⚠️</span><div><strong>Avoid:</strong> ${step.mistake}</div></div>
-       ${step.stopWhen ? `<div class="fade-step-row fade-step-stop"><span class="fade-step-icon">🛑</span><div><strong>Stop when:</strong> ${step.stopWhen}</div></div>` : ''}
+  // Taper steps: one focus line + optional finishing touches. Guard/lever/motion are visual.
+  // Buzz steps keep their original layout.
+  const bodyRows = step.do !== undefined
+    ? `<div class="fade-step-focus">${step.do}</div>
        ${step.finishingTouches ? `<div class="fade-finishing">
-          <div class="fade-finishing-title">Optional finishing touches</div>
-          ${step.finishingTouches.map(f => `<div class="fade-finishing-row"><strong>${f.label}:</strong> ${f.desc}</div>`).join('')}
+          <div class="fade-finishing-title">Clean-up checklist</div>
+          ${step.finishingTouches.map(f => `<div class="fade-finishing-row"><strong>${f.label}</strong> ${f.desc}</div>`).join('')}
         </div>` : ''}`
     : `${guardRow}
        ${leverRow}
@@ -4275,7 +4244,7 @@ async function presentFadePlanStep(i) {
        <div class="fade-step-row"><span class="fade-step-icon">📏</span><div><strong>How high:</strong> ${step.heightDesc}</div></div>
        <div class="fade-step-row"><span class="fade-step-icon">👉</span><div><strong>Flick out:</strong> ${step.flickDesc}</div></div>`;
 
-  const coachingCard = (step.goal !== undefined) ? buildCoachingCard(step, i) : '';
+  const coachingCard = (step.do !== undefined) ? buildCoachingCard(step, i) : '';
 
   // Build progress tracker pills
   const stepShortLabel = (s, idx) => {
