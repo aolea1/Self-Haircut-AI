@@ -684,31 +684,31 @@ body {
 #cropHeader h2{font-size:16px;font-weight:700;color:#e8d5a3;margin:0 0 3px;}
 #cropHeader p{font-size:12px;color:var(--text3);margin:0;}
 @keyframes cropTipPulse {
-  0%,100%{ box-shadow:0 0 0 0 rgba(232,213,163,0), inset 0 0 0 1px rgba(232,213,163,0.18); }
-  50%    { box-shadow:0 0 10px 2px rgba(232,213,163,0.10), inset 0 0 0 1px rgba(232,213,163,0.32); }
+  0%,100%{ box-shadow:0 0 0 1px rgba(232,213,163,0.18), 0 0 0 0 rgba(232,213,163,0); }
+  50%    { box-shadow:0 0 0 1px rgba(232,213,163,0.38), 0 0 16px 4px rgba(232,213,163,0.14); }
 }
-#cropTip{flex-shrink:0;margin:0;padding:10px 14px 8px;
-  border-top:1px solid rgba(232,213,163,0.10);
-  background:rgba(232,213,163,0.04);
-  border-radius:0 0 0 0; /* inherits from parent modal bottom */
-  animation:cropTipPulse 2.8s ease-in-out infinite;}
-#cropTip.tip-open{ animation:none; background:rgba(232,213,163,0.06);
-  box-shadow:inset 0 0 0 1px rgba(232,213,163,0.22); }
+#cropTip{flex-shrink:0;margin:10px 12px 6px;padding:12px;
+  background:rgba(232,213,163,0.05);
+  border:1px solid rgba(232,213,163,0.22);
+  border-radius:18px;
+  animation:cropTipPulse 3s ease-in-out infinite;}
+#cropTip.tip-open{ animation:none;
+  box-shadow:0 0 0 1px rgba(232,213,163,0.28), 0 4px 20px rgba(232,213,163,0.10); }
 #cropTipToggle{display:flex;align-items:center;justify-content:space-between;
-  gap:8px;cursor:pointer;user-select:none;padding:2px 0;}
-#cropTipLabel{font-size:11.5px;font-weight:700;color:rgba(232,213,163,0.72);
-  letter-spacing:0.05em;text-transform:uppercase;}
-#cropTipChevron{font-size:10px;color:rgba(232,213,163,0.45);
+  gap:8px;cursor:pointer;user-select:none;padding:0 0 2px;}
+#cropTipLabel{font-size:13px;font-weight:700;color:rgba(232,213,163,0.82);
+  letter-spacing:0.02em;}
+#cropTipChevron{font-size:11px;color:rgba(232,213,163,0.5);
   transition:transform 0.28s cubic-bezier(0.22,1,0.36,1);line-height:1;}
-#cropTipBody{overflow:hidden;max-height:0;transition:max-height 0.38s cubic-bezier(0.22,1,0.36,1);}
-#cropTip.tip-open #cropTipBody{max-height:240px;}
+#cropTipBody{overflow:hidden;max-height:0;transition:max-height 0.42s cubic-bezier(0.22,1,0.36,1);}
+#cropTip.tip-open #cropTipBody{max-height:360px;}
 #cropTip.tip-open #cropTipChevron{transform:rotate(180deg);}
-#cropTipInner{display:flex;gap:10px;align-items:flex-start;padding:9px 0 10px;}
-#cropTip video{width:110px;min-width:110px;height:72px;object-fit:cover;
-  border-radius:8px;border:1px solid rgba(232,213,163,0.28);flex-shrink:0;display:block;}
-#cropTipText{font-size:11.5px;line-height:1.55;color:rgba(232,213,163,0.68);}
-#cropTipText strong{display:block;font-size:12px;font-weight:700;
-  color:rgba(232,213,163,0.92);margin-bottom:3px;}
+#cropTipInner{display:flex;flex-direction:column;gap:10px;padding-top:10px;}
+#cropTip video{width:100%;height:140px;object-fit:cover;
+  border-radius:12px;border:1px solid rgba(232,213,163,0.25);display:block;}
+#cropTipText{font-size:13px;line-height:1.55;color:rgba(232,213,163,0.72);}
+#cropTipText strong{display:block;font-size:13.5px;font-weight:700;
+  color:rgba(232,213,163,0.95);margin-bottom:4px;}
 #cropCanvasWrap{flex:1;position:relative;overflow:hidden;touch-action:none;}
 #cropCanvas{display:block;width:100%;height:100%;cursor:crosshair;}
 #cropFooter{padding:14px 20px 28px;display:flex;gap:10px;flex-shrink:0;}
@@ -908,18 +908,20 @@ body {
 .guide-img-wrap canvas { width: 100%; display: block; cursor: ns-resize; touch-action: none; }
 .taper-zoom-bubble {
   position: absolute;
-  width: 112px; height: 112px;
+  width: 160px; height: 160px;
   border-radius: 50%;
-  border: 2.5px solid rgba(232,213,163,0.92);
-  box-shadow: 0 6px 28px rgba(0,0,0,0.65), 0 0 0 1px rgba(0,0,0,0.4);
+  border: 2.5px solid rgba(232,213,163,0.88);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.75), 0 0 0 1px rgba(0,0,0,0.5),
+              0 0 16px 2px rgba(232,213,163,0.18);
   pointer-events: none;
   display: none;
   z-index: 20;
   overflow: hidden;
-  transform: translate(-50%, calc(-100% - 18px));
-  background: #111;
+  /* Offset upper-left so it never covers the finger */
+  transform: translate(calc(-50% - 40px), calc(-100% - 28px));
+  background: #0d0d0b;
 }
-.taper-zoom-bubble canvas { width: 112px; height: 112px; display: block; }
+.taper-zoom-bubble canvas { width: 160px; height: 160px; display: block; }
 
 .drag-hint {
   text-align: center; font-size: 11px; color: var(--text3);
@@ -2954,8 +2956,8 @@ function drawTaperShapeOverlay(ctx, W, H, lines) {
 function updateZoomBubble(bubble, bubbleCanvas, img, lines, W, H, active, fingerCSS) {
   if (!active || !fingerCSS) { bubble.style.display = 'none'; return; }
 
-  const BUBBLE_PX = 112; // matches CSS width/height
-  const ZOOM      = 3.2;
+  const BUBBLE_PX = 160; // matches CSS width/height
+  const ZOOM      = 4.0;
   const p         = lines[active.lineKey][active.pointKey];
 
   // Source rect in natural image coords
@@ -2967,20 +2969,27 @@ function updateZoomBubble(bubble, bubbleCanvas, img, lines, W, H, active, finger
   const bctx = bubbleCanvas.getContext('2d');
   bubbleCanvas.width = BUBBLE_PX; bubbleCanvas.height = BUBBLE_PX;
 
-  // Clip to circle and draw
+  // Clip to circle and draw photo
   bctx.save();
   bctx.beginPath(); bctx.arc(BUBBLE_PX / 2, BUBBLE_PX / 2, BUBBLE_PX / 2, 0, Math.PI * 2);
   bctx.clip();
   bctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, BUBBLE_PX, BUBBLE_PX);
+  bctx.restore();
 
-  // Crosshair at center
-  bctx.strokeStyle = 'rgba(232,213,163,0.9)'; bctx.lineWidth = 1;
+  // Reticle crosshair — full-span lines with a gap around center for clarity
   const cx = BUBBLE_PX / 2, cy = BUBBLE_PX / 2;
-  bctx.beginPath(); bctx.moveTo(cx - 10, cy); bctx.lineTo(cx + 10, cy); bctx.stroke();
-  bctx.beginPath(); bctx.moveTo(cx, cy - 10); bctx.lineTo(cx, cy + 10); bctx.stroke();
-
-  // Center dot
-  bctx.fillStyle = 'rgba(232,213,163,0.95)';
+  const GAP = 10, R = BUBBLE_PX / 2 - 4;
+  bctx.save();
+  bctx.strokeStyle = 'rgba(0,0,0,0.55)'; bctx.lineWidth = 3; // shadow
+  [[cx-R,cy,cx-GAP,cy],[cx+GAP,cy,cx+R,cy],[cx,cy-R,cx,cy-GAP],[cx,cy+GAP,cx,cy+R]]
+    .forEach(([x1,y1,x2,y2]) => { bctx.beginPath(); bctx.moveTo(x1,y1); bctx.lineTo(x2,y2); bctx.stroke(); });
+  bctx.strokeStyle = 'rgba(232,213,163,0.95)'; bctx.lineWidth = 1.5; // gold
+  [[cx-R,cy,cx-GAP,cy],[cx+GAP,cy,cx+R,cy],[cx,cy-R,cx,cy-GAP],[cx,cy+GAP,cx,cy+R]]
+    .forEach(([x1,y1,x2,y2]) => { bctx.beginPath(); bctx.moveTo(x1,y1); bctx.lineTo(x2,y2); bctx.stroke(); });
+  // Center target — outer ring + bright dot
+  bctx.strokeStyle = 'rgba(232,213,163,0.7)'; bctx.lineWidth = 1.2;
+  bctx.beginPath(); bctx.arc(cx, cy, 6, 0, Math.PI * 2); bctx.stroke();
+  bctx.fillStyle = '#fffceb';
   bctx.beginPath(); bctx.arc(cx, cy, 2.5, 0, Math.PI * 2); bctx.fill();
   bctx.restore();
 
@@ -5151,7 +5160,7 @@ if ('serviceWorker' in navigator) {
     <div id="cropCanvasWrap">
       <canvas id="cropCanvas"></canvas>
     </div>
-    <div id="cropTip">
+    <div id="cropTip" class="tip-open">
       <div id="cropTipToggle" onclick="this.closest('#cropTip').classList.toggle('tip-open')">
         <span id="cropTipLabel">Example Crop</span>
         <span id="cropTipChevron">▾</span>
