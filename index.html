@@ -2990,11 +2990,16 @@ function drawTaperShapeOverlay(ctx, W, H, lines) {
     drawHandle(p0, lk, 'p0');
     drawHandle(p1, lk, 'p1');
 
+    // Point label — large enough to read on a phone without zooming
     ctx.save();
-    ctx.font = 'bold 11px sans-serif'; ctx.fillStyle = GOLD; ctx.textBaseline = 'bottom';
-    ctx.shadowColor = 'rgba(0,0,0,1)'; ctx.shadowBlur = 6;
+    ctx.font = 'bold 26px sans-serif'; ctx.textBaseline = 'bottom';
     const tw = ctx.measureText(label).width;
-    ctx.fillText(label, p1.x - tw/2, Math.max(14, p1.y - 16));
+    const lx = p1.x - tw/2, ly = Math.max(28, p1.y - 18);
+    // Dark outline for contrast against any photo
+    ctx.strokeStyle = 'rgba(0,0,0,0.95)'; ctx.lineWidth = 5; ctx.lineJoin = 'round';
+    ctx.strokeText(label, lx, ly);
+    ctx.fillStyle = GOLD; ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+    ctx.fillText(label, lx, ly);
     ctx.restore();
   };
 
@@ -3676,10 +3681,12 @@ function drawStepOverlay(ctx, W, H, step, guideLine, offset) {
       ctx.fillStyle = GOLD; ctx.beginPath(); ctx.arc(x, lineY, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.restore();
     });
 
-    ctx.save(); ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = GOLD;
-    ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 8;
-    const lbl = step.guard === 'None' ? 'Bald guideline — clip here' : 'Clip along this line';
-    ctx.fillText(lbl, startX + (endX - startX) / 2 - ctx.measureText(lbl).width / 2, lineY + 18);
+    const lbl = step.guard === 'None' ? 'Bald Guideline' : 'Clip along this line';
+    ctx.save(); ctx.font = 'bold 24px sans-serif';
+    const lblW = ctx.measureText(lbl).width;
+    const lblX = startX + (endX - startX) / 2 - lblW / 2, lblY = lineY + 28;
+    ctx.strokeStyle = 'rgba(0,0,0,0.95)'; ctx.lineWidth = 5; ctx.lineJoin = 'round'; ctx.strokeText(lbl, lblX, lblY);
+    ctx.fillStyle = GOLD; ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4; ctx.fillText(lbl, lblX, lblY);
     ctx.restore();
 
   } else if (zone.type === 'band') {
@@ -3726,10 +3733,12 @@ function drawStepOverlay(ctx, W, H, step, guideLine, offset) {
     ctx.moveTo(arrowX, arrowTop); ctx.lineTo(arrowX - 7, arrowTop + 14); ctx.lineTo(arrowX + 7, arrowTop + 14); ctx.closePath(); ctx.fill();
     ctx.restore();
 
-    // "Flick Out Here" — must be impossible to miss
-    ctx.save(); ctx.font = 'bold 18px sans-serif'; ctx.fillStyle = GOLD;
+    // "Flick Out Here" — must be readable from arm's length
+    ctx.save(); ctx.font = 'bold 28px sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.shadowColor = 'rgba(0,0,0,1)'; ctx.shadowBlur = 14;
+    ctx.strokeStyle = 'rgba(0,0,0,0.95)'; ctx.lineWidth = 6; ctx.lineJoin = 'round';
+    ctx.strokeText(flickLabel, arrowX, arrowTop + 18);
+    ctx.fillStyle = GOLD; ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
     ctx.fillText(flickLabel, arrowX, arrowTop + 18);
     ctx.restore();
 
@@ -3821,10 +3830,12 @@ function drawStepOverlay(ctx, W, H, step, guideLine, offset) {
     ctx.moveTo(arrowX, arrowTop); ctx.lineTo(arrowX - 7, arrowTop + 14); ctx.lineTo(arrowX + 7, arrowTop + 14); ctx.closePath(); ctx.fill();
     ctx.restore();
 
-    // "Flick Out Here" — must be impossible to miss
-    ctx.save(); ctx.font = 'bold 18px sans-serif'; ctx.fillStyle = GOLD;
+    // "Flick Out Here" — must be readable from arm's length
+    ctx.save(); ctx.font = 'bold 28px sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.shadowColor = 'rgba(0,0,0,1)'; ctx.shadowBlur = 14;
+    ctx.strokeStyle = 'rgba(0,0,0,0.95)'; ctx.lineWidth = 6; ctx.lineJoin = 'round';
+    ctx.strokeText(flickLabel, arrowX, arrowTop + 18);
+    ctx.fillStyle = GOLD; ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
     ctx.fillText(flickLabel, arrowX, arrowTop + 18);
     ctx.restore();
 
@@ -3878,10 +3889,12 @@ function drawStepOverlay(ctx, W, H, step, guideLine, offset) {
     // Label — top of the zone
     const dtLabelX = dtStartX + dtSpanX / 2;
     ctx.save();
-    ctx.font = 'bold 16px sans-serif'; ctx.fillStyle = 'rgba(240,215,140,0.98)';
-    ctx.shadowColor = 'rgba(0,0,0,1)'; ctx.shadowBlur = 12;
+    ctx.font = 'bold 24px sans-serif';
     const dtLbl = '↑ Light pass here';
-    ctx.fillText(dtLbl, dtLabelX - ctx.measureText(dtLbl).width / 2, Math.max(16, dtTopY - 12));
+    const dtLblX2 = dtLabelX - ctx.measureText(dtLbl).width / 2;
+    const dtLblY2 = Math.max(28, dtTopY - 14);
+    ctx.strokeStyle = 'rgba(0,0,0,0.95)'; ctx.lineWidth = 5; ctx.lineJoin = 'round'; ctx.strokeText(dtLbl, dtLblX2, dtLblY2);
+    ctx.fillStyle = 'rgba(240,215,140,1)'; ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4; ctx.fillText(dtLbl, dtLblX2, dtLblY2);
     ctx.restore();
 
   } else if (zone.type === 'detail') {
@@ -3894,9 +3907,10 @@ function drawStepOverlay(ctx, W, H, step, guideLine, offset) {
     ctx.beginPath(); ctx.roundRect(startX - pad, topY - pad, (endX - startX) + pad * 2, (botY - topY) + pad * 2, 8); ctx.stroke();
     ctx.restore();
 
-    ctx.save(); ctx.font = 'bold 17px sans-serif'; ctx.fillStyle = GOLD;
-    ctx.shadowColor = 'rgba(0,0,0,1)'; ctx.shadowBlur = 12;
-    ctx.fillText('Detail Trim Here', startX - pad, Math.max(18, topY - pad - 6));
+    ctx.save(); ctx.font = 'bold 26px sans-serif';
+    const dtx = startX - pad, dty = Math.max(28, topY - pad - 6);
+    ctx.strokeStyle = 'rgba(0,0,0,0.95)'; ctx.lineWidth = 6; ctx.lineJoin = 'round'; ctx.strokeText('Detail Trim Here', dtx, dty);
+    ctx.fillStyle = GOLD; ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4; ctx.fillText('Detail Trim Here', dtx, dty);
     ctx.restore();
 
   } else if (zone.type === 'detail-mini') {
@@ -3926,11 +3940,12 @@ function drawStepOverlay(ctx, W, H, step, guideLine, offset) {
 
     // "✦ Detail Trim Here" label
     ctx.save();
-    ctx.font = 'bold 17px sans-serif'; ctx.fillStyle = AMBER;
-    ctx.shadowColor = 'rgba(0,0,0,1)'; ctx.shadowBlur = 12;
+    ctx.font = 'bold 26px sans-serif';
     const lbl = '✶ Detail Trim Here';
     const tw = ctx.measureText(lbl).width;
-    ctx.fillText(lbl, bStartX + (bEndX - bStartX) / 2 - tw / 2, Math.max(16, bTopY - 8));
+    const dlx = bStartX + (bEndX - bStartX) / 2 - tw / 2, dly = Math.max(28, bTopY - 10);
+    ctx.strokeStyle = 'rgba(0,0,0,0.95)'; ctx.lineWidth = 6; ctx.lineJoin = 'round'; ctx.strokeText(lbl, dlx, dly);
+    ctx.fillStyle = AMBER; ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4; ctx.fillText(lbl, dlx, dly);
     ctx.restore();
     return; // skip the badge for mid-step detail zones
   }
@@ -3941,14 +3956,13 @@ function drawStepOverlay(ctx, W, H, step, guideLine, offset) {
     : step.guard
       ? (step.lever ? `${step.guard}  ·  ${leverLabel(step.lever)}` : step.guard)
       : 'Detail trimmer';
-  ctx.save(); ctx.font = 'bold 15px sans-serif';
-  const bw = ctx.measureText(badgeText).width + 22;
-  const bx = W - bw - 10, by = H - 38;
-  ctx.fillStyle = 'rgba(0,0,0,0.78)';
-  ctx.beginPath(); ctx.roundRect(bx, by, bw, 28, 7); ctx.fill();
+  ctx.save(); ctx.font = 'bold 18px sans-serif';
+  const bw = ctx.measureText(badgeText).width + 28;
+  const bx = W - bw - 10, by = H - 46;
+  ctx.fillStyle = 'rgba(0,0,0,0.88)';
+  ctx.beginPath(); ctx.roundRect(bx, by, bw, 34, 8); ctx.fill();
   ctx.fillStyle = GOLD;
-  ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 4;
-  ctx.fillText(badgeText, bx + 11, by + 19); ctx.restore();
+  ctx.fillText(badgeText, bx + 14, by + 23); ctx.restore();
 }
 
 // Loads the photo, draws it, overlays the step's zone — static, view-only.
