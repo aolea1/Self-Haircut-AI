@@ -3076,7 +3076,7 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubb
   let _smoothRunning  = false;
 
   const HIT_R             = 80;  // very generous touch radius — grab a dot from anywhere nearby
-  const FINGER_OFFSET_CSS = 28;  // slight lift above finger (no magnifier, so minimal offset)
+  const FINGER_OFFSET_CSS = 0;   // point stays directly under the finger — magnifier provides visibility
 
   // No snapping — pure, consistent dragging everywhere.
   // Snapping was creating invisible resistance zones that made movement feel uneven.
