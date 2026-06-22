@@ -1236,19 +1236,20 @@ body {
 }
 
 /* Active step zone pulse — warm gold glow around the canvas, breathing gently */
-/* Fade-zone label overlay: visible for 3s, then smoothly fades out over 1s */
-@keyframes flickLabelFade { 0%,75%{opacity:1} 100%{opacity:0} }
+/* Fade-zone label overlay — centered inside zone via JS, fades after 2s */
+@keyframes flickLabelFade { 0%,65%{opacity:1} 100%{opacity:0} }
 .flick-label-overlay {
-  position:absolute; left:50%; transform:translateX(-50%);
-  white-space:nowrap; pointer-events:none; z-index:5;
-  top:38%;
-  font-family:'DM Sans',sans-serif; font-size:20px; font-weight:700;
+  position:absolute; pointer-events:none; z-index:5;
+  /* top/left/transform set by JS to zone center; these are fallback only */
+  top:50%; left:50%; transform:translate(-50%,-50%);
+  white-space:nowrap;
+  font-family:'DM Sans',sans-serif; font-size:22px; font-weight:800;
   color:rgba(240,223,168,1);
   text-shadow:
     -2px -2px 0 rgba(0,0,0,0.95), 2px -2px 0 rgba(0,0,0,0.95),
     -2px  2px 0 rgba(0,0,0,0.95), 2px  2px 0 rgba(0,0,0,0.95),
     0 0 16px rgba(0,0,0,0.8);
-  animation: flickLabelFade 4s ease-out forwards;
+  animation: flickLabelFade 3s ease-out forwards;
 }
 @keyframes stepZonePulse {
   0%,100% { box-shadow: 0 0 0 1px rgba(232,213,163,0.10), 0 0 0 0 rgba(232,213,163,0); }
@@ -4347,11 +4348,34 @@ async function presentFadePlanStep(i) {
   if (overlayText) {
     const wrap = msg.querySelector('.guide-img-wrap');
     if (wrap) {
+      // Compute the zone's center as fractions of the canvas, accounting for offset.
+      const off = { x: state.fadeOffsetXFrac || 0, y: state.fadeOffsetYFrac || 0 };
+      const z = step.zone;
+      let cx = 0.5, cy = 0.5; // fallback: dead center
+      if (z.type === 'band') {
+        cx = (z.startXFrac + z.endXFrac) / 2 + off.x;
+        cy = (z.topFrac   + z.bottomFrac) / 2 + off.y;
+      } else if (z.type === 'quad' || z.type === 'detail-top') {
+        const pts = z.points;
+        cx = pts.reduce((s,p) => s + p.x, 0) / pts.length + off.x;
+        cy = pts.reduce((s,p) => s + p.y, 0) / pts.length + off.y;
+      } else if (z.type === 'detail' || z.type === 'detail-mini') {
+        cx = (z.startXFrac + z.endXFrac) / 2 + off.x;
+        cy = (z.topFrac   + z.bottomFrac) / 2 + off.y;
+      }
+      // Clamp to keep label inside the canvas
+      cx = Math.max(0.1, Math.min(0.9, cx));
+      cy = Math.max(0.08, Math.min(0.92, cy));
+
       const ov = document.createElement('div');
       ov.className = 'flick-label-overlay';
       ov.textContent = overlayText;
+      // Override the CSS position to be exactly at the zone center
+      ov.style.bottom = '';
+      ov.style.top    = `${cy * 100}%`;
+      ov.style.left   = `${cx * 100}%`;
+      ov.style.transform = 'translate(-50%, -50%)';
       wrap.appendChild(ov);
-      // Remove from DOM after animation completes so it doesn't block touch events
       ov.addEventListener('animationend', () => ov.remove());
     }
   }
