@@ -3020,6 +3020,18 @@ function drawTaperShapeOverlay(ctx, W, H, lines) {
   drawSegment(sb0, sb1, 'sideburn', 'Sideburn');
   drawSegment(rr0, rr1, 'rear',     'Near top of ear');
 
+  // ── Centered "Bald Line" label between the two bottom (p0) points ──
+  // p0 points always share the same Y (they move as one horizontal unit).
+  const baldMidX = (sb0.x + rr0.x) / 2;
+  const baldY    = (sb0.y + rr0.y) / 2; // same Y, midpoint for safety
+  ctx.save();
+  ctx.font = 'bold 24px sans-serif'; ctx.textBaseline = 'top'; ctx.textAlign = 'center';
+  ctx.strokeStyle = 'rgba(0,0,0,0.95)'; ctx.lineWidth = 5; ctx.lineJoin = 'round';
+  ctx.strokeText('Bald Line', baldMidX, baldY + 10);
+  ctx.fillStyle = GOLD; ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  ctx.fillText('Bald Line', baldMidX, baldY + 10);
+  ctx.restore();
+
   ctx.restore();
 }
 
@@ -3142,6 +3154,7 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubb
     dragging  = findHandle(pt.x, pt.y);
     isTouch   = touch;
     if (!dragging) return;
+    if (lines._onFirstDrag) lines._onFirstDrag();
     if (lines._stopIdleAnim) lines._stopIdleAnim();
     lines._active        = dragging;
     lines._fingerOffsetY = touch ? FINGER_OFFSET_CSS * pt.scaleY : 0;
@@ -3299,6 +3312,25 @@ async function startTaperShaping() {
   const wrap = msg.querySelector('.guide-img-wrap');
   wrap.appendChild(canvas);
   wrap.appendChild(bubble);
+
+  // Helper hint — fades after 5s or instantly on first drag
+  const hint = document.createElement('div');
+  hint.style.cssText = [
+    'position:absolute','bottom:10px','left:50%','transform:translateX(-50%)',
+    'background:rgba(0,0,0,0.72)','color:rgba(240,223,168,0.96)',
+    'font-size:15px','font-weight:600','white-space:nowrap',
+    'padding:8px 16px','border-radius:20px',
+    'pointer-events:none','z-index:6',
+    'transition:opacity 0.8s ease',
+    'border:1px solid rgba(232,213,163,0.25)',
+  ].join(';');
+  hint.textContent = 'Drag each point to where the label shows.';
+  wrap.appendChild(hint);
+  const dismissHint = () => { hint.style.opacity = '0'; setTimeout(() => hint.remove(), 800); };
+  const hintTimer = setTimeout(dismissHint, 5000);
+  // Dismiss immediately when the user starts dragging any point
+  lines._onFirstDrag = () => { clearTimeout(hintTimer); dismissHint(); lines._onFirstDrag = null; };
+
   msg._taperLines = lines;
   msg._taperCanvas = canvas;
 
