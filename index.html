@@ -3305,7 +3305,8 @@ async function startTaperShaping() {
       <p style="font-size:13.5px;line-height:1.6;margin:0 0 10px;color:var(--text);">Show me where you want your taper. Drag the four dots until the shape looks right for you.</p>
       <div class="guide-img-wrap" style="position:relative;overflow:visible;"></div>
       <div class="drag-hint" style="margin-top:8px;">↕ Drag any dot to adjust your taper</div>
-      <button class="opt-btn" style="margin-top:12px;width:100%;font-size:15px;padding:14px;letter-spacing:0.02em;" onclick="finalizeTaperShape(this)">That's My Taper — Let's Build This Fade</button>
+      <button onclick="openTaperExample()" style="display:block;width:100%;margin-top:8px;padding:10px;background:rgba(232,213,163,0.08);border:1px solid rgba(232,213,163,0.25);border-radius:14px;color:rgba(232,213,163,0.82);font-size:14px;font-weight:600;cursor:pointer;letter-spacing:0.01em;">▶ See Example</button>
+      <button class="opt-btn" style="margin-top:10px;width:100%;font-size:15px;padding:14px;letter-spacing:0.02em;" onclick="finalizeTaperShape(this)">That's My Taper — Let's Build This Fade</button>
     </div></div>`;
   messagesWrap.appendChild(msg);
   canvas.style.width = '100%';
@@ -4606,6 +4607,24 @@ function submitFeedback(btn, rating) {
   card.appendChild(thanks);
 }
 
+// ── TAPER EXAMPLE MODAL ──
+function openTaperExample() {
+  const modal = document.getElementById('taperExampleModal');
+  modal.style.display = 'flex';
+  // Restart video from beginning each open
+  const vid = document.getElementById('taperExampleVideo');
+  if (vid) { vid.currentTime = 0; vid.play().catch(() => {}); }
+}
+function closeTaperExample() {
+  const modal = document.getElementById('taperExampleModal');
+  modal.style.display = 'none';
+  document.getElementById('taperExampleVideo')?.pause();
+}
+// Close on backdrop tap
+document.getElementById('taperExampleModal')?.addEventListener('click', e => {
+  if (e.target === document.getElementById('taperExampleModal')) closeTaperExample();
+});
+
 // ── COPY GUIDE STEPS ──
 function copyGuideSteps(btn, style) {
   const steps = {
@@ -5333,6 +5352,30 @@ if ('serviceWorker' in navigator) {
     <div id="cropFooter">
       <button class="crop-btn-primary" onclick="applyCrop()">Use This Crop</button>
       <button class="crop-btn-skip" onclick="skipCrop()">Full Photo</button>
+    </div>
+  </div>
+
+  <!-- Taper example video modal -->
+  <div id="taperExampleModal" style="display:none;position:fixed;inset:0;z-index:9600;
+       background:rgba(0,0,0,0.88);align-items:center;justify-content:center;padding:16px;">
+    <div style="position:relative;width:100%;max-width:420px;">
+      <button onclick="closeTaperExample()" style="
+        position:absolute;top:-14px;right:-14px;z-index:1;
+        width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;
+        background:rgba(255,255,255,0.15);color:#fff;font-size:18px;line-height:1;
+        display:flex;align-items:center;justify-content:center;">✕</button>
+      <video id="taperExampleVideo" src="taper_example.mp4"
+        autoplay loop muted playsinline
+        style="width:100%;border-radius:16px;display:block;
+               border:1.5px solid rgba(232,213,163,0.30);"></video>
+      <p style="margin:10px 0 0;text-align:center;font-size:13px;
+                color:rgba(232,213,163,0.65);line-height:1.5;">
+        Drag the <strong style="color:rgba(232,213,163,0.9)">Sideburn</strong>
+        and <strong style="color:rgba(232,213,163,0.9)">Near Top of Ear</strong>
+        points to shape your taper.<br>
+        Drag the <strong style="color:rgba(232,213,163,0.9)">Bald Line</strong>
+        up or down to set the start height.
+      </p>
     </div>
   </div>
 </body>
