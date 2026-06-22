@@ -229,11 +229,12 @@ body {
 .chat-area {
   position: absolute;
   top: var(--topbar-h);
-  bottom: var(--inputdock-h);
+  bottom: 0;
   left: 0; right: 0;
   overflow-y: scroll;
   overflow-x: hidden;
   padding: 24px 24px 40px;
+  /* padding-bottom is updated live by ResizeObserver to match dock height */
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scrollbar-color: #555 #1a1a1a;
@@ -246,10 +247,10 @@ body {
 
 /* ── INPUT DOCK ── */
 .input-dock {
-  position: absolute;
+  position: fixed;
   bottom: 0; left: 0; right: 0;
-  height: var(--inputdock-h);
-  padding: 12px 24px 16px;
+  height: auto;
+  padding: 10px 24px calc(16px + env(safe-area-inset-bottom, 0px));
   background: var(--bg);
   border-top: 1px solid var(--border);
   z-index: 10;
@@ -1391,8 +1392,7 @@ body {
   .topbar { padding: 0 16px; }
   .chat-area { padding: 16px 16px 40px; }
   .input-dock {
-    padding: 10px 16px 14px;
-    padding-bottom: max(14px, env(safe-area-inset-bottom));
+    padding: 10px 16px calc(14px + env(safe-area-inset-bottom, 0px));
   }
   .inspo-grid { gap: 8px; }
   .hero-headline { font-size: 22px; }
@@ -1572,6 +1572,17 @@ const messagesWrap = document.getElementById('messagesWrap');
 const hero = document.getElementById('hero');
 const chatArea = document.getElementById('chatArea');
 const uploadPreview = document.getElementById('uploadPreview');
+const inputDock = document.querySelector('.input-dock');
+
+// Keep chat area bottom padding in sync with dock height so the dock
+// never covers content — works when photo preview expands the dock.
+if (inputDock && chatArea) {
+  const syncDockHeight = () => {
+    chatArea.style.paddingBottom = (inputDock.offsetHeight + 16) + 'px';
+  };
+  new ResizeObserver(syncDockHeight).observe(inputDock);
+  syncDockHeight();
+}
 
 let started = false;
 let pendingFiles = [];
