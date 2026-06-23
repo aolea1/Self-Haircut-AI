@@ -1165,6 +1165,39 @@ body {
 .feedback-btn:hover { background: rgba(232,213,163,0.14); border-color: rgba(232,213,163,0.35); transform: scale(1.06); }
 .feedback-btn.selected { background: rgba(232,213,163,0.16); border-color: rgba(232,213,163,0.5); }
 .feedback-thanks { margin-top: 10px; font-size: 12.5px; color: rgba(232,213,163,0.55); }
+/* ── SAVE MY BEST FADE ── */
+.save-fade-card {
+  margin-top: 14px; padding: 16px 18px;
+  background: rgba(232,213,163,0.06); border: 1px solid rgba(232,213,163,0.22);
+  border-radius: 20px; text-align: center;
+  animation: coachCardIn 0.38s cubic-bezier(0.22,1,0.36,1) both;
+}
+.save-fade-title { font-size: 15px; font-weight: 700; color: rgba(232,213,163,0.92); margin-bottom: 4px; }
+.save-fade-sub   { font-size: 13px; color: rgba(232,213,163,0.52); margin-bottom: 14px; }
+.save-fade-btn {
+  width: 100%; padding: 13px; border-radius: 14px;
+  background: rgba(232,213,163,0.12); border: 1.5px solid rgba(232,213,163,0.38);
+  color: rgba(232,213,163,0.95); font-size: 15px; font-weight: 700; cursor: pointer;
+  transition: background 0.16s, border-color 0.16s;
+}
+.save-fade-btn:hover { background: rgba(232,213,163,0.20); border-color: rgba(232,213,163,0.58); }
+/* Hero "Recreate" banner */
+.recreate-banner {
+  margin: 0 0 20px; padding: 14px 16px;
+  background: rgba(232,213,163,0.07); border: 1px solid rgba(232,213,163,0.24);
+  border-radius: 18px; display: flex; align-items: center; gap: 12px;
+}
+.recreate-banner-icon { font-size: 22px; flex-shrink: 0; }
+.recreate-banner-text { flex: 1; }
+.recreate-banner-title { font-size: 14px; font-weight: 700; color: rgba(232,213,163,0.90); }
+.recreate-banner-meta  { font-size: 12px; color: rgba(232,213,163,0.48); margin-top: 1px; }
+.recreate-banner-btn {
+  padding: 9px 14px; border-radius: 12px; border: none; flex-shrink: 0;
+  background: rgba(232,213,163,0.14); border: 1.5px solid rgba(232,213,163,0.35);
+  color: rgba(232,213,163,0.92); font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: background 0.15s;
+}
+.recreate-banner-btn:hover { background: rgba(232,213,163,0.24); }
 /* ── VISUAL COACHING CARD ── */
 .coaching-card {
   display: flex; gap: 0;
@@ -1483,6 +1516,7 @@ body {
 
       <!-- HERO -->
       <div class="lp-hero">
+        <div id="recreateBanner"></div>
         <h1 class="lp-h1">Stop Paying $50 For A Cleanup</h1>
         <p class="lp-sub">Upload a picture. Shape your taper. Follow the fade.</p>
         <div class="lp-upload-row">
@@ -4578,7 +4612,7 @@ function addFadePlanWrapUp() {
     }
   }, 60000);
 
-  // Feedback card
+  // Feedback card + Save My Best Fade
   setTimeout(() => {
     const fbMsg = addAIMessage(`<div class="feedback-card">
       <div class="feedback-title">How did your taper come out?</div>
@@ -4587,6 +4621,11 @@ function addFadePlanWrapUp() {
         <button class="feedback-btn" onclick="submitFeedback(this,'okay')" title="Okay">😐</button>
         <button class="feedback-btn" onclick="submitFeedback(this,'needs-work')" title="Needs Work">👎</button>
       </div>
+    </div>
+    <div class="save-fade-card" style="margin-top:10px;">
+      <div class="save-fade-title">💈 Save My Best Fade</div>
+      <div class="save-fade-sub">Come back anytime and recreate this exact fade.</div>
+      <button class="save-fade-btn" onclick="saveBestFade(this)">Save This Fade</button>
     </div>`, null);
     scrollToMsg(fbMsg);
   }, 300);
@@ -4669,6 +4708,67 @@ function closeTaperExample() {
 document.getElementById('taperExampleModal')?.addEventListener('click', e => {
   if (e.target === document.getElementById('taperExampleModal')) closeTaperExample();
 });
+
+// ── SAVE MY BEST FADE ──
+const SAVED_FADE_KEY = 'shc_saved_fade';
+
+function saveBestFade(btn) {
+  const style     = state.taperStyle || 'low';
+  const styleLabel = { low:'Low Taper', mid:'Mid Taper', high:'High Taper', skin:'Skin Fade', buzz:'Buzz Cut' }[style] || 'Taper';
+  // Grab a thumbnail from the most recent step canvas
+  const canvases  = document.querySelectorAll('.guide-img-wrap canvas');
+  const thumb     = canvases.length ? canvases[canvases.length-1].toDataURL('image/jpeg', 0.4) : null;
+  const payload   = {
+    style,
+    styleLabel,
+    savedAt: Date.now(),
+    thumb,
+    taperLines: state.taperLines ? JSON.parse(JSON.stringify(state.taperLines)) : null,
+  };
+  try { localStorage.setItem(SAVED_FADE_KEY, JSON.stringify(payload)); } catch(e) {}
+  btn.textContent = '✓ Fade Saved';
+  btn.disabled    = true;
+  btn.style.opacity = '0.6';
+}
+
+function getSavedFade() {
+  try { return JSON.parse(localStorage.getItem(SAVED_FADE_KEY) || 'null'); } catch(e) { return null; }
+}
+
+function clearSavedFade() {
+  localStorage.removeItem(SAVED_FADE_KEY);
+  document.getElementById('recreateBanner').innerHTML = '';
+}
+
+function recreateBestFade() {
+  const saved = getSavedFade();
+  if (!saved) return;
+  // Pre-select the saved style and prompt the user to upload a new photo
+  state.taperStyle = saved.style;
+  const banner = document.getElementById('recreateBanner');
+  if (banner) banner.innerHTML = '';
+  addAIMessage(`<p>Your saved fade is a <strong>${saved.styleLabel}</strong>. Upload a new photo and I'll rebuild your exact guide.</p>`, null);
+  scrollBottom();
+  triggerUpload();
+}
+
+function showRecreateBanner() {
+  const saved  = getSavedFade();
+  const banner = document.getElementById('recreateBanner');
+  if (!saved || !banner) return;
+  const ago = (() => {
+    const d = Math.floor((Date.now() - saved.savedAt) / 86400000);
+    return d === 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`;
+  })();
+  banner.innerHTML = `<div class="recreate-banner">
+    ${saved.thumb ? `<img src="${saved.thumb}" class="recreate-banner-icon" style="width:44px;height:44px;border-radius:10px;object-fit:cover;flex-shrink:0;">` : '<div class="recreate-banner-icon">💈</div>'}
+    <div class="recreate-banner-text">
+      <div class="recreate-banner-title">My Saved Fade — ${saved.styleLabel}</div>
+      <div class="recreate-banner-meta">Saved ${ago} · tap to recreate</div>
+    </div>
+    <button class="recreate-banner-btn" onclick="recreateBestFade()">Recreate →</button>
+  </div>`;
+}
 
 // ── COPY GUIDE STEPS ──
 function copyGuideSteps(btn, style) {
@@ -5343,6 +5443,9 @@ _renderSidebarAuth();
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
+
+// Show "Recreate My Best Fade" banner if the user has a saved fade
+showRecreateBanner();
 </script>
 
   <!-- ── CAMERA CAPTURE MODAL ── -->
