@@ -1303,12 +1303,25 @@ body {
 .auth-error { font-size:12.5px;color:#ff5f3d;text-align:center;margin-bottom:8px; }
 /* Account avatar in topbar */
 .auth-avatar-btn {
-  width:30px;height:30px;border-radius:50%;border:1.5px solid rgba(232,213,163,0.4);
-  background:rgba(232,213,163,0.12);color:rgba(232,213,163,0.88);
-  font-size:13px;font-weight:700;cursor:pointer;display:flex;
-  align-items:center;justify-content:center;transition:background 0.14s;
+  padding:6px 12px; border-radius:20px;
+  border:1px solid rgba(232,213,163,0.28);
+  background:rgba(232,213,163,0.07);
+  color:rgba(232,213,163,0.80);
+  font-size:13px;font-weight:600;cursor:pointer;
+  display:flex;align-items:center;gap:5px;white-space:nowrap;
+  transition:background 0.14s,border-color 0.14s,color 0.14s;
+  letter-spacing:0.01em;
 }
-.auth-avatar-btn:hover { background:rgba(232,213,163,0.22); }
+.auth-avatar-btn:hover {
+  background:rgba(232,213,163,0.14);
+  border-color:rgba(232,213,163,0.45);
+  color:rgba(232,213,163,0.95);
+}
+.auth-avatar-btn.signed-in {
+  border-color:rgba(232,213,163,0.38);
+  background:rgba(232,213,163,0.10);
+  color:rgba(232,213,163,0.92);
+}
 /* ── SAVE MY BEST FADE ── */
 .save-fade-card {
   margin-top: 14px; padding: 16px 18px;
@@ -1648,9 +1661,8 @@ body {
     </button>
     <button class="topbar-title" onclick="_easedScroll(document.getElementById('chatArea'),0,900)" style="font-family:'Manrope',sans-serif;font-weight:700;font-size:15px;letter-spacing:-0.2px;background:none;border:none;padding:6px 10px;border-radius:10px;cursor:pointer;color:inherit;-webkit-tap-highlight-color:transparent;">SelfHaircut<span style="color:var(--accent2)">.ai</span></button>
     <div class="topbar-actions">
-      <button class="auth-avatar-btn" id="authTopbarBtn" onclick="onAuthBtnTap()" title="Account">
-        <svg id="authTopbarIcon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        <span id="authTopbarInitial" style="display:none"></span>
+      <button class="auth-avatar-btn" id="authTopbarBtn" onclick="onAuthBtnTap()">
+        <span id="authTopbarLabel">Log In</span>
       </button>
     </div>
   </header>
@@ -4862,16 +4874,13 @@ let _authPendingAction = null; // callback to run after login
 window._currentUser = null;
 window._onAuthChange = (user) => {
   window._currentUser = user;
-  const btn = document.getElementById('authTopbarBtn');
-  const icon = document.getElementById('authTopbarIcon');
-  const initial = document.getElementById('authTopbarInitial');
+  const btn   = document.getElementById('authTopbarBtn');
+  const label = document.getElementById('authTopbarLabel');
   if (!btn) return;
   if (user) {
-    const name = user.displayName || user.email || '';
-    const letter = name.charAt(0).toUpperCase() || '?';
-    icon.style.display = 'none';
-    initial.style.display = '';
-    initial.textContent = letter;
+    const firstName = (user.displayName || user.email || '').split(' ')[0];
+    if (label) label.textContent = firstName ? `Hi, ${firstName} ▾` : 'Account ▾';
+    btn.classList.add('signed-in');
     // Personalized greeting in hero if not already started
     const greetEl = document.getElementById('authGreeting');
     const firstName = (user.displayName || '').split(' ')[0];
@@ -4886,8 +4895,8 @@ window._onAuthChange = (user) => {
       }).catch(() => {});
     }
   } else {
-    icon.style.display = '';
-    initial.style.display = 'none';
+    if (label) label.textContent = 'Log In';
+    btn.classList.remove('signed-in');
     const greetEl = document.getElementById('authGreeting');
     if (greetEl) greetEl.textContent = '';
   }
