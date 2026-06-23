@@ -4820,8 +4820,20 @@ function addFadePlanWrapUp() {
     }
   }, 60000);
 
-  // Feedback card + Save My Best Fade
+  // Feedback card + Save My Best Fade (only for logged-in users)
   setTimeout(() => {
+    const saveFadeHtml = window._currentUser ? `
+    <div class="save-fade-card" style="margin-top:10px;">
+      <div class="save-fade-title">💈 Save My Best Fade</div>
+      <div class="save-fade-sub">Come back anytime and recreate this exact fade.</div>
+      <button class="save-fade-btn" onclick="saveBestFade(this)">Save This Fade</button>
+    </div>` : `
+    <div style="margin-top:12px;text-align:center;">
+      <button class="save-fade-btn" style="font-size:13px;padding:11px;" onclick="openAuthModal(()=>{})">
+        Create a free account to save this fade →
+      </button>
+    </div>`;
+
     const fbMsg = addAIMessage(`<div class="feedback-card">
       <div class="feedback-title">How did your taper come out?</div>
       <div class="feedback-btns">
@@ -4829,12 +4841,7 @@ function addFadePlanWrapUp() {
         <button class="feedback-btn" onclick="submitFeedback(this,'okay')" title="Okay">😐</button>
         <button class="feedback-btn" onclick="submitFeedback(this,'needs-work')" title="Needs Work">👎</button>
       </div>
-    </div>
-    <div class="save-fade-card" style="margin-top:10px;">
-      <div class="save-fade-title">💈 Save My Best Fade</div>
-      <div class="save-fade-sub">Come back anytime and recreate this exact fade.</div>
-      <button class="save-fade-btn" onclick="saveBestFade(this)">Save This Fade</button>
-    </div>`, null);
+    </div>${saveFadeHtml}`, null);
     scrollToMsg(fbMsg);
   }, 300);
 }
@@ -5038,6 +5045,7 @@ async function authWithEmail() {
     let r;
     if (_authMode === 'signup') {
       r = await window._fbCreateEmail(email, pass, name);
+      sendWelcomeEmail(email, name);
     } else {
       r = await window._fbSignInEmail(email, pass);
     }
@@ -5059,6 +5067,31 @@ async function authWithEmail() {
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = _authMode === 'signup' ? 'Create Account' : 'Sign In'; }
   }
+}
+
+// ── WELCOME EMAIL ──
+function sendWelcomeEmail(email, firstName) {
+  const body = `Hi ${firstName || 'there'},
+
+Thank you for joining SelfHaircut.ai.
+
+Your journey to becoming your own barber — and saving thousands a year — starts today.
+
+SelfHaircut.ai was built to help you cut with more confidence, avoid common self-haircut mistakes, and improve every time you step in front of the mirror.
+
+Welcome to the future of self-haircuts.
+
+— The SelfHaircut.ai Team`;
+
+  fetch(BACKEND_URL + '/send-email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      to: email,
+      subject: 'Welcome to SelfHaircut.ai',
+      text: body,
+    }),
+  }).catch(() => {}); // fail silently — email is a nice-to-have
 }
 
 // ── SAVE MY BEST FADE ──
@@ -5111,9 +5144,12 @@ function recreateBestFade() {
 }
 
 function showRecreateBanner() {
-  const saved  = getSavedFade();
   const banner = document.getElementById('recreateBanner');
-  if (!saved || !banner) return;
+  if (!banner) return;
+  // Only show for signed-in users with a saved fade
+  if (!window._currentUser) { banner.innerHTML = ''; return; }
+  const saved = getSavedFade();
+  if (!saved) return;
   const ago = (() => {
     const d = Math.floor((Date.now() - saved.savedAt) / 86400000);
     return d === 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`;
