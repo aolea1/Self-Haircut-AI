@@ -470,6 +470,7 @@ body {
   margin: 0 auto;
   display: flex; flex-direction: column; align-items: center;
   animation: heroIn .45s ease both;
+  padding-bottom: 60px;
 }
 @keyframes heroIn {
   from { opacity:0; transform:translateY(14px); }
@@ -1780,7 +1781,7 @@ const inputDock = document.querySelector('.input-dock');
 // never covers content — works when photo preview expands the dock.
 if (inputDock && chatArea) {
   const syncDockHeight = () => {
-    chatArea.style.paddingBottom = (inputDock.offsetHeight + 16) + 'px';
+    chatArea.style.paddingBottom = (inputDock.offsetHeight + 40) + 'px';
   };
   new ResizeObserver(syncDockHeight).observe(inputDock);
   syncDockHeight();
