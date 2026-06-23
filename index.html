@@ -4881,9 +4881,7 @@ window._onAuthChange = (user) => {
     const firstName = (user.displayName || user.email || '').split(' ')[0];
     if (label) label.textContent = firstName ? `Hi, ${firstName} ▾` : 'Account ▾';
     btn.classList.add('signed-in');
-    // Personalized greeting in hero if not already started
     const greetEl = document.getElementById('authGreeting');
-    const firstName = (user.displayName || '').split(' ')[0];
     if (greetEl && firstName) greetEl.textContent = `Welcome back, ${firstName}`;
     // Load cloud fade and update banner
     if (window._fbGetFade) {
