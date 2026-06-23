@@ -1372,6 +1372,23 @@ body {
   transition: background 0.16s, border-color 0.16s;
 }
 .save-fade-btn:hover { background: rgba(232,213,163,0.20); border-color: rgba(232,213,163,0.58); }
+/* Personalized returning-user greeting */
+.personal-greeting {
+  width:100%; margin-bottom:18px; padding:18px 20px;
+  background:rgba(232,213,163,0.05); border:1px solid rgba(232,213,163,0.18);
+  border-radius:18px; text-align:left;
+  animation:heroIn .4s ease both;
+}
+.personal-greeting-name {
+  font-family:'Manrope',sans-serif; font-size:18px; font-weight:800;
+  color:rgba(232,213,163,0.95); margin-bottom:3px;
+}
+.personal-greeting-days {
+  font-size:13.5px; color:rgba(232,213,163,0.55); margin-bottom:8px;
+}
+.personal-greeting-cta {
+  font-size:13.5px; font-weight:600; color:rgba(232,213,163,0.72);
+}
 /* Hero "Recreate" banner */
 .recreate-banner {
   margin: 0 0 20px; padding: 14px 16px;
@@ -1720,8 +1737,9 @@ body {
 
       <!-- HERO -->
       <div class="lp-hero">
+        <div id="personalGreeting"></div>
         <div id="recreateBanner"></div>
-        <p id="authGreeting" style="font-size:13px;font-weight:600;color:rgba(232,213,163,0.62);margin-bottom:8px;min-height:18px;"></p>
+        <p id="authGreeting" style="display:none"></p>
         <h1 class="lp-h1">Stop Paying $50 For A Cleanup</h1>
         <p class="lp-sub">Upload a picture. Shape your taper. Follow the fade.</p>
         <div class="lp-upload-row">
@@ -4943,6 +4961,7 @@ window._onAuthChange = (user) => {
     // Sync sidebar state
     _sidebarUser = { name: user.displayName, email: user.email, photoURL: user.photoURL, uid: user.uid };
     _renderSidebarAuth();
+    showPersonalizedGreeting(user);
     // Load cloud fade and update banner
     if (window._fbGetFade) {
       window._fbGetFade(user.uid).then(fade => {
@@ -5141,6 +5160,35 @@ function recreateBestFade() {
   addAIMessage(`<p>Your saved fade is a <strong>${saved.styleLabel}</strong>. Upload a new photo and I'll rebuild your exact guide.</p>`, null);
   scrollBottom();
   triggerUpload();
+}
+
+async function showPersonalizedGreeting(user) {
+  const el = document.getElementById('personalGreeting');
+  if (!el) return;
+  if (!user || !window._fbGetHistory) { el.innerHTML = ''; return; }
+
+  let lastCutTs = null;
+  try {
+    const history = await window._fbGetHistory(user.uid);
+    if (!history || !history.length) { el.innerHTML = ''; return; } // no cuts yet
+    // ts may be a Firestore Timestamp object or a ms number
+    const raw = history[0].ts;
+    lastCutTs = raw?.toDate ? raw.toDate().getTime() : (typeof raw === 'number' ? raw : null);
+  } catch(e) { el.innerHTML = ''; return; }
+
+  if (!lastCutTs) { el.innerHTML = ''; return; }
+
+  const firstName = (user.displayName || '').split(' ')[0] || 'there';
+  const days = Math.floor((Date.now() - lastCutTs) / 86400000);
+  const daysLine = days === 0 ? 'You just cut today.'
+                 : days === 1 ? "It's been 1 day since your last cut."
+                 : `It's been ${days} days since your last cut.`;
+
+  el.innerHTML = `<div class="personal-greeting">
+    <div class="personal-greeting-name">Welcome back, ${firstName}.</div>
+    <div class="personal-greeting-days">${daysLine}</div>
+    <div class="personal-greeting-cta">Ready for your next cleanup?</div>
+  </div>`;
 }
 
 function showRecreateBanner() {
