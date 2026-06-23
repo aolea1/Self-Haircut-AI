@@ -17,6 +17,82 @@
 <meta name="twitter:title" content="SelfHaircut.ai — Barber-Calibrated Taper Guide">
 <meta name="twitter:description" content="Mark your ear, get your exact taper line. Step-by-step guard guide. Cut your own hair like a pro.">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp }                         from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+  import { getAuth, onAuthStateChanged, signOut,
+           GoogleAuthProvider, OAuthProvider,
+           signInWithPopup, createUserWithEmailAndPassword,
+           signInWithEmailAndPassword, updateProfile } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+  import { getFirestore, doc, setDoc, getDoc }    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+  // ── PASTE YOUR FIREBASE CONFIG HERE ──────────────────────────────────────
+  // Create a project at https://console.firebase.google.com, enable
+  // Authentication (Google, Apple, Email/Password) and Firestore, then
+  // copy the config object from Project Settings → Your Apps.
+  const firebaseConfig = {
+    apiKey:            "PASTE_API_KEY",
+    authDomain:        "PASTE_AUTH_DOMAIN",
+    projectId:         "PASTE_PROJECT_ID",
+    storageBucket:     "PASTE_STORAGE_BUCKET",
+    messagingSenderId: "PASTE_MESSAGING_SENDER_ID",
+    appId:             "PASTE_APP_ID",
+  };
+  // ─────────────────────────────────────────────────────────────────────────
+
+  let _app, _auth, _db;
+  try {
+    _app  = initializeApp(firebaseConfig);
+    _auth = getAuth(_app);
+    _db   = getFirestore(_app);
+  } catch(e) {
+    console.warn('Firebase not configured:', e.message);
+  }
+
+  // Expose to global scope so non-module code can call these
+  window._fbAuth = _auth;
+  window._fbDb   = _db;
+
+  window._fbSignInGoogle = async () => {
+    const p = new GoogleAuthProvider();
+    return signInWithPopup(_auth, p);
+  };
+  window._fbSignInApple = async () => {
+    const p = new OAuthProvider('apple.com');
+    p.addScope('email'); p.addScope('name');
+    return signInWithPopup(_auth, p);
+  };
+  window._fbSignInEmail = (email, pass) => signInWithEmailAndPassword(_auth, email, pass);
+  window._fbCreateEmail = async (email, pass, name) => {
+    const cred = await createUserWithEmailAndPassword(_auth, email, pass);
+    if (name) await updateProfile(cred.user, { displayName: name });
+    return cred;
+  };
+  window._fbSignOut = () => signOut(_auth);
+
+  // Firestore helpers
+  window._fbSaveFade = async (uid, data) => {
+    if (!_db) return;
+    await setDoc(doc(_db, 'users', uid, 'fades', 'best'), data);
+  };
+  window._fbGetFade = async (uid) => {
+    if (!_db) return null;
+    const snap = await getDoc(doc(_db, 'users', uid, 'fades', 'best'));
+    return snap.exists() ? snap.data() : null;
+  };
+  window._fbSaveProfile = async (uid, data) => {
+    if (!_db) return;
+    await setDoc(doc(_db, 'users', uid), data, { merge: true });
+  };
+
+  // Auth state listener
+  if (_auth) {
+    onAuthStateChanged(_auth, user => {
+      window._currentUser = user || null;
+      if (typeof window._onAuthChange === 'function') window._onAuthChange(user);
+    });
+  }
+</script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1165,6 +1241,74 @@ body {
 .feedback-btn:hover { background: rgba(232,213,163,0.14); border-color: rgba(232,213,163,0.35); transform: scale(1.06); }
 .feedback-btn.selected { background: rgba(232,213,163,0.16); border-color: rgba(232,213,163,0.5); }
 .feedback-thanks { margin-top: 10px; font-size: 12.5px; color: rgba(232,213,163,0.55); }
+/* ── AUTH MODAL ── */
+.auth-overlay {
+  position:fixed;inset:0;z-index:9900;background:rgba(0,0,0,0.72);
+  display:none;align-items:flex-end;justify-content:center;
+}
+.auth-overlay.open { display:flex; }
+.auth-sheet {
+  width:100%;max-width:480px;padding:28px 24px 40px;
+  background:#161616;border-radius:24px 24px 0 0;
+  border-top:1px solid rgba(255,255,255,0.10);
+  animation:sheetUp 0.32s cubic-bezier(0.22,1,0.36,1) both;
+}
+@keyframes sheetUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+.auth-sheet-title {
+  font-family:'Manrope',sans-serif;font-size:18px;font-weight:800;
+  color:#f5f2ee;text-align:center;margin-bottom:6px;
+}
+.auth-sheet-sub {
+  font-size:13px;color:var(--text3);text-align:center;margin-bottom:22px;
+}
+.auth-provider-btn {
+  width:100%;padding:13px;margin-bottom:10px;border-radius:14px;
+  background:var(--surface2);border:1px solid var(--border2);
+  color:var(--text);font-size:15px;font-weight:600;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  transition:background 0.14s,border-color 0.14s;
+}
+.auth-provider-btn:hover { background:var(--surface3); border-color:rgba(255,255,255,0.2); }
+.auth-provider-btn svg { width:20px;height:20px;flex-shrink:0; }
+.auth-divider {
+  display:flex;align-items:center;gap:10px;margin:14px 0;
+}
+.auth-divider hr { flex:1;border:none;border-top:1px solid var(--border); }
+.auth-divider span { font-size:12px;color:var(--text3); }
+.auth-field {
+  width:100%;padding:12px 14px;margin-bottom:10px;border-radius:12px;
+  background:var(--surface2);border:1px solid var(--border2);
+  color:var(--text);font-size:15px;outline:none;
+  transition:border-color 0.14s;
+}
+.auth-field:focus { border-color:rgba(232,213,163,0.4); }
+.auth-field::placeholder { color:var(--text3); }
+.auth-submit-btn {
+  width:100%;padding:14px;border-radius:14px;border:none;margin-top:4px;
+  background:var(--accent);color:#1a1410;font-size:15px;font-weight:700;cursor:pointer;
+  transition:background 0.14s;
+}
+.auth-submit-btn:hover { background:var(--accent2); }
+.auth-toggle {
+  text-align:center;margin-top:14px;font-size:13px;color:var(--text3);
+}
+.auth-toggle button {
+  background:none;border:none;color:var(--accent2);font-size:13px;
+  font-weight:600;cursor:pointer;padding:0;
+}
+.auth-close {
+  position:absolute;top:16px;right:20px;background:none;border:none;
+  color:var(--text3);font-size:22px;cursor:pointer;line-height:1;padding:4px;
+}
+.auth-error { font-size:12.5px;color:#ff5f3d;text-align:center;margin-bottom:8px; }
+/* Account avatar in topbar */
+.auth-avatar-btn {
+  width:30px;height:30px;border-radius:50%;border:1.5px solid rgba(232,213,163,0.4);
+  background:rgba(232,213,163,0.12);color:rgba(232,213,163,0.88);
+  font-size:13px;font-weight:700;cursor:pointer;display:flex;
+  align-items:center;justify-content:center;transition:background 0.14s;
+}
+.auth-avatar-btn:hover { background:rgba(232,213,163,0.22); }
 /* ── SAVE MY BEST FADE ── */
 .save-fade-card {
   margin-top: 14px; padding: 16px 18px;
@@ -1504,8 +1648,9 @@ body {
     </button>
     <button class="topbar-title" onclick="_easedScroll(document.getElementById('chatArea'),0,900)" style="font-family:'Manrope',sans-serif;font-weight:700;font-size:15px;letter-spacing:-0.2px;background:none;border:none;padding:6px 10px;border-radius:10px;cursor:pointer;color:inherit;-webkit-tap-highlight-color:transparent;">SelfHaircut<span style="color:var(--accent2)">.ai</span></button>
     <div class="topbar-actions">
-      <button class="icon-btn" title="Menu" onclick="openSidebar()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <button class="auth-avatar-btn" id="authTopbarBtn" onclick="onAuthBtnTap()" title="Account">
+        <svg id="authTopbarIcon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span id="authTopbarInitial" style="display:none"></span>
       </button>
     </div>
   </header>
@@ -1517,6 +1662,7 @@ body {
       <!-- HERO -->
       <div class="lp-hero">
         <div id="recreateBanner"></div>
+        <p id="authGreeting" style="font-size:13px;font-weight:600;color:rgba(232,213,163,0.62);margin-bottom:8px;min-height:18px;"></p>
         <h1 class="lp-h1">Stop Paying $50 For A Cleanup</h1>
         <p class="lp-sub">Upload a picture. Shape your taper. Follow the fade.</p>
         <div class="lp-upload-row">
@@ -4709,26 +4855,150 @@ document.getElementById('taperExampleModal')?.addEventListener('click', e => {
   if (e.target === document.getElementById('taperExampleModal')) closeTaperExample();
 });
 
+// ── AUTH ──
+let _authMode = 'signin'; // 'signin' | 'signup'
+let _authPendingAction = null; // callback to run after login
+
+window._currentUser = null;
+window._onAuthChange = (user) => {
+  window._currentUser = user;
+  const btn = document.getElementById('authTopbarBtn');
+  const icon = document.getElementById('authTopbarIcon');
+  const initial = document.getElementById('authTopbarInitial');
+  if (!btn) return;
+  if (user) {
+    const name = user.displayName || user.email || '';
+    const letter = name.charAt(0).toUpperCase() || '?';
+    icon.style.display = 'none';
+    initial.style.display = '';
+    initial.textContent = letter;
+    // Personalized greeting in hero if not already started
+    const greetEl = document.getElementById('authGreeting');
+    const firstName = (user.displayName || '').split(' ')[0];
+    if (greetEl && firstName) greetEl.textContent = `Welcome back, ${firstName}`;
+    // Load cloud fade and update banner
+    if (window._fbGetFade) {
+      window._fbGetFade(user.uid).then(fade => {
+        if (fade) {
+          try { localStorage.setItem(SAVED_FADE_KEY, JSON.stringify(fade)); } catch(e) {}
+          showRecreateBanner();
+        }
+      }).catch(() => {});
+    }
+  } else {
+    icon.style.display = '';
+    initial.style.display = 'none';
+    const greetEl = document.getElementById('authGreeting');
+    if (greetEl) greetEl.textContent = '';
+  }
+};
+
+function openAuthModal(pendingAction) {
+  _authPendingAction = pendingAction || null;
+  _authMode = 'signin';
+  _applyAuthMode();
+  document.getElementById('authOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('authEmail')?.focus(), 350);
+}
+function closeAuthModal() {
+  document.getElementById('authOverlay').classList.remove('open');
+  document.getElementById('authError').style.display = 'none';
+  ['authEmail','authPass','authName'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+}
+function onAuthBtnTap() {
+  if (window._currentUser) {
+    // Logged in — show quick menu
+    const signedInAs = window._currentUser.displayName || window._currentUser.email;
+    if (confirm(`Signed in as ${signedInAs}\n\nSign out?`)) {
+      if (window._fbSignOut) window._fbSignOut().catch(() => {});
+      window._currentUser = null;
+      window._onAuthChange(null);
+    }
+  } else {
+    openAuthModal(null);
+  }
+}
+function toggleAuthMode() {
+  _authMode = _authMode === 'signin' ? 'signup' : 'signin';
+  _applyAuthMode();
+}
+function _applyAuthMode() {
+  const isSignUp = _authMode === 'signup';
+  document.getElementById('authTitle').textContent = isSignUp ? 'Create your account' : 'Sign in to SelfHaircut.ai';
+  document.getElementById('authSub').textContent = isSignUp ? 'Save your fade and access it anywhere.' : 'Save your fade and access it from any device.';
+  document.getElementById('authSubmitBtn').textContent = isSignUp ? 'Create Account' : 'Sign In';
+  document.getElementById('authToggleText').textContent = isSignUp ? 'Already have an account?' : "Don't have an account?";
+  document.querySelector('#authEmailFields .auth-toggle button').textContent = isSignUp ? 'Sign in' : 'Create account';
+  document.getElementById('authNameWrap').style.display = isSignUp ? '' : 'none';
+  document.getElementById('authPass').autocomplete = isSignUp ? 'new-password' : 'current-password';
+  document.getElementById('authError').style.display = 'none';
+}
+function _authShowError(msg) {
+  const el = document.getElementById('authError');
+  el.textContent = msg; el.style.display = '';
+}
+function _afterAuth(user) {
+  closeAuthModal();
+  window._onAuthChange(user);
+  if (_authPendingAction) { _authPendingAction(user); _authPendingAction = null; }
+}
+async function authWithGoogle() {
+  if (!window._fbSignInGoogle) return _authShowError('Firebase not configured yet.');
+  try { const r = await window._fbSignInGoogle(); _afterAuth(r.user); }
+  catch(e) { if (e.code !== 'auth/popup-closed-by-user') _authShowError('Google sign-in failed.'); }
+}
+async function authWithApple() {
+  if (!window._fbSignInApple) return _authShowError('Firebase not configured yet.');
+  try { const r = await window._fbSignInApple(); _afterAuth(r.user); }
+  catch(e) { if (e.code !== 'auth/popup-closed-by-user') _authShowError('Apple sign-in failed.'); }
+}
+async function authWithEmail() {
+  if (!window._fbSignInEmail) return _authShowError('Firebase not configured yet.');
+  const email = document.getElementById('authEmail').value.trim();
+  const pass  = document.getElementById('authPass').value;
+  const name  = document.getElementById('authName')?.value.trim() || '';
+  if (!email || !pass) return _authShowError('Please enter your email and password.');
+  try {
+    let r;
+    if (_authMode === 'signup') {
+      if (!name) return _authShowError('Please enter your first name.');
+      r = await window._fbCreateEmail(email, pass, name);
+    } else {
+      r = await window._fbSignInEmail(email, pass);
+    }
+    _afterAuth(r.user);
+  } catch(e) {
+    const msgs = { 'auth/email-already-in-use':'Email already in use — try signing in.', 'auth/wrong-password':'Incorrect password.', 'auth/user-not-found':'No account found — try creating one.', 'auth/weak-password':'Password must be at least 6 characters.' };
+    _authShowError(msgs[e.code] || 'Something went wrong. Try again.');
+  }
+}
+
 // ── SAVE MY BEST FADE ──
 const SAVED_FADE_KEY = 'shc_saved_fade';
 
 function saveBestFade(btn) {
-  const style     = state.taperStyle || 'low';
-  const styleLabel = { low:'Low Taper', mid:'Mid Taper', high:'High Taper', skin:'Skin Fade', buzz:'Buzz Cut' }[style] || 'Taper';
-  // Grab a thumbnail from the most recent step canvas
-  const canvases  = document.querySelectorAll('.guide-img-wrap canvas');
-  const thumb     = canvases.length ? canvases[canvases.length-1].toDataURL('image/jpeg', 0.4) : null;
-  const payload   = {
-    style,
-    styleLabel,
-    savedAt: Date.now(),
-    thumb,
-    taperLines: state.taperLines ? JSON.parse(JSON.stringify(state.taperLines)) : null,
+  const doSave = (user) => {
+    const style      = state.taperStyle || 'low';
+    const styleLabel = { low:'Low Taper', mid:'Mid Taper', high:'High Taper', skin:'Skin Fade', buzz:'Buzz Cut' }[style] || 'Taper';
+    const canvases   = document.querySelectorAll('.guide-img-wrap canvas');
+    const thumb      = canvases.length ? canvases[canvases.length-1].toDataURL('image/jpeg', 0.4) : null;
+    const payload    = { style, styleLabel, savedAt: Date.now(), thumb,
+                         taperLines: state.taperLines ? JSON.parse(JSON.stringify(state.taperLines)) : null };
+    // Always save locally as fallback
+    try { localStorage.setItem(SAVED_FADE_KEY, JSON.stringify(payload)); } catch(e) {}
+    // Sync to Firestore if logged in
+    if (user && window._fbSaveFade) window._fbSaveFade(user.uid, payload).catch(() => {});
+    btn.textContent = '✓ Fade Saved';
+    btn.disabled = true; btn.style.opacity = '0.6';
+    showRecreateBanner();
   };
-  try { localStorage.setItem(SAVED_FADE_KEY, JSON.stringify(payload)); } catch(e) {}
-  btn.textContent = '✓ Fade Saved';
-  btn.disabled    = true;
-  btn.style.opacity = '0.6';
+
+  if (window._currentUser) {
+    doSave(window._currentUser);
+  } else {
+    // Prompt login first, then save after auth
+    openAuthModal((user) => doSave(user));
+  }
 }
 
 function getSavedFade() {
@@ -5447,6 +5717,40 @@ if ('serviceWorker' in navigator) {
 // Show "Recreate My Best Fade" banner if the user has a saved fade
 showRecreateBanner();
 </script>
+
+  <!-- ── AUTH MODAL ── -->
+  <div class="auth-overlay" id="authOverlay" onclick="if(event.target===this)closeAuthModal()">
+    <div class="auth-sheet" style="position:relative">
+      <button class="auth-close" onclick="closeAuthModal()">×</button>
+      <div class="auth-sheet-title" id="authTitle">Sign in to SelfHaircut.ai</div>
+      <div class="auth-sheet-sub" id="authSub">Save your fade and access it from any device.</div>
+      <div id="authError" class="auth-error" style="display:none"></div>
+
+      <button class="auth-provider-btn" onclick="authWithGoogle()">
+        <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Continue with Google
+      </button>
+      <button class="auth-provider-btn" onclick="authWithApple()">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.4c1.42.07 2.4.83 3.18.86.96-.17 1.88-.95 3.22-.86 1.54.11 2.71.77 3.46 2.02-3.04 1.86-2.35 5.86.68 7a9.57 9.57 0 0 1-2.54 4.86zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+        Continue with Apple
+      </button>
+
+      <div class="auth-divider"><hr/><span>or</span><hr/></div>
+
+      <div id="authEmailFields">
+        <div id="authNameWrap" style="display:none">
+          <input class="auth-field" id="authName" type="text" placeholder="First name" autocomplete="given-name">
+        </div>
+        <input class="auth-field" id="authEmail" type="email" placeholder="Email address" autocomplete="email">
+        <input class="auth-field" id="authPass"  type="password" placeholder="Password" autocomplete="current-password">
+        <button class="auth-submit-btn" id="authSubmitBtn" onclick="authWithEmail()">Sign In</button>
+        <div class="auth-toggle">
+          <span id="authToggleText">Don't have an account?</span>
+          <button onclick="toggleAuthMode()">Create account</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ── CAMERA CAPTURE MODAL ── -->
   <div id="arModal">
