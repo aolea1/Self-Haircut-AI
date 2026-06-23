@@ -93,6 +93,31 @@
     await setDoc(doc(_db, 'users', uid), data, { merge: true });
   };
 
+  // Haircut history — each entry is a separate doc with auto-ID under /users/{uid}/history/
+  window._fbLogHistory = async (uid, entry) => {
+    if (!_db) return;
+    const { addDoc, collection, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    await addDoc(collection(_db, 'users', uid, 'history'), { ...entry, ts: serverTimestamp() });
+  };
+  window._fbGetHistory = async (uid) => {
+    if (!_db) return [];
+    const { collection, getDocs, query, orderBy, limit } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    const q = query(collection(_db, 'users', uid, 'history'), orderBy('ts', 'desc'), limit(20));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  };
+
+  // Barber notes — single doc per user
+  window._fbSaveNotes = async (uid, text) => {
+    if (!_db) return;
+    await setDoc(doc(_db, 'users', uid, 'notes', 'barber'), { text, updatedAt: Date.now() }, { merge: true });
+  };
+  window._fbGetNotes = async (uid) => {
+    if (!_db) return '';
+    const snap = await getDoc(doc(_db, 'users', uid, 'notes', 'barber'));
+    return snap.exists() ? (snap.data().text || '') : '';
+  };
+
   // Auth state listener
   if (_auth) {
     onAuthStateChanged(_auth, user => {
@@ -1649,16 +1674,29 @@ body {
     </div>
 
     <div class="sidebar-section-label">My Cuts</div>
-    <div id="sidebarCutsList" style="flex:1; overflow-y:auto;">
-      <div style="font-size:12.5px; color:var(--text3); padding:6px 10px; line-height:1.6;">
-        No saved cuts yet.<br>Complete a fade to save it here.
+    <div id="sidebarCutsList" style="flex:1;overflow-y:auto;min-height:60px;">
+      <div style="font-size:12.5px;color:var(--text3);padding:6px 10px;line-height:1.6;">
+        No cuts yet. Complete a fade to log it here.
       </div>
+    </div>
+
+    <div class="sidebar-section-label" style="margin-top:10px;">Barber Notes</div>
+    <div style="padding:0 10px 10px;">
+      <textarea id="barberNotesField"
+        placeholder="Notes to yourself about your cut… guard sizes, what worked, what to avoid."
+        style="width:100%;min-height:90px;background:var(--surface2);border:1px solid var(--border2);
+               border-radius:12px;padding:10px;color:var(--text);font-size:12.5px;line-height:1.55;
+               resize:vertical;outline:none;font-family:'DM Sans',sans-serif;transition:border-color 0.15s;"
+        onfocus="this.style.borderColor='rgba(232,213,163,0.38)'"
+        onblur="this.style.borderColor='';saveBarberNotes(this.value)"
+      ></textarea>
+      <div id="barberNotesSaved" style="font-size:11px;color:rgba(232,213,163,0.4);text-align:right;margin-top:3px;opacity:0;transition:opacity 0.3s;">Saved</div>
     </div>
   </div>
 
   <div class="sidebar-bottom" id="sidebarBottom" style="display:none;">
-    <div style="font-size:11px; color:var(--text3); text-align:center; line-height:1.5;">
-      Cuts are saved to your account automatically after each session.
+    <div style="font-size:11px;color:var(--text3);text-align:center;line-height:1.5;">
+      Cuts and notes sync to your account automatically.
     </div>
   </div>
 </aside>
@@ -4731,6 +4769,9 @@ function addFadePlanWrapUp() {
   const style = state.taperStyle || 'low';
   const styleLabel = { low: 'Low Taper', mid: 'Mid Taper', high: 'High Taper', skin: 'Skin Fade', buzz: 'Buzz Cut' }[style] || 'Taper';
 
+  // Log to haircut history
+  logHaircutHistory();
+
   // Affiliate tool recommendations by style
   const tools = {
     low:  [{ name: 'Wahl Magic Clip', tag: 'Best for low tapers', url: 'https://www.amazon.com/s?k=Wahl+Magic+Clip+cordless' }, { name: 'Wahl Detailer', tag: 'For edge cleanup', url: 'https://www.amazon.com/s?k=Wahl+Detailer+trimmer' }],
@@ -4892,6 +4933,9 @@ window._onAuthChange = (user) => {
     btn.classList.add('signed-in');
     const greetEl = document.getElementById('authGreeting');
     if (greetEl && firstName) greetEl.textContent = `Welcome back, ${firstName}`;
+    // Sync sidebar state
+    _sidebarUser = { name: user.displayName, email: user.email, photoURL: user.photoURL, uid: user.uid };
+    _renderSidebarAuth();
     // Load cloud fade and update banner
     if (window._fbGetFade) {
       window._fbGetFade(user.uid).then(fade => {
@@ -5702,7 +5746,6 @@ function _renderSidebarAuth() {
     signedOut.style.display  = 'none';
     signedIn.style.display   = 'flex';
     bottom.style.display     = 'block';
-    // Populate user row
     const av = document.getElementById('sidebarAvatar');
     const un = document.getElementById('sidebarUsername');
     if (_sidebarUser.photoURL) {
@@ -5711,25 +5754,65 @@ function _renderSidebarAuth() {
       av.textContent = (_sidebarUser.name || _sidebarUser.email || '?')[0].toUpperCase();
     }
     un.textContent = _sidebarUser.name || _sidebarUser.email || 'My Account';
-    _renderCutsList();
+    if (_sidebarUser.uid) _loadSidebarData(_sidebarUser.uid);
   }
 }
 
-function _renderCutsList() {
+function _renderCutsList(cuts) {
   const list = document.getElementById('sidebarCutsList');
-  const cuts = JSON.parse(localStorage.getItem('shc_cuts') || '[]');
-  if (!cuts.length) {
-    list.innerHTML = `<div style="font-size:12.5px;color:var(--text3);padding:6px 10px;line-height:1.6;">No saved cuts yet.<br>Complete a fade to save it here.</div>`;
+  if (!list) return;
+  if (!cuts || !cuts.length) {
+    list.innerHTML = `<div style="font-size:12.5px;color:var(--text3);padding:6px 10px;line-height:1.6;">No cuts yet. Complete a fade to log it here.</div>`;
     return;
   }
-  list.innerHTML = cuts.map((c, i) => `
-    <div class="cut-item" onclick="loadSavedCut(${i})">
+  list.innerHTML = cuts.map(c => {
+    const date = c.ts?.toDate ? c.ts.toDate() : (c.ts ? new Date(c.ts) : new Date());
+    const dateStr = date.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+    return `<div class="cut-item">
       <div class="cut-item-dot"></div>
       <div>
-        <div>${c.label || 'Haircut session'}</div>
-        <div class="cut-item-meta">${c.date || ''}</div>
+        <div>${c.styleLabel || 'Haircut'}</div>
+        <div class="cut-item-meta">${dateStr}</div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+}
+
+// ── BARBER NOTES ──
+let _notesSaveTimer = null;
+function saveBarberNotes(text) {
+  const user = window._currentUser;
+  if (!user || !window._fbSaveNotes) return;
+  clearTimeout(_notesSaveTimer);
+  _notesSaveTimer = setTimeout(() => {
+    window._fbSaveNotes(user.uid, text).then(() => {
+      const saved = document.getElementById('barberNotesSaved');
+      if (saved) { saved.style.opacity = '1'; setTimeout(() => saved.style.opacity = '0', 1800); }
+    }).catch(() => {});
+  }, 800);
+}
+
+function _loadSidebarData(uid) {
+  // Load haircut history
+  if (window._fbGetHistory) {
+    window._fbGetHistory(uid).then(cuts => _renderCutsList(cuts)).catch(() => {});
+  }
+  // Load barber notes
+  if (window._fbGetNotes) {
+    window._fbGetNotes(uid).then(text => {
+      const field = document.getElementById('barberNotesField');
+      if (field && text) field.value = text;
+    }).catch(() => {});
+  }
+}
+
+// ── HAIRCUT HISTORY LOGGING ──
+function logHaircutHistory() {
+  const user = window._currentUser;
+  if (!user || !window._fbLogHistory) return;
+  const style      = state.taperStyle || 'low';
+  const styleLabel = { low:'Low Taper', mid:'Mid Taper', high:'High Taper', skin:'Skin Fade', buzz:'Buzz Cut' }[style] || 'Taper';
+  window._fbLogHistory(user.uid, { style, styleLabel, ts: Date.now() }).catch(() => {});
 }
 
 function sidebarSignInGoogle() {
