@@ -40,13 +40,20 @@
   };
   // ─────────────────────────────────────────────────────────────────────────
 
+  const _isPlaceholder = firebaseConfig.apiKey.startsWith('PASTE');
+  if (_isPlaceholder) {
+    console.warn('[SelfHaircut] Firebase config not set — auth disabled until configured.');
+    window._fbAuthUnconfigured = true;
+  }
+
   let _app, _auth, _db;
   try {
     _app  = initializeApp(firebaseConfig);
     _auth = getAuth(_app);
     _db   = getFirestore(_app);
   } catch(e) {
-    console.warn('Firebase not configured:', e.message);
+    console.warn('Firebase init failed:', e.message);
+    window._fbAuthUnconfigured = true;
   }
 
   // Expose to global scope so non-module code can call these
@@ -4961,23 +4968,51 @@ async function authWithApple() {
   catch(e) { if (e.code !== 'auth/popup-closed-by-user') _authShowError('Apple sign-in failed.'); }
 }
 async function authWithEmail() {
-  if (!window._fbSignInEmail) return _authShowError('Firebase not configured yet.');
+  // Check if Firebase is actually configured (not placeholder values)
+  if (!window._fbSignInEmail || !window._fbCreateEmail) {
+    return _authShowError('Account system not yet configured. Check back soon.');
+  }
+  // Detect placeholder config — Firebase accepts bad config but fails on first request
+  if (window._fbAuthUnconfigured) {
+    return _authShowError('Account system is being set up. Try again later.');
+  }
+
   const email = document.getElementById('authEmail').value.trim();
   const pass  = document.getElementById('authPass').value;
   const name  = document.getElementById('authName')?.value.trim() || '';
-  if (!email || !pass) return _authShowError('Please enter your email and password.');
+
+  if (!email) return _authShowError('Please enter your email address.');
+  if (!pass)  return _authShowError('Please enter a password.');
+  if (pass.length < 6) return _authShowError('Password must be at least 6 characters.');
+  if (_authMode === 'signup' && !name) return _authShowError('Please enter your first name.');
+
+  const btn = document.getElementById('authSubmitBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Please wait…'; }
+
   try {
     let r;
     if (_authMode === 'signup') {
-      if (!name) return _authShowError('Please enter your first name.');
       r = await window._fbCreateEmail(email, pass, name);
     } else {
       r = await window._fbSignInEmail(email, pass);
     }
     _afterAuth(r.user);
   } catch(e) {
-    const msgs = { 'auth/email-already-in-use':'Email already in use — try signing in.', 'auth/wrong-password':'Incorrect password.', 'auth/user-not-found':'No account found — try creating one.', 'auth/weak-password':'Password must be at least 6 characters.' };
-    _authShowError(msgs[e.code] || 'Something went wrong. Try again.');
+    console.error('[Auth error]', e.code, e.message);
+    const msgs = {
+      'auth/email-already-in-use':  'That email is already registered. Try signing in instead.',
+      'auth/wrong-password':         'Incorrect password. Please try again.',
+      'auth/invalid-credential':     'Incorrect email or password.',
+      'auth/user-not-found':         'No account found with that email. Create one below.',
+      'auth/weak-password':          'Password must be at least 6 characters.',
+      'auth/invalid-email':          'Please enter a valid email address.',
+      'auth/too-many-requests':      'Too many attempts. Please wait a moment and try again.',
+      'auth/network-request-failed': 'Network error. Check your connection and try again.',
+      'auth/api-key-not-valid.-please-pass-a-valid-api-key.': 'Account system not yet configured.',
+    };
+    _authShowError(msgs[e.code] || `Error: ${e.message || 'Something went wrong. Try again.'}`);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = _authMode === 'signup' ? 'Create Account' : 'Sign In'; }
   }
 }
 
