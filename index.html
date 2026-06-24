@@ -17,6 +17,83 @@
 <meta name="twitter:title" content="SelfHaircut.ai — Barber-Calibrated Taper Guide">
 <meta name="twitter:description" content="Mark your ear, get your exact taper line. Step-by-step guard guide. Cut your own hair like a pro.">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<!-- MediaPipe FaceMesh — loaded lazily, only when a photo is uploaded -->
+<script>
+// Lazy-load MediaPipe FaceMesh on first use.
+// Returns normalized [0,1] landmarks for the detected face, or null on failure.
+let _mpReady = false, _mpFaceMesh = null;
+async function _loadMediaPipe() {
+  if (_mpFaceMesh) return true;
+  try {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js';
+      s.crossOrigin = 'anonymous';
+      s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+    _mpFaceMesh = new FaceMesh({ locateFile: f =>
+      `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}` });
+    _mpFaceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true,
+      minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+    await new Promise(res => _mpFaceMesh.onResults(r => { window._mpLastResult = r; res(); }));
+    _mpReady = true;
+    return true;
+  } catch(e) { console.warn('[MediaPipe] load failed:', e); return false; }
+}
+
+// Run FaceMesh on an <img> or <canvas> element.
+// Returns { earTopFrac, earBottomFrac, earXfrac, profileSide } or null.
+async function detectEarFromPhoto(imgEl) {
+  try {
+    if (!await _loadMediaPipe()) return null;
+
+    const result = await new Promise(resolve => {
+      _mpFaceMesh.onResults(r => resolve(r));
+      _mpFaceMesh.send({ image: imgEl });
+    });
+
+    const lms = result?.multiFaceLandmarks?.[0];
+    if (!lms || lms.length < 400) return null;
+
+    // Determine profile side by nose tip position:
+    // If nose (landmark 4) is left of center → right-side profile (face looks left)
+    // If nose is right of center → left-side profile (face looks right)
+    const noseTip  = lms[4];
+    const side     = noseTip.x < 0.5 ? 'right' : 'left';
+
+    // Ear-adjacent face oval landmarks (FaceMesh 468-point model):
+    // Right side of face: 127,162,21,54,103 (upper) and 234,93,132,58 (lower/tragus)
+    // Left side of face:  356,389,251,284,332 (upper) and 454,323,361,288 (lower/tragus)
+    const upperIdxR = [127, 162, 21, 54, 103];
+    const lowerIdxR = [234, 93, 132, 58, 172];
+    const upperIdxL = [356, 389, 251, 284, 332];
+    const lowerIdxL = [454, 323, 361, 288, 397];
+
+    const avg = (indices, axis) =>
+      indices.reduce((s,i) => s + (lms[i]?.[axis] || 0), 0) / indices.length;
+
+    let earTopFrac, earBottomFrac, earXfrac;
+
+    if (side === 'right') {
+      // Right-side profile — ear landmarks are on the RIGHT side of the face
+      earTopFrac    = avg(upperIdxR, 'y');
+      earBottomFrac = avg(lowerIdxR, 'y');
+      earXfrac      = Math.max(...[...upperIdxR, ...lowerIdxR].map(i => lms[i]?.x || 0));
+    } else {
+      // Left-side profile — ear landmarks are on the LEFT side
+      earTopFrac    = avg(upperIdxL, 'y');
+      earBottomFrac = avg(lowerIdxL, 'y');
+      earXfrac      = Math.min(...[...upperIdxL, ...lowerIdxL].map(i => lms[i]?.x || 0));
+    }
+
+    // Sanity check
+    if (earTopFrac >= earBottomFrac || earXfrac < 0.05 || earXfrac > 0.95) return null;
+
+    return { earTopFrac, earBottomFrac, earXfrac, side };
+  } catch(e) { console.warn('[MediaPipe] detection error:', e); return null; }
+}
+</script>
 <!-- Firebase SDK -->
 <script type="module">
   import { initializeApp }                         from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -77,6 +154,10 @@
     return cred;
   };
   window._fbSignOut = () => signOut(_auth);
+
+  // Expose Firestore primitives for correction data saving
+  window._fbFirestoreModules = { doc, setDoc };
+  window._fbDb = _db;
 
   // Firestore helpers
   window._fbSaveFade = async (uid, data) => {
@@ -3018,11 +3099,34 @@ function markEarPosition(file) {
         msg.innerHTML = `${aiAvatar()}<div class="msg-body"><div class="msg-name">SelfHaircut.ai</div>
           <div class="msg-text">
             <p class="ear-mark-instruction"><strong>Mark the top of your ear</strong><br><span style="font-size:12px;color:var(--text3);">Drag the gold marker into place, then continue.</span></p>
+            <div id="mpStatusBadge" style="display:none;margin-bottom:8px;padding:6px 10px;background:rgba(100,220,140,0.10);border:1px solid rgba(100,220,140,0.30);border-radius:10px;font-size:12px;color:rgba(120,220,150,0.9);font-weight:600;">
+              ✓ Auto-detected — drag to correct if needed
+            </div>
             <div class="ear-mark-wrap"></div>
             <button class="opt-btn ear-mark-next" style="margin-top:8px;width:100%;">Continue →</button>
             <button class="opt-btn ear-mark-retake" style="margin-top:6px;width:100%;background:transparent;border:1px solid rgba(255,255,255,0.15);color:var(--text2);">Can't find your ear? Let's get a cleaner angle</button>
           </div></div>`;
         messagesWrap.appendChild(msg);
+
+        // ── MediaPipe auto-detection ──
+        // Run in background; if it succeeds, snap dots to detected positions.
+        detectEarFromPhoto(img).then(detected => {
+          if (!detected) return; // silent fallback to manual
+          marks.top.x    = detected.earXfrac;
+          marks.top.y    = detected.earTopFrac;
+          marks.bottom.x = detected.earXfrac;
+          marks.bottom.y = detected.earBottomFrac;
+          // Store detected side for later steps
+          state.profileSide = detected.side;
+          // Update dot positions
+          place(topDot, marks.top);
+          if (botDot.parentNode) place(botDot, marks.bottom);
+          // Show badge
+          const badge = msg.querySelector('#mpStatusBadge');
+          if (badge) badge.style.display = 'block';
+          // Save raw detection for training data (user corrections tracked via final values)
+          state._mpDetection = { ...detected, timestamp: Date.now() };
+        }).catch(() => {}); // never interrupt the flow
 
         const wrap = msg.querySelector('.ear-mark-wrap');
         wrap.appendChild(canvas);
@@ -3093,6 +3197,25 @@ function markEarPosition(file) {
             const span = earBottomFrac - earTopFrac;
             earTopFrac = MIN_EAR_TOP;
             earBottomFrac = earTopFrac + span;
+          }
+
+          // Save correction data for training if MediaPipe was used and user moved the dots
+          if (state._mpDetection && window._currentUser && window._fbDb) {
+            const correction = {
+              detected:   state._mpDetection,
+              corrected:  { earXfrac, earTopFrac, earBottomFrac },
+              side:       state.profileSide,
+              uid:        window._currentUser.uid,
+              savedAt:    Date.now(),
+            };
+            // Fire-and-forget — never block the UI
+            try {
+              const { doc, setDoc, getFirestore } = window._fbFirestoreModules || {};
+              if (doc && setDoc) {
+                setDoc(doc(window._fbDb, 'mp_corrections', `${window._currentUser.uid}_${Date.now()}`), correction).catch(() => {});
+              }
+            } catch(e) {}
+            state._mpDetection = null;
           }
 
           // Premium "Mapping your taper…" transition before handing off.
