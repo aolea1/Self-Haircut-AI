@@ -632,22 +632,36 @@ body {
 .showcase-sub {
   font-size:14px;color:rgba(255,255,255,0.48);margin-bottom:28px;
 }
-.showcase-grid {
-  display:flex;gap:14px;justify-content:center;align-items:flex-start;
+/* Hair-type tabs */
+.showcase-tabs {
+  display:flex;gap:8px;justify-content:center;margin-bottom:20px;
 }
-.showcase-grid-item { display:flex;flex-direction:column;align-items:center;flex:1;max-width:340px; }
-.showcase-grid-label {
-  font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;
-  color:rgba(255,255,255,0.35);margin-bottom:10px;
+.showcase-tab {
+  padding:8px 20px;border-radius:20px;font-size:13px;font-weight:700;
+  cursor:pointer;border:1.5px solid rgba(255,255,255,0.12);
+  background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.45);
+  transition:all 0.18s ease;
+}
+.showcase-tab.active {
+  background:rgba(232,213,163,0.14);
+  border-color:rgba(232,213,163,0.55);
+  color:rgba(232,213,163,0.97);
+}
+/* Single card wrapper with fade between panels */
+.showcase-card-wrap {
+  position:relative;width:100%;max-width:340px;margin:0 auto;
+}
+.showcase-panel {
+  position:absolute;inset:0;
+  opacity:0;transition:opacity 0.4s ease;pointer-events:none;
+}
+.showcase-panel.active {
+  position:relative;opacity:1;pointer-events:auto;
 }
 .showcase-card {
   position:relative;width:100%;
   border-radius:20px;overflow:hidden;aspect-ratio:3/4;
   background:#111;box-shadow:0 20px 60px rgba(0,0,0,0.6);
-}
-@media(max-width:600px){
-  .showcase-grid{flex-direction:column;align-items:center;}
-  .showcase-grid-item{max-width:100%;}
 }
 .showcase-img {
   position:absolute;inset:0;width:100%;height:100%;
@@ -1885,20 +1899,24 @@ body {
       <div class="showcase-section">
         <div class="showcase-eyebrow">Fade Goal</div>
         <div class="showcase-title">Works Across Hair Types</div>
-        <p class="showcase-sub">A visual reference for the low taper fade — whatever your hair texture.</p>
-        <div class="showcase-grid">
-          <!-- Card 1: Curly Hair -->
-          <div class="showcase-grid-item">
-            <div class="showcase-grid-label">Curly Hair</div>
+        <p class="showcase-sub">A visual reference for the low taper fade — whatever your texture.</p>
+
+        <div class="showcase-tabs">
+          <button class="showcase-tab active" onclick="switchShowcase('curly', this)">Curly Hair</button>
+          <button class="showcase-tab"        onclick="switchShowcase('straight', this)">Straight Hair</button>
+        </div>
+
+        <div class="showcase-card-wrap">
+          <!-- Curly panel -->
+          <div class="showcase-panel active" id="showcasePanel-curly">
             <div class="showcase-card">
               <img id="showcaseAfter"  class="showcase-img"        src="Low_taper_silhouette.webp" alt="After — curly hair">
               <img id="showcaseBefore" class="showcase-img hidden" src="before_fade_sm.png"         alt="Before — curly hair">
               <div class="showcase-badge after" id="showcaseBadge">After</div>
             </div>
           </div>
-          <!-- Card 2: Straight Hair -->
-          <div class="showcase-grid-item">
-            <div class="showcase-grid-label">Straight Hair</div>
+          <!-- Straight panel -->
+          <div class="showcase-panel" id="showcasePanel-straight">
             <div class="showcase-card">
               <img id="showcaseAfter2"  class="showcase-img"        src="straight_after.png"  alt="After — straight hair">
               <img id="showcaseBefore2" class="showcase-img hidden" src="straight_before.png" alt="Before — straight hair">
@@ -6188,7 +6206,16 @@ function _startCardAnim(afterId, beforeId, badgeId, offset) {
   }, offset);
 }
 _startCardAnim('showcaseAfter',  'showcaseBefore',  'showcaseBadge',  0);
-_startCardAnim('showcaseAfter2', 'showcaseBefore2', 'showcaseBadge2', 1000); // offset so cards don't flip in sync
+_startCardAnim('showcaseAfter2', 'showcaseBefore2', 'showcaseBadge2', 1000);
+
+function switchShowcase(type, btn) {
+  // Update tabs
+  document.querySelectorAll('.showcase-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  // Swap panels
+  document.querySelectorAll('.showcase-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('showcasePanel-' + type).classList.add('active');
+}
 </script>
 
   <!-- ── AUTH MODAL ── -->
