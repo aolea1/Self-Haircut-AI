@@ -88,9 +88,21 @@ async function detectEarFromPhoto(imgEl) {
     }
 
     // Sanity check
-    if (earTopFrac >= earBottomFrac || earXfrac < 0.05 || earXfrac > 0.95) return null;
+    if (earTopFrac >= earBottomFrac || earXfrac < 0.05 || earXfrac > 0.95) {
+      console.warn('[MediaPipe] Sanity check failed — falling back to manual', { earTopFrac, earBottomFrac, earXfrac });
+      return null;
+    }
 
-    return { earTopFrac, earBottomFrac, earXfrac, side };
+    const result2 = { earTopFrac, earBottomFrac, earXfrac, side };
+    // ── Debug log — visible in DevTools Console ──
+    console.group('[MediaPipe] ✅ Detection succeeded');
+    console.log('Profile side:', side);
+    console.log('Ear top Y:   ', earTopFrac.toFixed(3), '  (fraction from top)');
+    console.log('Ear bottom Y:', earBottomFrac.toFixed(3));
+    console.log('Ear X:       ', earXfrac.toFixed(3),   '  (fraction from left)');
+    console.log('Span:        ', (earBottomFrac - earTopFrac).toFixed(3));
+    console.groupEnd();
+    return result2;
   } catch(e) { console.warn('[MediaPipe] detection error:', e); return null; }
 }
 </script>
