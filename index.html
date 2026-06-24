@@ -4954,6 +4954,18 @@ function completeFadeStep(i) {
   if (i === plan.length - 1) {
     const wrapMsg = addAIMessage(`<p>That's your full fade — built around your taper. Take a final look in the mirror from both sides. If anything needs a touch-up, let me know and we'll fix it together.</p>`, null);
     scrollToMsg(wrapMsg);
+
+    // Optional C-cup step
+    setTimeout(() => {
+      const ccMsg = addAIMessage(`<div class="save-fade-card" style="margin:0;">
+        <div class="save-fade-title">Optional Finishing Step</div>
+        <div style="font-size:18px;font-weight:800;color:var(--text);margin:4px 0 6px;">Shape Your C-Cup</div>
+        <div class="save-fade-sub" style="margin-bottom:14px;">Generate a lineup guide around the ear for a cleaner finish.</div>
+        <button class="save-fade-btn" onclick="showCCupGuide(this)">Generate C-Cup Guide →</button>
+      </div>`, null);
+      scrollToMsg(ccMsg);
+    }, 600);
+
     addFadePlanWrapUp();
     return;
   }
@@ -5420,6 +5432,124 @@ function showRecreateBanner() {
     </div>
     <button class="recreate-banner-btn" onclick="recreateBestFade()">Recreate →</button>
   </div>`;
+}
+
+// ── C-CUP GUIDE ──
+async function showCCupGuide(btn) {
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+
+  const file = state.lastPhotoFile;
+  const em   = state.fadeGeometry;
+  if (!file || !em) {
+    btn.textContent = 'Upload a photo first';
+    return;
+  }
+
+  const { canvas, ctx, W, H } = await loadScaledCanvas(file);
+  _drawCCup(ctx, W, H, em, state.profileSide || 'right');
+
+  const msg = document.createElement('div');
+  msg.className = 'msg';
+  msg.innerHTML = `${aiAvatar()}<div class="msg-body"><div class="msg-name">SelfHaircut.ai</div>
+    <div class="msg-text">
+      <div class="steps-title" style="margin-bottom:10px;">C-Cup Lineup Guide</div>
+      <p style="font-size:14px;color:var(--text2);margin-bottom:12px;">Trace the gold line with your trimmer (no guard). Follow the curve naturally — don't try to cut a new line, just define what's already there. Go slow and check both sides.</p>
+      <div class="guide-img-wrap step-glow" style="position:relative;"></div>
+    </div></div>`;
+  messagesWrap.appendChild(msg);
+  canvas.style.width = '100%';
+  msg.querySelector('.guide-img-wrap').appendChild(canvas);
+  scrollToMsg(msg);
+}
+
+function _drawCCup(ctx, W, H, em, side) {
+  // Ear geometry in pixels
+  const earX   = em.earXfrac   * W;
+  const earTop = em.earTopFrac  * H;
+  const earBot = em.earBottomFrac * H;
+  const earH   = earBot - earTop;
+  const earMid = earTop + earH / 2;
+  const earR   = earH * 0.52; // radius of the C-curve around the ear
+
+  // Direction: for a left-side photo (face right), the sideburn is to the right of the ear.
+  // For a right-side photo (face left), sideburn is to the left.
+  const dir = (side === 'left') ? 1 : -1; // +1 = sideburn is right of ear
+
+  // C-cup path:
+  // Start above the ear at the sideburn junction
+  // Curve around the front of the ear
+  // End below the ear toward the neckline
+  const startX = earX + dir * earR * 0.6;
+  const startY = earTop - earH * 0.15;
+  const endX   = earX + dir * earR * 0.5;
+  const endY   = earBot + earH * 0.15;
+
+  // Control points for the cubic bezier C-curve
+  const cp1X = earX + dir * earR * 1.1;
+  const cp1Y = earTop + earH * 0.15;
+  const cp2X = earX + dir * earR * 1.1;
+  const cp2Y = earBot - earH * 0.15;
+
+  const GOLD = 'rgba(232,213,163,0.97)';
+
+  // Outer glow pass
+  ctx.save();
+  ctx.shadowColor = 'rgba(232,213,163,0.7)';
+  ctx.shadowBlur  = 18;
+  ctx.strokeStyle = 'rgba(232,213,163,0.4)';
+  ctx.lineWidth   = 6;
+  ctx.lineCap     = 'round';
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
+  ctx.stroke();
+  ctx.restore();
+
+  // Main gold line
+  ctx.save();
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth   = 2.5;
+  ctx.lineCap     = 'round';
+  ctx.shadowColor = 'rgba(0,0,0,0.8)';
+  ctx.shadowBlur  = 4;
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
+  ctx.stroke();
+  ctx.restore();
+
+  // Start dot
+  ctx.save();
+  ctx.fillStyle = GOLD;
+  ctx.shadowColor = 'rgba(232,213,163,0.9)'; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(startX, startY, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+
+  // Directional arrow at the end
+  const ang = Math.atan2(endY - cp2Y, endX - cp2X);
+  const arLen = 10;
+  ctx.save();
+  ctx.strokeStyle = GOLD; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+  ctx.beginPath();
+  ctx.moveTo(endX - Math.cos(ang - 0.5) * arLen, endY - Math.sin(ang - 0.5) * arLen);
+  ctx.lineTo(endX, endY);
+  ctx.lineTo(endX - Math.cos(ang + 0.5) * arLen, endY - Math.sin(ang + 0.5) * arLen);
+  ctx.stroke();
+  ctx.restore();
+
+  // Label "C-Cup" above the curve
+  const labelX = earX + dir * earR * 1.35;
+  const labelY = earMid;
+  ctx.save();
+  ctx.font = 'bold 22px sans-serif';
+  ctx.strokeStyle = 'rgba(0,0,0,0.95)'; ctx.lineWidth = 5; ctx.lineJoin = 'round';
+  ctx.strokeText('C-Cup', labelX - (side === 'left' ? 0 : ctx.measureText('C-Cup').width), labelY);
+  ctx.fillStyle = GOLD;
+  ctx.fillText('C-Cup', labelX - (side === 'left' ? 0 : ctx.measureText('C-Cup').width), labelY);
+  ctx.restore();
 }
 
 // ── TOOLS PAGE ──
