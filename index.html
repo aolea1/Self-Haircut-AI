@@ -5440,31 +5440,187 @@ function showRecreateBanner() {
 }
 
 // ── C-CUP GUIDE ──
-async function showCCupGuide(btn) {
+function showCCupGuide(btn) {
   btn.disabled = true;
-  btn.textContent = 'Generating…';
+  btn.textContent = 'Getting ready…';
 
-  const file = state.lastPhotoFile;
-  const em   = state.fadeGeometry;
-  if (!file || !em) {
-    btn.textContent = 'Upload a photo first';
+  // Ask for a fresh close-up photo focused on the ear/sideburn area
+  const prompt = addAIMessage(`
+    <div class="steps-title" style="margin-bottom:8px;">Shape Your C-Cup</div>
+    <p style="font-size:14px;color:var(--text2);margin-bottom:14px;">For the best result, take a new close-up photo showing your <strong>ear, sideburn, and temple area</strong> clearly. The closer the better.</p>
+    <button class="opt-btn" style="width:100%;margin-bottom:8px;" onclick="triggerCCupPhoto(this)">📷 Take C-Cup Photo</button>
+    <button class="opt-btn" style="width:100%;background:none;border-color:rgba(255,255,255,0.12);color:var(--text2);" onclick="useFadePhotoForCCup(this)">Use my existing fade photo instead</button>
+  `, null);
+  scrollToMsg(prompt);
+}
+
+function triggerCCupPhoto(btn) {
+  btn.closest('.msg-text').innerHTML = '<p style="color:var(--text2);font-size:13.5px;">Opening camera… take a close-up of your ear and sideburn area.</p>';
+  state.nextFileHandler = (file) => _startCCupCanvas(file);
+  document.getElementById('cameraInput').click();
+}
+
+function useFadePhotoForCCup(btn) {
+  btn.closest('.msg-text').innerHTML = '<p style="color:var(--text2);font-size:13.5px;">Loading your fade photo…</p>';
+  if (!state.lastPhotoFile) {
+    btn.closest('.msg-text').innerHTML = '<p style="color:var(--red);">No photo found. Please upload one first.</p>';
     return;
   }
+  _startCCupCanvas(state.lastPhotoFile);
+}
 
+async function _startCCupCanvas(file) {
+  state.lastPhotoFile = file;
   const { canvas, ctx, W, H } = await loadScaledCanvas(file);
-  _drawCCup(ctx, W, H, em, state.profileSide || 'right');
 
+  let pts = [];      // [pt1 = bottom of bar, pt2 = bottom of C-cup, pt3 = shape midpoint]
+  let dragging = -1;
+  const HIT = Math.round(W * 0.07);
+  const side = state.profileSide || 'right';
+
+  // ── Drawing helpers ──
+  function _ccupCurve(c, pt1, pt2, mid) {
+    const cpX = 2 * mid.x - 0.5 * pt1.x - 0.5 * pt2.x;
+    const cpY = 2 * mid.y - 0.5 * pt1.y - 0.5 * pt2.y;
+    const GOLD = 'rgba(232,213,163,0.97)';
+    c.save();
+    c.shadowColor = 'rgba(232,213,163,0.65)'; c.shadowBlur = 18;
+    c.strokeStyle = 'rgba(232,213,163,0.25)'; c.lineWidth = 8; c.lineCap = 'round'; c.setLineDash([]);
+    c.beginPath(); c.moveTo(pt1.x, pt1.y); c.quadraticCurveTo(cpX, cpY, pt2.x, pt2.y); c.stroke(); c.restore();
+    c.save();
+    c.strokeStyle = GOLD; c.lineWidth = 3; c.lineCap = 'round';
+    c.shadowColor = 'rgba(0,0,0,0.95)'; c.shadowBlur = 6;
+    c.beginPath(); c.moveTo(pt1.x, pt1.y); c.quadraticCurveTo(cpX, cpY, pt2.x, pt2.y); c.stroke(); c.restore();
+  }
+
+  function _defaultMid(p1, p2) {
+    const dx = p2.x - p1.x, dy = p2.y - p1.y;
+    const span = Math.sqrt(dx*dx + dy*dy) || 1;
+    const faceDir = side === 'left' ? 1 : -1;
+    const nx = -dy / span, ny = dx / span;
+    const px = (nx * faceDir > 0) ? nx : -nx;
+    const py = (ny * faceDir > 0) ? ny : -ny;
+    return { x: (p1.x+p2.x)/2 + px * span * 0.28, y: (p1.y+p2.y)/2 + py * span * 0.28 };
+  }
+
+  function _dot(c, p, color, label, active) {
+    const r = active ? Math.round(W * 0.045) : Math.round(W * 0.032);
+    c.save(); c.strokeStyle = color; c.lineWidth = active ? 2.5 : 1.8;
+    c.shadowColor = color; c.shadowBlur = active ? 20 : 10; c.setLineDash([]);
+    c.beginPath(); c.arc(p.x, p.y, r, 0, Math.PI*2); c.stroke(); c.restore();
+    c.save(); c.fillStyle = color; c.shadowColor = color; c.shadowBlur = 12;
+    c.beginPath(); c.arc(p.x, p.y, 5, 0, Math.PI*2); c.fill(); c.restore();
+    const fs = Math.max(13, Math.round(W * 0.038));
+    c.save(); c.font = `bold ${fs}px sans-serif`; c.textBaseline = 'middle';
+    const tw = c.measureText(label).width;
+    const lx = p.x < W/2 ? p.x + r + 7 : p.x - r - tw - 7;
+    c.strokeStyle='rgba(0,0,0,0.95)'; c.lineWidth=5; c.lineJoin='round'; c.strokeText(label,lx,p.y);
+    c.fillStyle=color; c.shadowColor='rgba(0,0,0,0.8)'; c.shadowBlur=3; c.fillText(label,lx,p.y); c.restore();
+  }
+
+  function redraw() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(canvas._srcImg || canvas, 0, 0, W, H);
+    if (pts.length === 3) _ccupCurve(ctx, pts[0], pts[1], pts[2]);
+    const colors = ['rgba(232,213,163,0.97)', 'rgba(100,200,255,0.97)', 'rgba(180,130,255,0.97)'];
+    const labels = ['Bottom of Bar', 'Bottom of C-Cup', 'Shape Curve ↔'];
+    pts.forEach((p, i) => _dot(ctx, p, colors[i], labels[i], dragging === i));
+
+    // Instruction overlay when waiting for next tap
+    if (pts.length < 2) {
+      const next = ['Tap: Bottom of Bar', 'Tap: Bottom of C-Cup'][pts.length];
+      ctx.save(); ctx.font = `bold ${Math.max(14, Math.round(W*0.04))}px sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.strokeStyle='rgba(0,0,0,0.95)'; ctx.lineWidth=5; ctx.lineJoin='round'; ctx.strokeText(next, W/2, H-12);
+      ctx.fillStyle='rgba(232,213,163,0.85)'; ctx.shadowColor='rgba(0,0,0,0.8)'; ctx.shadowBlur=4; ctx.fillText(next, W/2, H-12);
+      ctx.restore();
+    }
+  }
+
+  // Build the message with interactive canvas
   const msg = document.createElement('div');
   msg.className = 'msg';
   msg.innerHTML = `${aiAvatar()}<div class="msg-body"><div class="msg-name">SelfHaircut.ai</div>
     <div class="msg-text">
-      <div class="steps-title" style="margin-bottom:10px;">C-Cup Lineup Guide</div>
-      <p style="font-size:14px;color:var(--text2);margin-bottom:12px;">Trace the gold line with your trimmer (no guard). Follow the curve naturally — don't try to cut a new line, just define what's already there. Go slow and check both sides.</p>
-      <div class="guide-img-wrap step-glow" style="position:relative;"></div>
+      <div class="steps-title" style="margin-bottom:6px;">Shape Your C-Cup</div>
+      <p style="font-size:13.5px;color:var(--text2);margin-bottom:4px;">Tap to place <strong style="color:rgba(232,213,163,0.9)">Bottom of Bar</strong>, then <strong style="color:rgba(100,200,255,0.9)">Bottom of C-Cup</strong>. The shape point appears automatically — drag it to refine the curve.</p>
+      <div class="guide-img-wrap step-glow" id="ccupWrap" style="position:relative;touch-action:none;cursor:crosshair;"></div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="opt-btn" style="flex:1;" onclick="_ccupReset()">↺ Reset Points</button>
+        <button class="opt-btn" id="ccupDoneBtn" style="flex:2;opacity:0.4;pointer-events:none;" onclick="_ccupDone(this)">That's My C-Cup ✓</button>
+      </div>
     </div></div>`;
   messagesWrap.appendChild(msg);
+
+  // Store source image on canvas for redraw
+  const srcCanvas = document.createElement('canvas');
+  srcCanvas.width = W; srcCanvas.height = H;
+  srcCanvas.getContext('2d').drawImage(canvas, 0, 0);
+  ctx.drawImage(srcCanvas, 0, 0);
+  canvas._srcImg = srcCanvas;
+
   canvas.style.width = '100%';
-  msg.querySelector('.guide-img-wrap').appendChild(canvas);
+  canvas.style.display = 'block';
+  msg.querySelector('#ccupWrap').appendChild(canvas);
+
+  // Expose reset globally (simple approach)
+  window._ccupReset  = () => { pts = []; dragging = -1; _updateDoneBtn(); redraw(); };
+  window._ccupDone   = (btn) => {
+    btn.textContent = '✓ C-Cup Saved';
+    canvas.style.cursor = 'default';
+    canvas.removeEventListener('mousedown', onDown);
+    canvas.removeEventListener('touchstart', onDown);
+    addAIMessage('<p>Perfect. Trace the gold curve with your trimmer (no guard). Go slow, follow the line, and check both sides in the mirror.</p>', null);
+    scrollToMsg(msg);
+  };
+
+  function _updateDoneBtn() {
+    const btn = document.getElementById('ccupDoneBtn');
+    if (!btn) return;
+    btn.style.opacity = pts.length === 3 ? '1' : '0.4';
+    btn.style.pointerEvents = pts.length === 3 ? 'auto' : 'none';
+  }
+
+  function toCanvas(e) {
+    const r = canvas.getBoundingClientRect();
+    const cl = e.touches ? e.touches[0] : e;
+    return { x: (cl.clientX - r.left) * (W / r.width), y: (cl.clientY - r.top) * (H / r.height) };
+  }
+
+  function hitTest(pos) {
+    for (let i = pts.length - 1; i >= 0; i--) {
+      const dx = pos.x - pts[i].x, dy = pos.y - pts[i].y;
+      if (dx*dx + dy*dy < HIT*HIT) return i;
+    }
+    return -1;
+  }
+
+  function onDown(e) {
+    e.preventDefault();
+    const pos = toCanvas(e);
+    const hit = hitTest(pos);
+    if (hit >= 0) { dragging = hit; }
+    else if (pts.length < 2) {
+      pts.push(pos);
+      if (pts.length === 2) { pts.push(_defaultMid(pts[0], pts[1])); }
+      _updateDoneBtn();
+    }
+    redraw();
+  }
+  function onMove(e) {
+    if (dragging < 0) return; e.preventDefault();
+    pts[dragging] = toCanvas(e); redraw();
+  }
+  function onUp() { dragging = -1; redraw(); }
+
+  canvas.addEventListener('mousedown', onDown);
+  canvas.addEventListener('mousemove', onMove);
+  canvas.addEventListener('mouseup',   onUp);
+  canvas.addEventListener('touchstart', onDown, { passive: false });
+  canvas.addEventListener('touchmove',  onMove, { passive: false });
+  canvas.addEventListener('touchend',   onUp);
+
+  redraw();
   scrollToMsg(msg);
 }
 
