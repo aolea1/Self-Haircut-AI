@@ -2408,8 +2408,8 @@ function getResponse(text) {
   // ── BARBER ASSISTANT RESPONSES ──
   // Answer questions directly without forcing taper style selection.
 
-  if (/what tools|which tools|what do i need|what should i (buy|get|use)|starter kit|beginner tools/i.test(lower)) {
-    return { html: '<p>For a beginner self-cut you need:</p><p><strong>✂️ Clippers</strong> — Wahl Magic Clip is a great starter.<br><strong>🪒 Trimmer</strong> — for edges, sideburns, and neckline cleanup.<br><strong>🪞 3-way mirror</strong> — so you can see the back and sides.<br><strong>🪮 Fade brush</strong> — brush off loose hair between passes.<br><strong>💈 Guard set</strong> — most clippers come with one.</p><p>Optional: foil shaver for a cleaner skin line.</p>', options: null, toolsBtn: true };
+  if (/tool|clipper|trimmer|mirror|guard.*(set|use|need)|what (do|should|are|i) (i |you )?(need|recommend|use|buy|get)|recommend.*tool|starter kit|beginner (tool|kit|equip)|equipment|what (clippers?|trimmers?)/i.test(lower)) {
+    return { html: '<p>For most beginners, I recommend:</p><p><strong>✂️ Clippers</strong> — Wahl Magic Clip is a great starter<br><strong>🪒 Trimmer</strong> — for edges, sideburns, and neckline cleanup<br><strong>🪞 3-way mirror</strong> — so you can see the back and sides<br><strong>🪮 Fade brush</strong> — brush off loose hair between passes<br><strong>💈 Guard set</strong> — most clippers include one</p><p>For a cleaner finish, add:<br><strong>⚡ Foil shaver</strong> — gets closer than a bare blade<br><strong>🪒 Razor + shave gel</strong> — sharpest skin line possible</p>', options: null, toolsBtn: true };
   }
 
   if (/dark spot|bald spot|uneven|patch|hole|mistake|went too (high|deep|far)|too much off/i.test(lower)) {
@@ -2574,7 +2574,12 @@ function getResponse(text) {
   }
 
   // Default — anything hair-related gets a helpful nudge toward the guide
-  return { html: '<p>Good question. If you\'re ready to cut, upload a side profile photo and I\'ll walk you through the whole thing step by step. Or ask me anything — guards, blending, tools, lineup — I\'m here.</p>', options: null };
+  // Default — don't redirect to photo upload; answer as a knowledgeable barber.
+  const isHairQ = /hair|cut|fade|taper|blend|guard|clipper|trimmer|edge|line|neckline|sideburn|temple|ear|lineup|razor|shave|trim|comb|brush|length|texture|curl|wave|straight/i.test(lower);
+  if (isHairQ) {
+    return { html: '<p>Can you give me a bit more detail on what you\'re working on? I can help with guards, blending, lineup, tools, fixing mistakes — anything barbering. The more specific you are, the better I can help.</p>', options: null };
+  }
+  return { html: '<p>I\'m a barber assistant — ask me anything about cutting, fading, guards, blending, tools, or lineup. When you\'re ready to get your personalized guide, hit <strong>Upload side profile</strong> below.</p>', options: null };
 }
 
 // ── PHOTO QUALITY GATE ──
