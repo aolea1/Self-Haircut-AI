@@ -5469,91 +5469,81 @@ async function showCCupGuide(btn) {
 }
 
 function _drawCCup(ctx, W, H, em, side) {
-  // Ear geometry in pixels
-  const earX   = em.earXfrac   * W;
-  const earTop = em.earTopFrac  * H;
+  const earX   = em.earXfrac * W;
+  const earTop = em.earTopFrac * H;
   const earBot = em.earBottomFrac * H;
   const earH   = earBot - earTop;
-  const earMid = earTop + earH / 2;
-  const earR   = earH * 0.52; // radius of the C-curve around the ear
+  const earMid = (earTop + earBot) / 2;
 
-  // Direction: for a left-side photo (face right), the sideburn is to the right of the ear.
-  // For a right-side photo (face left), sideburn is to the left.
-  const dir = (side === 'left') ? 1 : -1; // +1 = sideburn is right of ear
+  // faceDir: +1 = face is to the RIGHT (left-side profile, face looking right)
+  //          -1 = face is to the LEFT  (right-side profile, face looking left)
+  const faceDir = (side === 'left') ? 1 : -1;
 
-  // C-cup path:
-  // Start above the ear at the sideburn junction
-  // Curve around the front of the ear
-  // End below the ear toward the neckline
-  const startX = earX + dir * earR * 0.6;
-  const startY = earTop - earH * 0.15;
-  const endX   = earX + dir * earR * 0.5;
-  const endY   = earBot + earH * 0.15;
+  // The C-cup hairline sits in FRONT of the ear (between the ear and the face).
+  // The ear sits INSIDE the C — the curve never goes behind the ear.
 
-  // Control points for the cubic bezier C-curve
-  const cp1X = earX + dir * earR * 1.1;
+  // How far in front of earX the hairline begins (toward the face)
+  const frontOffset = earH * 0.30;
+
+  // Start: upper temple/sideburn junction — above and in front of the ear top
+  const startX = earX + faceDir * frontOffset;
+  const startY = earTop - earH * 0.25;
+
+  // End: lower sideburn area — below and slightly in front of the ear bottom
+  const endX = earX + faceDir * frontOffset * 0.55;
+  const endY = earBot + earH * 0.20;
+
+  // The C bulges outward TOWARD THE FACE at mid-ear height.
+  // Control points push the bezier curve in front of the ear, not behind it.
+  const bulge = earH * 0.60;
+  const cp1X = earX + faceDir * (frontOffset + bulge);
   const cp1Y = earTop + earH * 0.15;
-  const cp2X = earX + dir * earR * 1.1;
+  const cp2X = earX + faceDir * (frontOffset + bulge);
   const cp2Y = earBot - earH * 0.15;
 
   const GOLD = 'rgba(232,213,163,0.97)';
 
-  // Outer glow pass
+  // Glow pass
   ctx.save();
-  ctx.shadowColor = 'rgba(232,213,163,0.7)';
-  ctx.shadowBlur  = 18;
-  ctx.strokeStyle = 'rgba(232,213,163,0.4)';
-  ctx.lineWidth   = 6;
-  ctx.lineCap     = 'round';
-  ctx.setLineDash([]);
-  ctx.beginPath();
-  ctx.moveTo(startX, startY);
+  ctx.shadowColor = 'rgba(232,213,163,0.65)'; ctx.shadowBlur = 20;
+  ctx.strokeStyle = 'rgba(232,213,163,0.35)'; ctx.lineWidth = 7;
+  ctx.lineCap = 'round'; ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(startX, startY);
   ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
-  ctx.stroke();
-  ctx.restore();
+  ctx.stroke(); ctx.restore();
 
   // Main gold line
   ctx.save();
-  ctx.strokeStyle = GOLD;
-  ctx.lineWidth   = 2.5;
-  ctx.lineCap     = 'round';
-  ctx.shadowColor = 'rgba(0,0,0,0.8)';
-  ctx.shadowBlur  = 4;
-  ctx.beginPath();
-  ctx.moveTo(startX, startY);
+  ctx.strokeStyle = GOLD; ctx.lineWidth = 2.8; ctx.lineCap = 'round';
+  ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 5;
+  ctx.beginPath(); ctx.moveTo(startX, startY);
   ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
-  ctx.stroke();
-  ctx.restore();
+  ctx.stroke(); ctx.restore();
 
-  // Start dot
-  ctx.save();
-  ctx.fillStyle = GOLD;
+  // Start dot at temple
+  ctx.save(); ctx.fillStyle = GOLD;
   ctx.shadowColor = 'rgba(232,213,163,0.9)'; ctx.shadowBlur = 10;
   ctx.beginPath(); ctx.arc(startX, startY, 5, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 
-  // Directional arrow at the end
-  const ang = Math.atan2(endY - cp2Y, endX - cp2X);
-  const arLen = 10;
-  ctx.save();
-  ctx.strokeStyle = GOLD; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
-  ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
-  ctx.beginPath();
-  ctx.moveTo(endX - Math.cos(ang - 0.5) * arLen, endY - Math.sin(ang - 0.5) * arLen);
-  ctx.lineTo(endX, endY);
-  ctx.lineTo(endX - Math.cos(ang + 0.5) * arLen, endY - Math.sin(ang + 0.5) * arLen);
-  ctx.stroke();
+  // End dot at jaw/sideburn
+  ctx.save(); ctx.fillStyle = GOLD;
+  ctx.shadowColor = 'rgba(232,213,163,0.9)'; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(endX, endY, 5, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 
-  // Label "C-Cup" above the curve
-  const labelX = earX + dir * earR * 1.35;
+  // Label — placed in front of the ear (toward the face), away from the curve
+  const lblOffset = earH * 0.75;
+  const labelX = earX + faceDir * (frontOffset + lblOffset);
   const labelY = earMid;
   ctx.save();
-  ctx.font = 'bold 22px sans-serif';
+  ctx.font = 'bold 20px sans-serif';
+  const tw = ctx.measureText('C-Cup').width;
+  const lx = faceDir === 1 ? labelX : labelX - tw;
   ctx.strokeStyle = 'rgba(0,0,0,0.95)'; ctx.lineWidth = 5; ctx.lineJoin = 'round';
-  ctx.strokeText('C-Cup', labelX - (side === 'left' ? 0 : ctx.measureText('C-Cup').width), labelY);
-  ctx.fillStyle = GOLD;
-  ctx.fillText('C-Cup', labelX - (side === 'left' ? 0 : ctx.measureText('C-Cup').width), labelY);
+  ctx.strokeText('C-Cup', lx, labelY);
+  ctx.fillStyle = GOLD; ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 3;
+  ctx.fillText('C-Cup', lx, labelY);
   ctx.restore();
 }
 
