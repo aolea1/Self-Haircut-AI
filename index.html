@@ -302,12 +302,17 @@ body {
   position: absolute;
   top: 0; left: 0; right: 0;
   height: var(--topbar-h);
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 24px;
+  /* 3-column grid: left | center | right — title is always mathematically centered */
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0 16px;
   border-bottom: 1px solid var(--border);
   background: var(--bg);
   z-index: 10;
 }
+.topbar-left  { display: flex; align-items: center; }
+.topbar-right { display: flex; align-items: center; justify-content: flex-end; }
 
 .menu-btn {
   display: flex; background: none; border: none;
@@ -1860,11 +1865,13 @@ body {
 
 <main class="main">
   <header class="topbar">
-    <button class="menu-btn" onclick="openSidebar()">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
-    </button>
+    <div class="topbar-left">
+      <button class="menu-btn" onclick="openSidebar()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+      </button>
+    </div>
     <button class="topbar-title" onclick="_easedScroll(document.getElementById('chatArea'),0,900)" style="font-family:'Manrope',sans-serif;font-weight:700;font-size:15px;letter-spacing:-0.2px;background:none;border:none;padding:6px 10px;border-radius:10px;cursor:pointer;color:inherit;-webkit-tap-highlight-color:transparent;">SelfHaircut<span style="color:var(--accent2)">.ai</span></button>
-    <div class="topbar-actions">
+    <div class="topbar-right">
       <button class="auth-avatar-btn" id="authTopbarBtn" onclick="onAuthBtnTap()">
         <span id="authTopbarLabel">Log In</span>
       </button>
