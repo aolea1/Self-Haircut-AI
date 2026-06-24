@@ -686,23 +686,28 @@ body {
 }
 
 /* HOW IT WORKS */
-.lp-steps { display: flex; flex-direction: column; }
+.lp-steps {
+  display: flex; flex-direction: row; gap: 10px; align-items: stretch;
+}
 .lp-step {
-  display: flex; align-items: flex-start; gap: 20px;
-  padding: 18px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  text-align: center; padding: 22px 14px;
+  background: rgba(255,255,255,0.04); border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.06);
 }
-.lp-step:last-child { border-bottom: none; }
-.lp-step-n {
-  font-family: 'Manrope', sans-serif; font-size: 11px;
-  font-weight: 700; color: rgba(232,213,163,0.5);
-  padding-top: 2px; flex-shrink: 0; width: 28px;
+.lp-step-icon {
+  font-size: 30px; margin-bottom: 12px; line-height: 1;
+  filter: drop-shadow(0 0 8px rgba(232,213,163,0.35));
 }
-.lp-step-title { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 3px; }
-.lp-step-desc {
-  font-size: 13px;
-  color: rgba(255,255,255,0.50);
-  line-height: 1.45;
-  letter-spacing: -0.1px;
+.lp-step-title {
+  font-family: 'Manrope', sans-serif;
+  font-size: 15px; font-weight: 800; color: #fff;
+  margin-bottom: 6px; line-height: 1.2;
+}
+.lp-step-desc { font-size: 12.5px; color: rgba(255,255,255,0.45); line-height: 1.5; }
+.lp-step-arrow {
+  font-size: 18px; color: rgba(232,213,163,0.30);
+  align-self: center; flex-shrink: 0; padding: 0 2px;
 }
 
 /* TRUST */
@@ -1904,28 +1909,24 @@ body {
       </div>
 
       <!-- HOW IT WORKS -->
-      <div class="lp-section">
+      <div class="lp-section" style="padding-top:8px;">
         <div class="lp-steps">
           <div class="lp-step">
-            <div class="lp-step-n">01</div>
-            <div>
-              <div class="lp-step-title">Upload Your Picture</div>
-              <div class="lp-step-desc">Take a close-up photo of your sideburn and taper area.</div>
-            </div>
+            <div class="lp-step-icon">📸</div>
+            <div class="lp-step-title">Upload Photo</div>
+            <div class="lp-step-desc">Show your sideburn and ear.</div>
           </div>
+          <div class="lp-step-arrow">→</div>
           <div class="lp-step">
-            <div class="lp-step-n">02</div>
-            <div>
-              <div class="lp-step-title">Shape Your Taper</div>
-              <div class="lp-step-desc">Adjust the four points until the taper matches how you want it to look.</div>
-            </div>
+            <div class="lp-step-icon">📍</div>
+            <div class="lp-step-title">Place Points</div>
+            <div class="lp-step-desc">Match the points to your haircut.</div>
           </div>
+          <div class="lp-step-arrow">→</div>
           <div class="lp-step">
-            <div class="lp-step-n">03</div>
-            <div>
-              <div class="lp-step-title">Follow Your Fade</div>
-              <div class="lp-step-desc">Get step-by-step barber guidance and fade with confidence.</div>
-            </div>
+            <div class="lp-step-icon">✂️</div>
+            <div class="lp-step-title">Follow Guide</div>
+            <div class="lp-step-desc">Cut exactly where shown.</div>
           </div>
         </div>
       </div>
