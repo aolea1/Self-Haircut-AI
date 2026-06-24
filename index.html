@@ -5503,36 +5503,84 @@ async function _startCCupCanvas(file) {
     return { x: (p1.x+p2.x)/2 + px * span * 0.28, y: (p1.y+p2.y)/2 + py * span * 0.28 };
   }
 
-  function _dot(c, p, color, label, active) {
-    const r = active ? Math.round(W * 0.045) : Math.round(W * 0.032);
-    c.save(); c.strokeStyle = color; c.lineWidth = active ? 2.5 : 1.8;
-    c.shadowColor = color; c.shadowBlur = active ? 20 : 10; c.setLineDash([]);
+  const POINT_CFG = [
+    { label: 'Bottom of Vertical Bar', desc: 'Where your vertical lineup ends.',        color: 'rgba(232,213,163,0.97)' },
+    { label: 'Bottom of Sideburn',     desc: 'Where the bottom of your sideburn begins.', color: 'rgba(100,200,255,0.97)' },
+    { label: 'Shape Curve',            desc: 'Drag near the middle of your natural C-cup.', color: 'rgba(180,130,255,0.97)' },
+  ];
+
+  // interacted[i] = true once the user has dragged that point (description fades)
+  const interacted = [false, false, false];
+
+  function _dot(c, p, cfg, isActive, showDesc) {
+    const r = isActive ? Math.round(W * 0.050) : Math.round(W * 0.034);
+    // Ring
+    c.save(); c.strokeStyle = cfg.color; c.lineWidth = isActive ? 2.8 : 1.8;
+    c.shadowColor = cfg.color; c.shadowBlur = isActive ? 22 : 10; c.setLineDash([]);
     c.beginPath(); c.arc(p.x, p.y, r, 0, Math.PI*2); c.stroke(); c.restore();
-    c.save(); c.fillStyle = color; c.shadowColor = color; c.shadowBlur = 12;
-    c.beginPath(); c.arc(p.x, p.y, 5, 0, Math.PI*2); c.fill(); c.restore();
-    const fs = Math.max(13, Math.round(W * 0.038));
-    c.save(); c.font = `bold ${fs}px sans-serif`; c.textBaseline = 'middle';
-    const tw = c.measureText(label).width;
-    const lx = p.x < W/2 ? p.x + r + 7 : p.x - r - tw - 7;
-    c.strokeStyle='rgba(0,0,0,0.95)'; c.lineWidth=5; c.lineJoin='round'; c.strokeText(label,lx,p.y);
-    c.fillStyle=color; c.shadowColor='rgba(0,0,0,0.8)'; c.shadowBlur=3; c.fillText(label,lx,p.y); c.restore();
+    // Center dot
+    c.save(); c.fillStyle = cfg.color; c.shadowColor = cfg.color; c.shadowBlur = 14;
+    c.beginPath(); c.arc(p.x, p.y, 5.5, 0, Math.PI*2); c.fill(); c.restore();
+
+    // Label — large, dark-outlined
+    const fs = Math.max(14, Math.round(W * 0.042));
+    c.save(); c.font = `800 ${fs}px sans-serif`; c.textBaseline = 'middle';
+    const tw = c.measureText(cfg.label).width;
+    const onRight = p.x + r + 10 + tw < W - 4;
+    const lx = onRight ? p.x + r + 10 : p.x - r - tw - 10;
+    c.strokeStyle = 'rgba(0,0,0,0.98)'; c.lineWidth = 6; c.lineJoin = 'round';
+    c.strokeText(cfg.label, lx, p.y);
+    c.fillStyle = cfg.color; c.shadowColor = 'rgba(0,0,0,0.7)'; c.shadowBlur = 4;
+    c.fillText(cfg.label, lx, p.y);
+    c.restore();
+
+    // Description — smaller, appears below label when active or newly placed
+    if (showDesc && cfg.desc) {
+      const dfs = Math.max(11, Math.round(W * 0.032));
+      c.save(); c.font = `600 ${dfs}px sans-serif`; c.textBaseline = 'top';
+      const dw = c.measureText(cfg.desc).width;
+      const dx = onRight ? lx : lx + tw - dw;
+      const dy = p.y + fs * 0.65;
+      c.strokeStyle = 'rgba(0,0,0,0.98)'; c.lineWidth = 5; c.lineJoin = 'round';
+      c.strokeText(cfg.desc, dx, dy);
+      c.fillStyle = 'rgba(255,255,255,0.75)'; c.shadowColor = 'rgba(0,0,0,0.7)'; c.shadowBlur = 4;
+      c.fillText(cfg.desc, dx, dy);
+      c.restore();
+    }
   }
 
   function redraw() {
     ctx.clearRect(0, 0, W, H);
     ctx.drawImage(canvas._srcImg || canvas, 0, 0, W, H);
     if (pts.length === 3) _ccupCurve(ctx, pts[0], pts[1], pts[2]);
-    const colors = ['rgba(232,213,163,0.97)', 'rgba(100,200,255,0.97)', 'rgba(180,130,255,0.97)'];
-    const labels = ['Bottom of Bar', 'Bottom of C-Cup', 'Shape Curve ↔'];
-    pts.forEach((p, i) => _dot(ctx, p, colors[i], labels[i], dragging === i));
+    pts.forEach((p, i) => {
+      const showDesc = (dragging === i) || !interacted[i];
+      _dot(ctx, p, POINT_CFG[i], dragging === i, showDesc);
+    });
 
-    // Instruction overlay when waiting for next tap
+    // Step prompt when waiting for next tap
     if (pts.length < 2) {
-      const next = ['Tap: Bottom of Bar', 'Tap: Bottom of C-Cup'][pts.length];
-      ctx.save(); ctx.font = `bold ${Math.max(14, Math.round(W*0.04))}px sans-serif`;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-      ctx.strokeStyle='rgba(0,0,0,0.95)'; ctx.lineWidth=5; ctx.lineJoin='round'; ctx.strokeText(next, W/2, H-12);
-      ctx.fillStyle='rgba(232,213,163,0.85)'; ctx.shadowColor='rgba(0,0,0,0.8)'; ctx.shadowBlur=4; ctx.fillText(next, W/2, H-12);
+      const cfg = POINT_CFG[pts.length];
+      const prompt = `Tap to place: ${cfg.label}`;
+      const sub    = cfg.desc;
+      const pfs = Math.max(14, Math.round(W * 0.042));
+      const sfs = Math.max(11, Math.round(W * 0.032));
+      ctx.save();
+      // Dark pill background
+      ctx.font = `800 ${pfs}px sans-serif`;
+      const pw = Math.max(ctx.measureText(prompt).width, ctx.measureText(sub).width) + 24;
+      const ph = pfs + sfs + 20;
+      const px = (W - pw) / 2, py = H - ph - 14;
+      ctx.fillStyle = 'rgba(0,0,0,0.72)';
+      ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 10); ctx.fill();
+      // Main prompt
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillStyle = cfg.color; ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 4;
+      ctx.fillText(prompt, W/2, py + 8);
+      // Sub description
+      ctx.font = `600 ${sfs}px sans-serif`;
+      ctx.fillStyle = 'rgba(255,255,255,0.65)';
+      ctx.fillText(sub, W/2, py + 8 + pfs + 4);
       ctx.restore();
     }
   }
@@ -5543,7 +5591,7 @@ async function _startCCupCanvas(file) {
   msg.innerHTML = `${aiAvatar()}<div class="msg-body"><div class="msg-name">SelfHaircut.ai</div>
     <div class="msg-text">
       <div class="steps-title" style="margin-bottom:6px;">Shape Your C-Cup</div>
-      <p style="font-size:13.5px;color:var(--text2);margin-bottom:4px;">Tap to place <strong style="color:rgba(232,213,163,0.9)">Bottom of Bar</strong>, then <strong style="color:rgba(100,200,255,0.9)">Bottom of C-Cup</strong>. The shape point appears automatically — drag it to refine the curve.</p>
+      <p style="font-size:13.5px;color:var(--text2);margin-bottom:4px;">Tap to place <strong style="color:rgba(232,213,163,0.9)">Bottom of Vertical Bar</strong>, then <strong style="color:rgba(100,200,255,0.9)">Bottom of Sideburn</strong>. A third <strong style="color:rgba(180,130,255,0.9)">Shape Curve</strong> point appears automatically — drag it to match your natural C-cup.</p>
       <div class="guide-img-wrap step-glow" id="ccupWrap" style="position:relative;touch-action:none;cursor:crosshair;"></div>
       <div style="display:flex;gap:8px;margin-top:10px;">
         <button class="opt-btn" style="flex:1;" onclick="_ccupReset()">↺ Reset Points</button>
@@ -5609,7 +5657,9 @@ async function _startCCupCanvas(file) {
   }
   function onMove(e) {
     if (dragging < 0) return; e.preventDefault();
-    pts[dragging] = toCanvas(e); redraw();
+    pts[dragging] = toCanvas(e);
+    interacted[dragging] = true; // description fades after first drag
+    redraw();
   }
   function onUp() { dragging = -1; redraw(); }
 
