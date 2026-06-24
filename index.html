@@ -1356,6 +1356,15 @@ body {
 .fade-review-row strong.warn { color: var(--text2); }
 
 /* ── NEED HELP PANEL ── */
+.tools-link-btn {
+  display:inline-flex;align-items:center;gap:6px;
+  margin-top:12px;padding:11px 18px;border-radius:14px;
+  background:rgba(232,213,163,0.10);border:1.5px solid rgba(232,213,163,0.38);
+  color:rgba(232,213,163,0.92);font-size:14px;font-weight:700;cursor:pointer;
+  width:100%;justify-content:center;
+  transition:background 0.15s,border-color 0.15s;
+}
+.tools-link-btn:hover{background:rgba(232,213,163,0.18);border-color:rgba(232,213,163,0.58);}
 .need-help-btn {
   display: block; width: 100%; margin-top: 8px; padding: 10px 14px;
   background: none; border: 1px solid rgba(232,213,163,0.16);
@@ -2165,7 +2174,7 @@ function addUserMessage(text, files) {
   scrollBottom(true);
 }
 
-function addAIMessage(html, options) {
+function addAIMessage(html, options, toolsBtn) {
   const msg = document.createElement('div');
   msg.className = 'msg';
   let opts = '';
@@ -2174,7 +2183,10 @@ function addAIMessage(html, options) {
       '<button class="opt-btn" onclick="optionClick(this,\'' + o + '\')">' + o + '</button>'
     ).join('') + '</div>';
   }
-  msg.innerHTML = `${aiAvatar()}<div class="msg-body"><div class="msg-name">SelfHaircut.ai</div><div class="msg-text">${html}${opts}</div></div>`;
+  const toolsBtnHtml = toolsBtn
+    ? `<button class="tools-link-btn" onclick="openToolsPage()">View Recommended Tools →</button>`
+    : '';
+  msg.innerHTML = `${aiAvatar()}<div class="msg-body"><div class="msg-name">SelfHaircut.ai</div><div class="msg-text">${html}${toolsBtnHtml}${opts}</div></div>`;
   messagesWrap.appendChild(msg);
   scrollBottom();
   return msg;
@@ -2283,7 +2295,7 @@ async function sendMessage() {
   setTimeout(() => {
     removeTyping();
     const r = getResponse(text);
-    addAIMessage(r.html, r.options);
+    addAIMessage(r.html, r.options, r.toolsBtn);
   }, 700 + Math.random() * 500);
 }
 
@@ -2397,7 +2409,7 @@ function getResponse(text) {
   // Answer questions directly without forcing taper style selection.
 
   if (/what tools|which tools|what do i need|what should i (buy|get|use)|starter kit|beginner tools/i.test(lower)) {
-    return { html: '<p>For a beginner self-cut you need:</p><p><strong>✂️ Clippers</strong> — Wahl Magic Clip is a great starter.<br><strong>🪒 Trimmer</strong> — for edges, sideburns, and neckline cleanup.<br><strong>🪞 3-way mirror</strong> — so you can see the back and sides.<br><strong>🪮 Fade brush</strong> — brush off loose hair between passes.<br><strong>💈 Guard set</strong> — most clippers come with one.</p><p>Optional: foil shaver for a cleaner skin line.</p>', options: null };
+    return { html: '<p>For a beginner self-cut you need:</p><p><strong>✂️ Clippers</strong> — Wahl Magic Clip is a great starter.<br><strong>🪒 Trimmer</strong> — for edges, sideburns, and neckline cleanup.<br><strong>🪞 3-way mirror</strong> — so you can see the back and sides.<br><strong>🪮 Fade brush</strong> — brush off loose hair between passes.<br><strong>💈 Guard set</strong> — most clippers come with one.</p><p>Optional: foil shaver for a cleaner skin line.</p>', options: null, toolsBtn: true };
   }
 
   if (/dark spot|bald spot|uneven|patch|hole|mistake|went too (high|deep|far)|too much off/i.test(lower)) {
@@ -2413,7 +2425,7 @@ function getResponse(text) {
   }
 
   if (/foil (shaver|razor)|bald.*skin|skin.*shave|zero.*fade|0 fade/i.test(lower)) {
-    return { html: '<p>A foil shaver gets much closer than a bare clipper blade. After you fade down to a #0 with your clippers, go over the skin fade zone with a foil shaver in circular motions. Apply a little shave gel first for a smoother glide and less irritation. Don\'t push too hard — the foil does the work.</p>', options: null };
+    return { html: '<p>A foil shaver gets much closer than a bare clipper blade. After you fade down to a #0 with your clippers, go over the skin fade zone with a foil shaver in circular motions. Apply a little shave gel first for a smoother glide and less irritation. Don\'t push too hard — the foil does the work.</p>', options: null, toolsBtn: true };
   }
 
   if (/how (do|to).*fix|fix.*taper|uneven.*taper|taper.*uneven|one side (higher|lower|different)/i.test(lower)) {
@@ -2449,7 +2461,7 @@ function getResponse(text) {
       null: 'Tell me which taper style you\'re going for first and I\'ll give you the exact guard sequence.',
     };
     const advice = guards[state.taperStyle] || guards[null];
-    return { html: `<p>${advice}</p>`, options: null };
+    return { html: `<p>${advice}</p>`, options: null, toolsBtn: true };
   }
 
   // Blending questions
