@@ -2325,6 +2325,11 @@ function addAIMessageWithCanvas(html, canvas) {
   _wrap.appendChild(canvas);
   _wrap.classList.add('guide-pulse');
   setTimeout(() => _wrap.classList.remove('guide-pulse'), 1900);
+  // Start laser draw-on animation for the bald guideline
+  if (canvas._guideAnim) {
+    const { W, H, lineY, startX, endX } = canvas._guideAnim;
+    requestAnimationFrame(() => _premiumGuideLineAnim(canvas, W, H, lineY, startX, endX));
+  }
   // Remove drag tutorial after animation completes
   const _tut = _wrap.querySelector('.drag-tutorial');
   if (_tut) setTimeout(() => { _tut.style.opacity='0'; _tut.style.transition='opacity .4s'; setTimeout(()=>_tut.remove(),400); }, 3000);
@@ -3394,6 +3399,7 @@ function drawGuide(file, guide, earMarks) {
     state.fadeOffsetYFrac = 0;
 
     drawGuideOverlay(ctx, W, H, lineY, startX, endX, fadeH, guardLbl, styleLbl);
+    canvas._guideAnim = { W, H, lineY, startX, endX };
     makeGuideDraggable(canvas, img, lineY, startX, endX, fadeH, guardLbl, styleLbl, earTopY, W, H, dpr);
 
     if (navigator.vibrate) navigator.vibrate(60);
@@ -4681,7 +4687,14 @@ function drawStepOverlay(ctx, W, H, step, guideLine, offset, skipLabel) {
 // Loads the photo, draws it, overlays the step's zone — static, view-only.
 async function renderStepCanvas(file, step, guideLine, offset) {
   const { canvas, ctx, W, H } = await loadScaledCanvas(file);
-  drawStepOverlay(ctx, W, H, step, guideLine, offset, true); // skipLabel=true — overlay handles it
+  // Draw only photo + static structural elements (no animated parts)
+  // skipLabel=true so the fading HTML overlay handles the label
+  drawStepOverlay(ctx, W, H, step, guideLine, offset, true);
+
+  // Tag the canvas so addStepMessage can start the premium animation after DOM insertion
+  if (step.zone && (step.zone.type === 'band' || step.zone.type === 'quad')) {
+    canvas._animData = { W, H, step, guideLine: { ...guideLine }, offset: { ...offset } };
+  }
   return canvas;
 }
 
@@ -4705,6 +4718,11 @@ function addStepMessage(html, canvas) {
   messagesWrap.appendChild(msg);
   canvas.style.width = '100%';
   msg.querySelector('.guide-img-wrap').appendChild(canvas);
+  // Start premium animation after canvas is in the DOM
+  if (canvas._animData) {
+    const { W, H, step, guideLine, offset } = canvas._animData;
+    requestAnimationFrame(() => _premiumStepAnim(canvas, W, H, step, guideLine, offset));
+  }
   scrollToMsg(msg);
   return msg;
 }
@@ -5925,6 +5943,252 @@ function _drawCCup(ctx, W, H, em, side) {
   ctx.fillStyle = GOLD; ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 3;
   ctx.fillText('C-Cup', lx, labelY);
   ctx.restore();
+}
+
+// ── PREMIUM GUIDE ANIMATION ENGINE ──
+// After a canvas is inserted into the DOM, run a rAF loop that adds:
+//   • Sequential reveal (guide → zone → arrows → label)
+//   • Animated line draw (lineDashOffset trick)
+//   • Breathing glow border
+//   • Moving upward flick arrows
+//   • Feathered gradient fill instead of flat white
+// The base photo pixels are captured first so every frame can restore them.
+
+function _premiumStepAnim(canvas, W, H, step, guideLine, offset) {
+  const ctx       = canvas.getContext('2d');
+  const cW        = canvas.width, cH = canvas.height;
+  const dpr       = cW / W;
+  const GOLD      = 'rgba(232,213,163,0.97)';
+  const GOLD_DIM  = 'rgba(232,213,163,0.40)';
+  const off       = offset || { x: 0, y: 0 };
+  const zone      = step.zone;
+
+  // Capture clean photo (no overlays yet) for per-frame restoration
+  const baseSnap  = ctx.getImageData(0, 0, cW, cH);
+
+  // Zone geometry (same calculation as drawStepOverlay, band/quad/detail)
+  let startX, endX, topY, botY, pts, isQuad = false;
+  if (zone.type === 'band') {
+    topY   = (zone.topFrac    + off.y) * H;
+    botY   = (zone.bottomFrac + off.y) * H;
+    startX = (zone.startXFrac + off.x) * W;
+    endX   = (zone.endXFrac   + off.x) * W;
+  } else if (zone.type === 'quad') {
+    pts    = zone.points.map(p => ({ x: (p.x + off.x) * W, y: (p.y + off.y) * H }));
+    isQuad = true;
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+    startX = Math.min(...xs); endX = Math.max(...xs);
+    topY   = Math.min(...ys); botY = Math.max(...ys);
+  } else { return; } // other zone types use their own draw path
+
+  const zoneW = endX - startX, zoneH = botY - topY;
+  const arrowX = startX + zoneW / 2;
+  const refY   = guideLine ? (guideLine.lineYFrac + off.y) * H : botY;
+
+  let running  = true;
+  const t0     = performance.now();
+
+  function frame(now) {
+    if (!running || !canvas.isConnected) { running = false; return; }
+
+    const elapsed = (now - t0) / 1000; // seconds since animation started
+
+    ctx.save();
+    ctx.scale(dpr, dpr); // work in CSS pixels throughout
+
+    // ── Restore base photo ──
+    ctx.restore();
+    ctx.putImageData(baseSnap, 0, 0);
+    ctx.save();
+    ctx.scale(dpr, dpr);
+
+    // ── Phase 0 (0–0.4s): Reveal zone fill ──
+    const fillAlpha = Math.min(1, elapsed / 0.4);
+
+    // Feathered gradient fill (no flat white grid)
+    ctx.save();
+    if (isQuad && pts) {
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+      ctx.closePath();
+    } else {
+      ctx.rect(startX, topY, zoneW, zoneH);
+    }
+    ctx.clip();
+    const grad = ctx.createLinearGradient(0, botY, 0, topY);
+    grad.addColorStop(0,    `rgba(232,213,163,${0.28 * fillAlpha})`);
+    grad.addColorStop(0.45, `rgba(232,213,163,${0.14 * fillAlpha})`);
+    grad.addColorStop(1,    `rgba(232,213,163,${0.03 * fillAlpha})`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(startX - 2, topY - 2, zoneW + 4, zoneH + 4);
+    ctx.restore();
+
+    // ── Phase 1 (0.3–0.9s): Draw border progressively ──
+    const borderT = Math.max(0, Math.min(1, (elapsed - 0.3) / 0.6));
+    if (borderT > 0) {
+      const perim   = 2 * (zoneW + zoneH);
+      const dashLen = perim * borderT;
+      const breathe = 0.7 + 0.3 * Math.sin(elapsed * 2.5); // breathing 0.7–1.0
+
+      // Dark outline for contrast
+      ctx.save();
+      ctx.setLineDash([dashLen, perim]);
+      ctx.lineDashOffset = 0;
+      ctx.strokeStyle = `rgba(0,0,0,${0.6 * borderT})`;
+      ctx.lineWidth   = 5;
+      ctx.shadowColor = 'transparent';
+      if (isQuad && pts) {
+        ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+        pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y)); ctx.closePath();
+      } else { ctx.strokeRect(startX, topY, zoneW, zoneH); }
+      ctx.stroke();
+      ctx.restore();
+
+      // Gold laser border with glow
+      ctx.save();
+      ctx.setLineDash([dashLen, perim]);
+      ctx.lineDashOffset = 0;
+      ctx.strokeStyle = `rgba(232,213,163,${0.97 * borderT})`;
+      ctx.lineWidth   = 2.5;
+      ctx.shadowColor = `rgba(232,213,163,${0.85 * breathe * borderT})`;
+      ctx.shadowBlur  = 14 * breathe;
+      if (isQuad && pts) {
+        ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+        pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y)); ctx.closePath();
+      } else { ctx.strokeRect(startX, topY, zoneW, zoneH); }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // ── Phase 2 (0.8s+): Animated upward arrows ──
+    if (elapsed > 0.8) {
+      const arrowAlpha = Math.min(1, (elapsed - 0.8) / 0.4);
+      const PERIOD     = 1.6; // seconds per loop
+      const cycle      = (elapsed % PERIOD) / PERIOD; // 0..1
+
+      // Three arrows staggered across the zone
+      const arrowXs = [
+        startX + zoneW * 0.25,
+        startX + zoneW * 0.50,
+        startX + zoneW * 0.75,
+      ];
+      arrowXs.forEach((ax, idx) => {
+        const offset_t = (cycle + idx * 0.33) % 1; // stagger each arrow by 1/3 period
+        // Arrow travels from 80% down zone to 10% down zone
+        const ay      = botY - zoneH * 0.15 - (zoneH * 0.65 * offset_t);
+        const opacity = arrowAlpha * Math.sin(offset_t * Math.PI); // fade in+out
+        if (opacity < 0.05) return;
+
+        ctx.save();
+        ctx.strokeStyle = `rgba(232,213,163,${opacity})`;
+        ctx.fillStyle   = `rgba(232,213,163,${opacity})`;
+        ctx.lineWidth   = 2;
+        ctx.shadowColor = `rgba(232,213,163,${opacity * 0.8})`;
+        ctx.shadowBlur  = 8;
+        // Arrow shaft
+        ctx.beginPath(); ctx.moveTo(ax, ay + 10); ctx.lineTo(ax, ay - 4); ctx.stroke();
+        // Arrow head
+        ctx.beginPath();
+        ctx.moveTo(ax, ay - 10);
+        ctx.lineTo(ax - 5, ay);
+        ctx.lineTo(ax + 5, ay);
+        ctx.closePath(); ctx.fill();
+        ctx.restore();
+      });
+    }
+
+    // ── Reference line (bald guideline) — static, always visible ──
+    ctx.save();
+    ctx.setLineDash([4, 5]);
+    ctx.strokeStyle = GOLD_DIM; ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.moveTo(startX, refY); ctx.lineTo(endX, refY); ctx.stroke();
+    ctx.restore();
+
+    ctx.restore();
+    requestAnimationFrame(frame);
+  }
+
+  requestAnimationFrame(frame);
+  return () => { running = false; };
+}
+
+// Animate the bald guideline canvas — draws the line left-to-right with a laser glow.
+function _premiumGuideLineAnim(canvas, W, H, lineY, startX, endX) {
+  const ctx  = canvas.getContext('2d');
+  const cW   = canvas.width, cH = canvas.height;
+  const dpr  = cW / W;
+  const GOLD = 'rgba(232,213,163,0.97)';
+
+  const baseSnap = ctx.getImageData(0, 0, cW, cH);
+  const lineLen  = endX - startX;
+
+  let running = true;
+  const t0    = performance.now();
+
+  function frame(now) {
+    if (!running || !canvas.isConnected) { running = false; return; }
+
+    const elapsed = (now - t0) / 1000;
+
+    ctx.putImageData(baseSnap, 0, 0);
+    ctx.save();
+    ctx.scale(dpr, dpr);
+
+    // ── Phase 0 (0–0.7s): Line draws itself left to right ──
+    const drawT   = Math.min(1, elapsed / 0.7);
+    const drawnX  = startX + lineLen * drawT;
+
+    // Bright laser core
+    ctx.save();
+    ctx.strokeStyle = GOLD;
+    ctx.lineWidth   = 2.5;
+    ctx.lineCap     = 'round';
+    ctx.setLineDash([]);
+    ctx.shadowColor = 'rgba(232,213,163,0.95)';
+    ctx.shadowBlur  = 16;
+    ctx.beginPath(); ctx.moveTo(startX, lineY); ctx.lineTo(drawnX, lineY); ctx.stroke();
+    ctx.restore();
+
+    // Wider soft glow layer behind the line
+    ctx.save();
+    ctx.strokeStyle = 'rgba(232,213,163,0.25)';
+    ctx.lineWidth   = 8;
+    ctx.lineCap     = 'round';
+    ctx.shadowColor = 'rgba(232,213,163,0.5)';
+    ctx.shadowBlur  = 22;
+    ctx.beginPath(); ctx.moveTo(startX, lineY); ctx.lineTo(drawnX, lineY); ctx.stroke();
+    ctx.restore();
+
+    // Leading bright spark at the draw head
+    if (drawT < 1) {
+      ctx.save();
+      ctx.fillStyle = '#fffde8';
+      ctx.shadowColor = 'rgba(255,255,200,1)';
+      ctx.shadowBlur  = 18;
+      ctx.beginPath(); ctx.arc(drawnX, lineY, 3.5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+
+    // ── Phase 1 (0.7s+): End dots appear + idle breathing pulse ──
+    if (elapsed > 0.7) {
+      const breathe = 0.75 + 0.25 * Math.sin((elapsed - 0.7) * 2.2);
+      [startX, endX].forEach(x => {
+        ctx.save();
+        ctx.fillStyle = GOLD;
+        ctx.shadowColor = `rgba(232,213,163,${breathe})`;
+        ctx.shadowBlur  = 12 * breathe;
+        ctx.beginPath(); ctx.arc(x, lineY, 4.5, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      });
+    }
+
+    ctx.restore();
+    requestAnimationFrame(frame);
+  }
+
+  requestAnimationFrame(frame);
+  return () => { running = false; };
 }
 
 // ── TOOLS PAGE ──
