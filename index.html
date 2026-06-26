@@ -2327,8 +2327,8 @@ function addAIMessageWithCanvas(html, canvas) {
   setTimeout(() => _wrap.classList.remove('guide-pulse'), 1900);
   // Start laser draw-on animation for the bald guideline
   if (canvas._guideAnim) {
-    const { W, H, lineY, startX, endX } = canvas._guideAnim;
-    requestAnimationFrame(() => _premiumGuideLineAnim(canvas, W, H, lineY, startX, endX));
+    const { W, H, lineY, startX, endX, photoSnap } = canvas._guideAnim;
+    requestAnimationFrame(() => _premiumGuideLineAnim(canvas, W, H, lineY, startX, endX, photoSnap));
   }
   // Remove drag tutorial after animation completes
   const _tut = _wrap.querySelector('.drag-tutorial');
@@ -3398,8 +3398,10 @@ function drawGuide(file, guide, earMarks) {
     state.fadeOffsetXFrac = 0;
     state.fadeOffsetYFrac = 0;
 
+    // Capture clean photo BEFORE drawing the overlay so the animation starts fresh
+    const _photoSnap = ctx.getImageData(0, 0, canvas.width, canvas.height);
     drawGuideOverlay(ctx, W, H, lineY, startX, endX, fadeH, guardLbl, styleLbl);
-    canvas._guideAnim = { W, H, lineY, startX, endX };
+    canvas._guideAnim = { W, H, lineY, startX, endX, photoSnap: _photoSnap };
     makeGuideDraggable(canvas, img, lineY, startX, endX, fadeH, guardLbl, styleLbl, earTopY, W, H, dpr);
 
     if (navigator.vibrate) navigator.vibrate(60);
@@ -6113,82 +6115,84 @@ function _premiumStepAnim(canvas, W, H, step, guideLine, offset) {
   return () => { running = false; };
 }
 
-// Animate the bald guideline canvas — draws the line left-to-right with a laser glow.
-function _premiumGuideLineAnim(canvas, W, H, lineY, startX, endX) {
-  const ctx  = canvas.getContext('2d');
-  const cW   = canvas.width, cH = canvas.height;
-  const dpr  = cW / W;
-  const GOLD = 'rgba(232,213,163,0.97)';
+// Animate the bald guideline canvas — draws the line left-to-right with a laser glow,
+// then pulses once and stops so the draggable overlay can take over cleanly.
+function _premiumGuideLineAnim(canvas, W, H, lineY, startX, endX, photoSnap) {
+  const ctx     = canvas.getContext('2d');
+  const cW      = canvas.width;
+  const dpr     = cW / W;
+  const GOLD    = 'rgba(232,213,163,0.97)';
+  const lineLen = endX - startX;
+  // Use the clean-photo snapshot so we start from a blank state
+  const base    = photoSnap || ctx.getImageData(0, 0, cW, canvas.height);
 
-  const baseSnap = ctx.getImageData(0, 0, cW, cH);
-  const lineLen  = endX - startX;
+  const DRAW_DUR   = 0.5;  // seconds to draw the line
+  const PULSE_DUR  = 0.4;  // seconds for the finish pulse
+  const TOTAL      = DRAW_DUR + PULSE_DUR;
 
-  let running = true;
-  const t0    = performance.now();
+  const t0 = performance.now();
 
   function frame(now) {
-    if (!running || !canvas.isConnected) { running = false; return; }
-
+    if (!canvas.isConnected) return;
     const elapsed = (now - t0) / 1000;
 
-    ctx.putImageData(baseSnap, 0, 0);
+    // Restore clean photo each frame
+    ctx.putImageData(base, 0, 0);
     ctx.save();
     ctx.scale(dpr, dpr);
 
-    // ── Phase 0 (0–0.7s): Line draws itself left to right ──
-    const drawT   = Math.min(1, elapsed / 0.7);
-    const drawnX  = startX + lineLen * drawT;
+    // ── Draw phase (0 → DRAW_DUR): line sweeps left to right ──
+    const drawT  = Math.min(1, elapsed / DRAW_DUR);
+    const headX  = startX + lineLen * drawT;
 
-    // Bright laser core
+    // Soft glow bloom behind the line
     ctx.save();
-    ctx.strokeStyle = GOLD;
-    ctx.lineWidth   = 2.5;
-    ctx.lineCap     = 'round';
-    ctx.setLineDash([]);
-    ctx.shadowColor = 'rgba(232,213,163,0.95)';
-    ctx.shadowBlur  = 16;
-    ctx.beginPath(); ctx.moveTo(startX, lineY); ctx.lineTo(drawnX, lineY); ctx.stroke();
+    ctx.strokeStyle = 'rgba(232,213,163,0.22)';
+    ctx.lineWidth = 10; ctx.lineCap = 'round'; ctx.setLineDash([]);
+    ctx.shadowColor = 'rgba(232,213,163,0.5)'; ctx.shadowBlur = 24;
+    ctx.beginPath(); ctx.moveTo(startX, lineY); ctx.lineTo(headX, lineY); ctx.stroke();
     ctx.restore();
 
-    // Wider soft glow layer behind the line
+    // Crisp gold laser core
     ctx.save();
-    ctx.strokeStyle = 'rgba(232,213,163,0.25)';
-    ctx.lineWidth   = 8;
-    ctx.lineCap     = 'round';
-    ctx.shadowColor = 'rgba(232,213,163,0.5)';
-    ctx.shadowBlur  = 22;
-    ctx.beginPath(); ctx.moveTo(startX, lineY); ctx.lineTo(drawnX, lineY); ctx.stroke();
+    ctx.strokeStyle = GOLD; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.setLineDash([]);
+    ctx.shadowColor = 'rgba(232,213,163,0.9)'; ctx.shadowBlur = 14;
+    ctx.beginPath(); ctx.moveTo(startX, lineY); ctx.lineTo(headX, lineY); ctx.stroke();
     ctx.restore();
 
-    // Leading bright spark at the draw head
+    // Bright spark at leading edge during draw
     if (drawT < 1) {
       ctx.save();
       ctx.fillStyle = '#fffde8';
-      ctx.shadowColor = 'rgba(255,255,200,1)';
-      ctx.shadowBlur  = 18;
-      ctx.beginPath(); ctx.arc(drawnX, lineY, 3.5, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowColor = 'rgba(255,252,220,1)'; ctx.shadowBlur = 20;
+      ctx.beginPath(); ctx.arc(headX, lineY, 4, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
 
-    // ── Phase 1 (0.7s+): End dots appear + idle breathing pulse ──
-    if (elapsed > 0.7) {
-      const breathe = 0.75 + 0.25 * Math.sin((elapsed - 0.7) * 2.2);
+    // ── Pulse phase (DRAW_DUR → TOTAL): glow expands then fades ──
+    if (elapsed >= DRAW_DUR) {
+      const pulseT  = (elapsed - DRAW_DUR) / PULSE_DUR; // 0 → 1
+      const glowR   = 4.5 + pulseT * 10;
+      const glowA   = (1 - pulseT) * 0.7;
       [startX, endX].forEach(x => {
         ctx.save();
-        ctx.fillStyle = GOLD;
-        ctx.shadowColor = `rgba(232,213,163,${breathe})`;
-        ctx.shadowBlur  = 12 * breathe;
+        ctx.strokeStyle = `rgba(232,213,163,${glowA})`;
+        ctx.lineWidth = 2;
+        ctx.shadowColor = `rgba(232,213,163,${glowA})`; ctx.shadowBlur = 18;
+        ctx.beginPath(); ctx.arc(x, lineY, glowR, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = GOLD; ctx.shadowBlur = 10;
         ctx.beginPath(); ctx.arc(x, lineY, 4.5, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
       });
     }
 
     ctx.restore();
-    requestAnimationFrame(frame);
+
+    // Stop after total animation; static overlay already drawn underneath
+    if (elapsed < TOTAL) requestAnimationFrame(frame);
   }
 
   requestAnimationFrame(frame);
-  return () => { running = false; };
 }
 
 // ── TOOLS PAGE ──
