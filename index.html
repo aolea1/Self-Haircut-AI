@@ -1043,9 +1043,20 @@ body {
 #cropTipText{font-size:12.5px;line-height:1.55;color:rgba(232,213,163,0.6);text-align:center;}
 #cropCanvasWrap{flex:1;position:relative;overflow:hidden;touch-action:none;}
 #cropCanvas{display:block;width:100%;height:100%;cursor:crosshair;}
-#cropFooter{padding:14px 20px 28px;display:flex;gap:10px;flex-shrink:0;}
+#cropFooter{padding:10px 20px 0;display:flex;flex-direction:column;gap:8px;flex-shrink:0;}
+.crop-footer-row{display:flex;gap:10px;}
 .crop-btn-primary{flex:1;padding:15px;background:#e8d5a3;color:#1a1410;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:-0.01em;}
 .crop-btn-skip{padding:15px 18px;background:transparent;color:var(--text3);border:1.5px solid rgba(255,255,255,0.12);border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;}
+.crop-btn-cancel{
+  width:100%;padding:13px;border:none;border-radius:12px;
+  background:transparent;
+  color:rgba(255,80,80,0.75);
+  font-size:14px;font-weight:600;cursor:pointer;
+  letter-spacing:0.01em;
+  transition:background 0.15s,color 0.15s;
+  margin-bottom:18px;
+}
+.crop-btn-cancel:hover{background:rgba(255,80,80,0.08);color:rgba(255,100,100,0.95);}
 /* ── TOOLS PAGE ── */
 #toolsPage {
   position:fixed;inset:0;z-index:9200;background:var(--bg);
@@ -6649,6 +6660,12 @@ function skipCrop() {
   _crop.resolve(_crop.origFile);
 }
 
+function cancelCrop() {
+  _closeCropModal();
+  // Re-open the file picker so the user can choose a different photo
+  triggerUpload();
+}
+
 function startGuide() {
   triggerUpload();
 }
@@ -6953,8 +6970,11 @@ function switchShowcase(type, btn) {
       </div>
     </div>
     <div id="cropFooter">
-      <button class="crop-btn-primary" onclick="applyCrop()">Use This Crop</button>
-      <button class="crop-btn-skip" onclick="skipCrop()">Full Photo</button>
+      <div class="crop-footer-row">
+        <button class="crop-btn-primary" onclick="applyCrop()">Use This Crop</button>
+        <button class="crop-btn-skip" onclick="skipCrop()">Full Photo</button>
+      </div>
+      <button class="crop-btn-cancel" onclick="cancelCrop()">↩ Choose a Different Photo</button>
     </div>
   </div>
 
