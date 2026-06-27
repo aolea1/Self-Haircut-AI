@@ -2325,11 +2325,6 @@ function addAIMessageWithCanvas(html, canvas) {
   _wrap.appendChild(canvas);
   _wrap.classList.add('guide-pulse');
   setTimeout(() => _wrap.classList.remove('guide-pulse'), 1900);
-  // Start laser draw-on animation for the bald guideline
-  if (canvas._guideAnim) {
-    const { W, H, lineY, startX, endX, photoSnap } = canvas._guideAnim;
-    requestAnimationFrame(() => _premiumGuideLineAnim(canvas, W, H, lineY, startX, endX, photoSnap));
-  }
   // Remove drag tutorial after animation completes
   const _tut = _wrap.querySelector('.drag-tutorial');
   if (_tut) setTimeout(() => { _tut.style.opacity='0'; _tut.style.transition='opacity .4s'; setTimeout(()=>_tut.remove(),400); }, 3000);
@@ -3398,10 +3393,7 @@ function drawGuide(file, guide, earMarks) {
     state.fadeOffsetXFrac = 0;
     state.fadeOffsetYFrac = 0;
 
-    // Capture clean photo BEFORE drawing the overlay so the animation starts fresh
-    const _photoSnap = ctx.getImageData(0, 0, canvas.width, canvas.height);
     drawGuideOverlay(ctx, W, H, lineY, startX, endX, fadeH, guardLbl, styleLbl);
-    canvas._guideAnim = { W, H, lineY, startX, endX, photoSnap: _photoSnap };
     makeGuideDraggable(canvas, img, lineY, startX, endX, fadeH, guardLbl, styleLbl, earTopY, W, H, dpr);
 
     if (navigator.vibrate) navigator.vibrate(60);
@@ -3545,109 +3537,31 @@ function drawTaperShapeOverlay(ctx, W, H, lines) {
   const minY = Math.min(...allPts.map(p=>p.y)), maxY = Math.max(...allPts.map(p=>p.y));
   const spanX = maxX - minX, spanY = maxY - minY;
 
-  // ── Animated Bald Guideline ──
-  const targetRefY  = ((lines.sideburn.p0.y + lines.rear.p0.y) / 2) * H;
-  const targetRefX0 = Math.min(lines.sideburn.p0.x, lines.rear.p0.x) * W;
-  const targetRefX1 = Math.max(lines.sideburn.p0.x, lines.rear.p0.x) * W;
-
-  // Initialise state once, then lerp smoothly every frame
-  if (!lines._gs) {
-    lines._gs = { y: targetRefY, x0: targetRefX0, x1: targetRefX1,
-                  drawT: 0, pulseT: 0, pulseDone: false };
-  }
-  const gs = lines._gs;
-
-  // Smooth morph — lerp toward current target (no jumping when a point moves)
-  const LR = active ? 0.28 : 0.12; // faster during drag so it tracks the finger
-  gs.y  += (targetRefY  - gs.y)  * LR;
-  gs.x0 += (targetRefX0 - gs.x0) * LR;
-  gs.x1 += (targetRefX1 - gs.x1) * LR;
-
-  // Draw-on progress: advance 0→1 over ~40 frames when idle
-  if (!active && gs.drawT < 1) gs.drawT = Math.min(1, gs.drawT + 0.025);
-  // Reset draw-on briefly when dragged so it re-activates on release
-  if (active) { gs.drawT = Math.max(0, gs.drawT - 0.04); gs.pulseDone = false; }
-
-  // Pulse once when draw completes
-  if (gs.drawT >= 1 && !gs.pulseDone) {
-    gs.pulseT = (gs.pulseT || 0) + 0.032;
-    if (gs.pulseT >= 1) gs.pulseDone = true;
-  }
-
-  const lineLen = gs.x1 - gs.x0;
-  const drawnX1 = gs.x0 + lineLen * gs.drawT; // draw progress
-
-  // ① Soft glow bloom (wide, low-alpha)
+  // ── Dashed bald-line reference ──
+  const refY = ((lines.sideburn.p0.y + lines.rear.p0.y) / 2) * H;
+  const refX0 = Math.min(lines.sideburn.p0.x, lines.rear.p0.x) * W;
+  const refX1 = Math.max(lines.sideburn.p0.x, lines.rear.p0.x) * W;
   ctx.save();
-  ctx.setLineDash([]); ctx.strokeStyle = 'rgba(232,213,163,0.18)'; ctx.lineWidth = 8; ctx.lineCap = 'round';
-  ctx.shadowColor = 'rgba(232,213,163,0.4)'; ctx.shadowBlur = 18;
-  ctx.beginPath(); ctx.moveTo(gs.x0, gs.y); ctx.lineTo(drawnX1, gs.y); ctx.stroke();
+  ctx.setLineDash([4,6]); ctx.strokeStyle = GOLD_DIM; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(refX0, refY); ctx.lineTo(refX1, refY); ctx.stroke();
   ctx.restore();
 
-  // ② Crisp gold core line
-  const coreAlpha = 0.55 + 0.35 * gs.drawT;
-  ctx.save();
-  ctx.setLineDash([]); ctx.strokeStyle = `rgba(232,213,163,${coreAlpha})`; ctx.lineWidth = 2; ctx.lineCap = 'round';
-  ctx.shadowColor = `rgba(232,213,163,${coreAlpha * 0.7})`; ctx.shadowBlur = 10;
-  ctx.beginPath(); ctx.moveTo(gs.x0, gs.y); ctx.lineTo(drawnX1, gs.y); ctx.stroke();
-  ctx.restore();
-
-  // ③ Leading spark at draw head
-  if (gs.drawT < 1) {
-    ctx.save();
-    ctx.fillStyle = '#fffde8'; ctx.shadowColor = 'rgba(255,255,200,1)'; ctx.shadowBlur = 16;
-    ctx.beginPath(); ctx.arc(drawnX1, gs.y, 3.5, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
-  }
-
-  // ④ Pulse ring (one-shot, plays once when draw completes)
-  if (gs.drawT >= 1 && !gs.pulseDone) {
-    const pt = Math.min(1, gs.pulseT);
-    const glowR = 3 + pt * 14, glowA = (1 - pt) * 0.7;
-    ctx.save();
-    ctx.strokeStyle = `rgba(232,213,163,${glowA})`; ctx.lineWidth = 2;
-    ctx.shadowColor = `rgba(232,213,163,${glowA})`; ctx.shadowBlur = 20;
-    [gs.x0, gs.x1].forEach(x => {
-      ctx.beginPath(); ctx.arc(x, gs.y, glowR, 0, Math.PI * 2); ctx.stroke();
-    });
-    ctx.restore();
-  }
-
-  // ⑤ Shimmer/scanner: bright dot slides back and forth along the settled line
-  if (gs.drawT >= 1 && gs.pulseDone) {
-    const shimX = gs.x0 + lineLen * (0.5 + 0.5 * Math.sin(phase * 1.2));
-    const shimA = 0.45 + 0.3 * Math.sin(phase * 1.8);
-    ctx.save();
-    ctx.fillStyle = `rgba(255,252,235,${shimA})`;
-    ctx.shadowColor = 'rgba(232,213,163,0.8)'; ctx.shadowBlur = 12;
-    ctx.beginPath(); ctx.arc(shimX, gs.y, 2.5, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
-  }
-
-  // ⑥ End-point dots
-  if (gs.drawT >= 0.85) {
-    const dotA = (gs.drawT - 0.85) / 0.15;
-    [gs.x0, gs.x1].forEach(x => {
-      ctx.save(); ctx.fillStyle = `rgba(232,213,163,${dotA * 0.9})`;
-      ctx.shadowColor = `rgba(232,213,163,${dotA * 0.7})`; ctx.shadowBlur = 8;
-      ctx.beginPath(); ctx.arc(x, gs.y, 4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-    });
-  }
-
-  // ── Layer 1: soft ambient bleed OUTSIDE the taper ──
+  // ── Layer 1: soft ambient bleed OUTSIDE the taper (suggests aura around fade zone) ──
   ctx.save();
   ctx.shadowColor = 'rgba(232,213,163,0.28)';
   ctx.shadowBlur  = 28;
-  ctx.strokeStyle = 'rgba(232,213,163,0.01)'; ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(232,213,163,0.01)';
+  ctx.lineWidth   = 1;
   taperContourPath(ctx, sb0, sb1, rr1, rr0);
   ctx.stroke();
   ctx.restore();
 
-  // ── Layer 2: clean gradient fill — no animations inside the taper zone ──
+  // ── Layer 2: multi-layer fill inside the taper ──
   ctx.save();
   taperContourPath(ctx, sb0, sb1, rr1, rr0);
   ctx.clip();
 
+  // Base gradient: warm dense gold at bald line, dissolves to transparent at crown
   const gBase = ctx.createLinearGradient(0, maxY, 0, minY);
   gBase.addColorStop(0,    'rgba(232,213,163,0.42)');
   gBase.addColorStop(0.35, 'rgba(232,213,163,0.22)');
@@ -3656,6 +3570,7 @@ function drawTaperShapeOverlay(ctx, W, H, lines) {
   ctx.fillStyle = gBase;
   ctx.fillRect(minX - 2, minY - 2, spanX + 4, spanY + 4);
 
+  // Secondary radial glow near bald line — makes the starting point feel "hot"
   const gRadial = ctx.createRadialGradient(
     (minX + maxX) / 2, maxY, 0,
     (minX + maxX) / 2, maxY, spanX * 0.7
@@ -3666,6 +3581,7 @@ function drawTaperShapeOverlay(ctx, W, H, lines) {
   ctx.fillStyle = gRadial;
   ctx.fillRect(minX - 2, minY - 2, spanX + 4, spanY + 4);
 
+  // Subtle diagonal grain — suggests graduated hair texture
   ctx.globalAlpha = 0.065;
   ctx.strokeStyle = 'rgba(232,213,163,1)'; ctx.lineWidth = 0.6;
   const grainStep = 14;
@@ -4765,14 +4681,7 @@ function drawStepOverlay(ctx, W, H, step, guideLine, offset, skipLabel) {
 // Loads the photo, draws it, overlays the step's zone — static, view-only.
 async function renderStepCanvas(file, step, guideLine, offset) {
   const { canvas, ctx, W, H } = await loadScaledCanvas(file);
-  // Draw only photo + static structural elements (no animated parts)
-  // skipLabel=true so the fading HTML overlay handles the label
-  drawStepOverlay(ctx, W, H, step, guideLine, offset, true);
-
-  // Tag the canvas so addStepMessage can start the premium animation after DOM insertion
-  if (step.zone && (step.zone.type === 'band' || step.zone.type === 'quad')) {
-    canvas._animData = { W, H, step, guideLine: { ...guideLine }, offset: { ...offset } };
-  }
+  drawStepOverlay(ctx, W, H, step, guideLine, offset, true); // skipLabel=true — overlay handles it
   return canvas;
 }
 
@@ -4796,11 +4705,6 @@ function addStepMessage(html, canvas) {
   messagesWrap.appendChild(msg);
   canvas.style.width = '100%';
   msg.querySelector('.guide-img-wrap').appendChild(canvas);
-  // Start premium animation after canvas is in the DOM
-  if (canvas._animData) {
-    const { W, H, step, guideLine, offset } = canvas._animData;
-    requestAnimationFrame(() => _premiumStepAnim(canvas, W, H, step, guideLine, offset));
-  }
   scrollToMsg(msg);
   return msg;
 }
@@ -5106,40 +5010,38 @@ async function presentFadePlanStep(i) {
     'detail-mini': '✶ Detail Trim Here',
     'detail-top':  '↑ Light pass here',
   }[zoneType];
-  // Band/quad zones already show the animated label via _premiumStepAnim (canvas).
-  // Only use the HTML overlay for detail zones that have no canvas animation.
-  const needsHtmlOverlay = overlayText && zoneType &&
-    (zoneType === 'detail' || zoneType === 'detail-mini' || zoneType === 'detail-top');
-
-  if (needsHtmlOverlay) {
+  if (overlayText) {
     const wrap = msg.querySelector('.guide-img-wrap');
     if (wrap) {
-      // Wait one frame so the canvas has been laid out and the wrap has real dimensions
-      requestAnimationFrame(() => {
-        const cRect = wrap.getBoundingClientRect();
-        if (!cRect.width || !cRect.height) return;
-        const off = { x: state.fadeOffsetXFrac || 0, y: state.fadeOffsetYFrac || 0 };
-        const z   = step.zone;
-        let cx = 0.5, cy = 0.45;
-        if (z.startXFrac !== undefined) {
-          cx = (z.startXFrac + z.endXFrac) / 2 + off.x;
-          cy = (z.topFrac   + z.bottomFrac) / 2 + off.y;
-        } else if (z.points) {
-          cx = z.points.reduce((s,p) => s + p.x, 0) / z.points.length + off.x;
-          cy = z.points.reduce((s,p) => s + p.y, 0) / z.points.length + off.y;
-        }
-        cx = Math.max(0.1, Math.min(0.9, cx));
-        cy = Math.max(0.1, Math.min(0.9, cy));
-        const ov = document.createElement('div');
-        ov.className   = 'flick-label-overlay';
-        ov.textContent = overlayText;
-        ov.style.position  = 'absolute';
-        ov.style.left      = `${cx * 100}%`;
-        ov.style.top       = `${cy * 100}%`;
-        ov.style.transform = 'translate(-50%, -50%)';
-        wrap.appendChild(ov);
-        ov.addEventListener('animationend', () => ov.remove());
-      });
+      // Compute the zone's center as fractions of the canvas, accounting for offset.
+      const off = { x: state.fadeOffsetXFrac || 0, y: state.fadeOffsetYFrac || 0 };
+      const z = step.zone;
+      let cx = 0.5, cy = 0.5; // fallback: dead center
+      if (z.type === 'band') {
+        cx = (z.startXFrac + z.endXFrac) / 2 + off.x;
+        cy = (z.topFrac   + z.bottomFrac) / 2 + off.y;
+      } else if (z.type === 'quad' || z.type === 'detail-top') {
+        const pts = z.points;
+        cx = pts.reduce((s,p) => s + p.x, 0) / pts.length + off.x;
+        cy = pts.reduce((s,p) => s + p.y, 0) / pts.length + off.y;
+      } else if (z.type === 'detail' || z.type === 'detail-mini') {
+        cx = (z.startXFrac + z.endXFrac) / 2 + off.x;
+        cy = (z.topFrac   + z.bottomFrac) / 2 + off.y;
+      }
+      // Clamp to keep label inside the canvas
+      cx = Math.max(0.1, Math.min(0.9, cx));
+      cy = Math.max(0.08, Math.min(0.92, cy));
+
+      const ov = document.createElement('div');
+      ov.className = 'flick-label-overlay';
+      ov.textContent = overlayText;
+      // Override the CSS position to be exactly at the zone center
+      ov.style.bottom = '';
+      ov.style.top    = `${cy * 100}%`;
+      ov.style.left   = `${cx * 100}%`;
+      ov.style.transform = 'translate(-50%, -50%)';
+      wrap.appendChild(ov);
+      ov.addEventListener('animationend', () => ov.remove());
     }
   }
 
@@ -6023,293 +5925,6 @@ function _drawCCup(ctx, W, H, em, side) {
   ctx.fillStyle = GOLD; ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 3;
   ctx.fillText('C-Cup', lx, labelY);
   ctx.restore();
-}
-
-// ── PREMIUM GUIDE ANIMATION ENGINE ──
-// After a canvas is inserted into the DOM, run a rAF loop that adds:
-//   • Sequential reveal (guide → zone → arrows → label)
-//   • Animated line draw (lineDashOffset trick)
-//   • Breathing glow border
-//   • Moving upward flick arrows
-//   • Feathered gradient fill instead of flat white
-// The base photo pixels are captured first so every frame can restore them.
-
-function _premiumStepAnim(canvas, W, H, step, guideLine, offset) {
-  const ctx       = canvas.getContext('2d');
-  const cW        = canvas.width, cH = canvas.height;
-  const dpr       = cW / W;
-  const GOLD      = 'rgba(232,213,163,0.97)';
-  const GOLD_DIM  = 'rgba(232,213,163,0.40)';
-  const off       = offset || { x: 0, y: 0 };
-  const zone      = step.zone;
-
-  // Capture clean photo (no overlays yet) for per-frame restoration
-  const baseSnap  = ctx.getImageData(0, 0, cW, cH);
-
-  // Zone geometry (same calculation as drawStepOverlay, band/quad/detail)
-  let startX, endX, topY, botY, pts, isQuad = false;
-  if (zone.type === 'band') {
-    topY   = (zone.topFrac    + off.y) * H;
-    botY   = (zone.bottomFrac + off.y) * H;
-    startX = (zone.startXFrac + off.x) * W;
-    endX   = (zone.endXFrac   + off.x) * W;
-  } else if (zone.type === 'quad') {
-    pts    = zone.points.map(p => ({ x: (p.x + off.x) * W, y: (p.y + off.y) * H }));
-    isQuad = true;
-    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
-    startX = Math.min(...xs); endX = Math.max(...xs);
-    topY   = Math.min(...ys); botY = Math.max(...ys);
-  } else { return; } // other zone types use their own draw path
-
-  const zoneW = endX - startX, zoneH = botY - topY;
-  const arrowX = startX + zoneW / 2;
-  const refY   = guideLine ? (guideLine.lineYFrac + off.y) * H : botY;
-
-  let running  = true;
-  const t0     = performance.now();
-
-  function frame(now) {
-    if (!running || !canvas.isConnected) { running = false; return; }
-
-    const elapsed = (now - t0) / 1000; // seconds since animation started
-
-    ctx.save();
-    ctx.scale(dpr, dpr); // work in CSS pixels throughout
-
-    // ── Restore base photo ──
-    ctx.restore();
-    ctx.putImageData(baseSnap, 0, 0);
-    ctx.save();
-    ctx.scale(dpr, dpr);
-
-    const breathe = 0.75 + 0.25 * Math.sin(elapsed * 2.2);
-
-    // ── Phase 0 (0–0.5s): Spray-paint gradient zone fills in ──
-    const fillAlpha = Math.min(1, elapsed / 0.5);
-    ctx.save();
-    if (isQuad && pts) {
-      ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
-      pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y)); ctx.closePath();
-    } else { ctx.rect(startX, topY, zoneW, zoneH); }
-    ctx.clip();
-    // Vertical spray: dense at the bald line, atomises to nothing at top
-    const sprayV = ctx.createLinearGradient(0, botY, 0, topY);
-    sprayV.addColorStop(0,    `rgba(232,213,163,${0.35 * fillAlpha})`);
-    sprayV.addColorStop(0.30, `rgba(232,213,163,${0.20 * fillAlpha})`);
-    sprayV.addColorStop(0.65, `rgba(232,213,163,${0.08 * fillAlpha})`);
-    sprayV.addColorStop(1,    `rgba(232,213,163,0)`);
-    ctx.fillStyle = sprayV;
-    ctx.fillRect(startX - 2, topY - 2, zoneW + 4, zoneH + 4);
-    // Horizontal radial spray — soft feather at left and right edges
-    const sprayH = ctx.createLinearGradient(startX, 0, endX, 0);
-    sprayH.addColorStop(0,    `rgba(0,0,0,${0.12 * fillAlpha})`);
-    sprayH.addColorStop(0.15, `rgba(0,0,0,0)`);
-    sprayH.addColorStop(0.85, `rgba(0,0,0,0)`);
-    sprayH.addColorStop(1,    `rgba(0,0,0,${0.12 * fillAlpha})`);
-    ctx.fillStyle = sprayH;
-    ctx.fillRect(startX - 2, topY - 2, zoneW + 4, zoneH + 4);
-    ctx.restore();
-
-    // ── Phase 1 (0.4–0.9s): Border draws + breathes ──
-    const borderT = Math.max(0, Math.min(1, (elapsed - 0.4) / 0.5));
-    if (borderT > 0) {
-      const perim = 2 * (zoneW + zoneH), dashLen = perim * borderT;
-      ctx.save();
-      ctx.setLineDash([dashLen, perim]); ctx.lineDashOffset = 0;
-      ctx.strokeStyle = `rgba(0,0,0,${0.55 * borderT})`; ctx.lineWidth = 5;
-      if (isQuad && pts) { ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y); pts.slice(1).forEach(p=>ctx.lineTo(p.x,p.y)); ctx.closePath(); }
-      else ctx.strokeRect(startX,topY,zoneW,zoneH);
-      ctx.stroke(); ctx.restore();
-
-      ctx.save();
-      ctx.setLineDash([dashLen, perim]); ctx.lineDashOffset = 0;
-      ctx.strokeStyle = `rgba(232,213,163,${0.97 * borderT})`; ctx.lineWidth = 2.5;
-      ctx.shadowColor = `rgba(232,213,163,${0.85 * breathe * borderT})`; ctx.shadowBlur = 14 * breathe;
-      if (isQuad && pts) { ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y); pts.slice(1).forEach(p=>ctx.lineTo(p.x,p.y)); ctx.closePath(); }
-      else ctx.strokeRect(startX,topY,zoneW,zoneH);
-      ctx.stroke(); ctx.restore();
-    }
-
-    // ── Phase 2 (0.7s+): Animated ↑ arrows + "Flick Out" label ──
-    if (elapsed > 0.7) {
-      const arrowAlpha = Math.min(1, (elapsed - 0.7) / 0.4);
-      const PERIOD = 1.8, cycle = (elapsed % PERIOD) / PERIOD;
-      const arrowXs = [startX + zoneW * 0.22, startX + zoneW * 0.50, startX + zoneW * 0.78];
-      const AH = Math.max(14, zoneH * 0.18), AW = Math.max(6, zoneW * 0.06);
-
-      arrowXs.forEach((ax, idx) => {
-        const t2  = (cycle + idx * 0.33) % 1;
-        const ay  = botY - zoneH * 0.12 - zoneH * 0.68 * t2;
-        const opa = arrowAlpha * Math.sin(t2 * Math.PI);
-        if (opa < 0.04) return;
-
-        ctx.save();
-        ctx.strokeStyle = `rgba(232,213,163,${opa})`; ctx.fillStyle = `rgba(232,213,163,${opa})`;
-        ctx.lineWidth = Math.max(1.5, AW * 0.25); ctx.lineCap = 'round';
-        ctx.shadowColor = `rgba(232,213,163,${opa * 0.7})`; ctx.shadowBlur = 10;
-        // Shaft
-        ctx.beginPath(); ctx.moveTo(ax, ay + AH * 0.5); ctx.lineTo(ax, ay); ctx.stroke();
-        // Head (triangle pointing up)
-        ctx.beginPath();
-        ctx.moveTo(ax, ay - AH * 0.55);
-        ctx.lineTo(ax - AW * 0.5, ay);
-        ctx.lineTo(ax + AW * 0.5, ay);
-        ctx.closePath(); ctx.fill();
-        ctx.restore();
-      });
-
-      // "↑ Flick Out" pill label — centered, gentle float
-      if (arrowAlpha > 0.3) {
-        const floatY = topY + zoneH * 0.18 - Math.sin(elapsed * 1.4) * 3;
-        const lbl = '↑ Flick Out';
-        const fs  = Math.max(13, Math.round(W * 0.038));
-        ctx.save();
-        ctx.font = `700 ${fs}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        const tw = ctx.measureText(lbl).width;
-        const px = startX + zoneW / 2, py = floatY;
-        const pw = tw + 18, ph = fs + 10;
-        // Pill bg
-        ctx.fillStyle = `rgba(0,0,0,${0.72 * arrowAlpha})`;
-        ctx.beginPath(); ctx.roundRect(px - pw/2, py - ph/2, pw, ph, ph/2); ctx.fill();
-        // Gold text
-        ctx.strokeStyle = 'rgba(0,0,0,0.9)'; ctx.lineWidth = 4; ctx.lineJoin = 'round';
-        ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 6;
-        ctx.strokeText(lbl, px, py);
-        ctx.fillStyle = `rgba(232,213,163,${arrowAlpha})`; ctx.shadowColor = 'rgba(232,213,163,0.4)'; ctx.shadowBlur = 6;
-        ctx.fillText(lbl, px, py);
-        ctx.restore();
-      }
-    }
-
-    // Reference bald guideline — subtle, always visible
-    ctx.save(); ctx.setLineDash([4,5]); ctx.strokeStyle = GOLD_DIM; ctx.lineWidth = 1.3;
-    ctx.beginPath(); ctx.moveTo(startX, refY); ctx.lineTo(endX, refY); ctx.stroke(); ctx.restore();
-
-    ctx.restore();
-    requestAnimationFrame(frame);
-  }
-
-  requestAnimationFrame(frame);
-  return () => { running = false; };
-}
-
-// Animate the bald guideline canvas — draws the line left-to-right with a laser glow,
-// then pulses once and stops so the draggable overlay can take over cleanly.
-function _premiumGuideLineAnim(canvas, W, H, lineY, startX, endX, photoSnap) {
-  const ctx     = canvas.getContext('2d');
-  const cW      = canvas.width;
-  const dpr     = cW / W;
-  const GOLD    = 'rgba(232,213,163,0.97)';
-  const lineLen = endX - startX;
-  // Use the clean-photo snapshot so we start from a blank state
-  const base    = photoSnap || ctx.getImageData(0, 0, cW, canvas.height);
-
-  const DRAW_DUR   = 0.5;  // seconds to draw the line
-  const PULSE_DUR  = 0.4;  // seconds for the finish pulse
-  const TOTAL      = DRAW_DUR + PULSE_DUR;
-
-  const t0 = performance.now();
-
-  function frame(now) {
-    if (!canvas.isConnected) return;
-    const elapsed = (now - t0) / 1000;
-
-    // Restore clean photo each frame
-    ctx.putImageData(base, 0, 0);
-    ctx.save();
-    ctx.scale(dpr, dpr);
-
-    // ── Draw phase (0 → DRAW_DUR): line sweeps left to right ──
-    const drawT  = Math.min(1, elapsed / DRAW_DUR);
-    const headX  = startX + lineLen * drawT;
-
-    // Soft glow bloom behind the line
-    ctx.save();
-    ctx.strokeStyle = 'rgba(232,213,163,0.22)';
-    ctx.lineWidth = 10; ctx.lineCap = 'round'; ctx.setLineDash([]);
-    ctx.shadowColor = 'rgba(232,213,163,0.5)'; ctx.shadowBlur = 24;
-    ctx.beginPath(); ctx.moveTo(startX, lineY); ctx.lineTo(headX, lineY); ctx.stroke();
-    ctx.restore();
-
-    // Crisp gold laser core
-    ctx.save();
-    ctx.strokeStyle = GOLD; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.setLineDash([]);
-    ctx.shadowColor = 'rgba(232,213,163,0.9)'; ctx.shadowBlur = 14;
-    ctx.beginPath(); ctx.moveTo(startX, lineY); ctx.lineTo(headX, lineY); ctx.stroke();
-    ctx.restore();
-
-    // Bright spark at leading edge during draw
-    if (drawT < 1) {
-      ctx.save();
-      ctx.fillStyle = '#fffde8';
-      ctx.shadowColor = 'rgba(255,252,220,1)'; ctx.shadowBlur = 20;
-      ctx.beginPath(); ctx.arc(headX, lineY, 4, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
-    }
-
-    // ── Clipper travels the line after draw (DRAW_DUR → DRAW_DUR + 0.55s) ──
-    const CLIP_START = DRAW_DUR + 0.05;
-    const CLIP_DUR   = 0.55;
-    if (elapsed >= CLIP_START && elapsed < CLIP_START + CLIP_DUR) {
-      const ct   = (elapsed - CLIP_START) / CLIP_DUR;       // 0→1
-      const cx   = startX + lineLen * ct;
-      const fade = ct < 0.85 ? 1 : (1 - ct) / 0.15;        // fade out near end
-      const cW2  = Math.max(20, lineLen * 0.11);            // clipper body width
-      const cH2  = Math.max(9,  cW2 * 0.38);               // clipper body height
-
-      ctx.save();
-      ctx.shadowColor = `rgba(232,213,163,${0.7 * fade})`; ctx.shadowBlur = 12;
-
-      // Body
-      ctx.fillStyle = `rgba(30,28,24,${0.92 * fade})`;
-      ctx.strokeStyle = `rgba(232,213,163,${0.85 * fade})`; ctx.lineWidth = 1.2;
-      ctx.beginPath(); ctx.roundRect(cx - cW2, lineY - cH2 / 2, cW2, cH2, 3);
-      ctx.fill(); ctx.stroke();
-
-      // Blade guard bar at the right (leading) end
-      ctx.fillStyle = `rgba(20,18,14,${0.92 * fade})`;
-      ctx.strokeStyle = `rgba(232,213,163,${0.7 * fade})`; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.roundRect(cx - 5, lineY - cH2 * 0.7, 5, cH2 * 1.4, 2);
-      ctx.fill(); ctx.stroke();
-
-      // Tooth lines on the blade
-      ctx.strokeStyle = `rgba(150,140,110,${0.8 * fade})`; ctx.lineWidth = 0.9;
-      [-3, 0, 3].forEach(dy => {
-        ctx.beginPath(); ctx.moveTo(cx - 4, lineY + dy); ctx.lineTo(cx - 1, lineY + dy); ctx.stroke();
-      });
-
-      // Direction arrow next to clipper
-      if (ct < 0.7) {
-        const arA = 0.8 * fade * (1 - ct * 0.5);
-        ctx.strokeStyle = `rgba(232,213,163,${arA})`; ctx.fillStyle = `rgba(232,213,163,${arA})`;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.moveTo(cx + 4, lineY); ctx.lineTo(cx + 11, lineY); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(cx + 14, lineY); ctx.lineTo(cx + 9, lineY - 4); ctx.lineTo(cx + 9, lineY + 4); ctx.closePath(); ctx.fill();
-      }
-
-      ctx.restore();
-    }
-
-    // ── Pulse phase: end dots glow then settle ──
-    if (elapsed >= DRAW_DUR) {
-      const pulseT = Math.min(1, (elapsed - DRAW_DUR) / PULSE_DUR);
-      const glowR  = 4.5 + pulseT * 10, glowA = (1 - pulseT) * 0.7;
-      [startX, endX].forEach(x => {
-        ctx.save();
-        ctx.strokeStyle = `rgba(232,213,163,${glowA})`; ctx.lineWidth = 2;
-        ctx.shadowColor = `rgba(232,213,163,${glowA})`; ctx.shadowBlur = 18;
-        ctx.beginPath(); ctx.arc(x, lineY, glowR, 0, Math.PI * 2); ctx.stroke();
-        ctx.fillStyle = GOLD; ctx.shadowBlur = 10;
-        ctx.beginPath(); ctx.arc(x, lineY, 4.5, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
-      });
-    }
-
-    ctx.restore();
-    if (elapsed < TOTAL) requestAnimationFrame(frame);
-  }
-
-  requestAnimationFrame(frame);
 }
 
 // ── TOOLS PAGE ──
