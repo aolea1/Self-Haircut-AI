@@ -3545,14 +3545,94 @@ function drawTaperShapeOverlay(ctx, W, H, lines) {
   const minY = Math.min(...allPts.map(p=>p.y)), maxY = Math.max(...allPts.map(p=>p.y));
   const spanX = maxX - minX, spanY = maxY - minY;
 
-  // ── Dashed bald-line reference ──
-  const refY = ((lines.sideburn.p0.y + lines.rear.p0.y) / 2) * H;
-  const refX0 = Math.min(lines.sideburn.p0.x, lines.rear.p0.x) * W;
-  const refX1 = Math.max(lines.sideburn.p0.x, lines.rear.p0.x) * W;
+  // ── Animated Bald Guideline ──
+  const targetRefY  = ((lines.sideburn.p0.y + lines.rear.p0.y) / 2) * H;
+  const targetRefX0 = Math.min(lines.sideburn.p0.x, lines.rear.p0.x) * W;
+  const targetRefX1 = Math.max(lines.sideburn.p0.x, lines.rear.p0.x) * W;
+
+  // Initialise state once, then lerp smoothly every frame
+  if (!lines._gs) {
+    lines._gs = { y: targetRefY, x0: targetRefX0, x1: targetRefX1,
+                  drawT: 0, pulseT: 0, pulseDone: false };
+  }
+  const gs = lines._gs;
+
+  // Smooth morph — lerp toward current target (no jumping when a point moves)
+  const LR = active ? 0.28 : 0.12; // faster during drag so it tracks the finger
+  gs.y  += (targetRefY  - gs.y)  * LR;
+  gs.x0 += (targetRefX0 - gs.x0) * LR;
+  gs.x1 += (targetRefX1 - gs.x1) * LR;
+
+  // Draw-on progress: advance 0→1 over ~40 frames when idle
+  if (!active && gs.drawT < 1) gs.drawT = Math.min(1, gs.drawT + 0.025);
+  // Reset draw-on briefly when dragged so it re-activates on release
+  if (active) { gs.drawT = Math.max(0, gs.drawT - 0.04); gs.pulseDone = false; }
+
+  // Pulse once when draw completes
+  if (gs.drawT >= 1 && !gs.pulseDone) {
+    gs.pulseT = (gs.pulseT || 0) + 0.032;
+    if (gs.pulseT >= 1) gs.pulseDone = true;
+  }
+
+  const lineLen = gs.x1 - gs.x0;
+  const drawnX1 = gs.x0 + lineLen * gs.drawT; // draw progress
+
+  // ① Soft glow bloom (wide, low-alpha)
   ctx.save();
-  ctx.setLineDash([4,6]); ctx.strokeStyle = GOLD_DIM; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(refX0, refY); ctx.lineTo(refX1, refY); ctx.stroke();
+  ctx.setLineDash([]); ctx.strokeStyle = 'rgba(232,213,163,0.18)'; ctx.lineWidth = 8; ctx.lineCap = 'round';
+  ctx.shadowColor = 'rgba(232,213,163,0.4)'; ctx.shadowBlur = 18;
+  ctx.beginPath(); ctx.moveTo(gs.x0, gs.y); ctx.lineTo(drawnX1, gs.y); ctx.stroke();
   ctx.restore();
+
+  // ② Crisp gold core line
+  const coreAlpha = 0.55 + 0.35 * gs.drawT;
+  ctx.save();
+  ctx.setLineDash([]); ctx.strokeStyle = `rgba(232,213,163,${coreAlpha})`; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.shadowColor = `rgba(232,213,163,${coreAlpha * 0.7})`; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.moveTo(gs.x0, gs.y); ctx.lineTo(drawnX1, gs.y); ctx.stroke();
+  ctx.restore();
+
+  // ③ Leading spark at draw head
+  if (gs.drawT < 1) {
+    ctx.save();
+    ctx.fillStyle = '#fffde8'; ctx.shadowColor = 'rgba(255,255,200,1)'; ctx.shadowBlur = 16;
+    ctx.beginPath(); ctx.arc(drawnX1, gs.y, 3.5, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  // ④ Pulse ring (one-shot, plays once when draw completes)
+  if (gs.drawT >= 1 && !gs.pulseDone) {
+    const pt = Math.min(1, gs.pulseT);
+    const glowR = 3 + pt * 14, glowA = (1 - pt) * 0.7;
+    ctx.save();
+    ctx.strokeStyle = `rgba(232,213,163,${glowA})`; ctx.lineWidth = 2;
+    ctx.shadowColor = `rgba(232,213,163,${glowA})`; ctx.shadowBlur = 20;
+    [gs.x0, gs.x1].forEach(x => {
+      ctx.beginPath(); ctx.arc(x, gs.y, glowR, 0, Math.PI * 2); ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  // ⑤ Shimmer/scanner: bright dot slides back and forth along the settled line
+  if (gs.drawT >= 1 && gs.pulseDone) {
+    const shimX = gs.x0 + lineLen * (0.5 + 0.5 * Math.sin(phase * 1.2));
+    const shimA = 0.45 + 0.3 * Math.sin(phase * 1.8);
+    ctx.save();
+    ctx.fillStyle = `rgba(255,252,235,${shimA})`;
+    ctx.shadowColor = 'rgba(232,213,163,0.8)'; ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.arc(shimX, gs.y, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  // ⑥ End-point dots
+  if (gs.drawT >= 0.85) {
+    const dotA = (gs.drawT - 0.85) / 0.15;
+    [gs.x0, gs.x1].forEach(x => {
+      ctx.save(); ctx.fillStyle = `rgba(232,213,163,${dotA * 0.9})`;
+      ctx.shadowColor = `rgba(232,213,163,${dotA * 0.7})`; ctx.shadowBlur = 8;
+      ctx.beginPath(); ctx.arc(x, gs.y, 4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    });
+  }
 
   // ── Layer 1: soft ambient bleed OUTSIDE the taper (suggests aura around fade zone) ──
   ctx.save();
