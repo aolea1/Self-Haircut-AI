@@ -3546,6 +3546,84 @@ function drawTaperShapeOverlay(ctx, W, H, lines) {
   ctx.beginPath(); ctx.moveTo(refX0, refY); ctx.lineTo(refX1, refY); ctx.stroke();
   ctx.restore();
 
+  // ── Curved guide arch between Sideburn (sb1) and Near Top of Ear (rr1) ──
+  // Both p1 points are locked to the same Y, so the arch is a shallow upward curve
+  // that represents the natural blending line of a low taper around the ear.
+  {
+    const archT   = lines._archAnim ? Math.min(1, (performance.now() - lines._archAnim.startTime) / 600) : 1;
+    const pulseT  = lines._archAnim && archT >= 1 ? Math.min(1, (performance.now() - lines._archAnim.startTime - 600) / 400) : -1;
+    const GOLD_A  = 'rgba(232,213,163,0.95)';
+
+    // The arch control point rises above the midpoint by ~18% of the horizontal span
+    const archMidX = (sb1.x + rr1.x) / 2;
+    const archRise = Math.abs(rr1.x - sb1.x) * 0.18; // how high the arch peaks
+    const cpX      = archMidX;
+    const cpY      = sb1.y - archRise; // rises upward (smaller Y = higher on screen)
+
+    // Quadratic bezier: sb1 → control point → rr1
+    // For draw-on, we sample points along the curve up to archT
+    const totalPts = 60;
+    const drawPts  = Math.round(totalPts * archT);
+
+    // Glow layer
+    ctx.save();
+    ctx.lineWidth = 7; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(232,213,163,0.15)';
+    ctx.shadowColor = 'rgba(232,213,163,0.5)'; ctx.shadowBlur = 18;
+    ctx.beginPath();
+    for (let i = 0; i <= drawPts; i++) {
+      const tt = i / totalPts;
+      const bx = (1-tt)*(1-tt)*sb1.x + 2*(1-tt)*tt*cpX + tt*tt*rr1.x;
+      const by = (1-tt)*(1-tt)*sb1.y + 2*(1-tt)*tt*cpY + tt*tt*rr1.y;
+      i === 0 ? ctx.moveTo(bx, by) : ctx.lineTo(bx, by);
+    }
+    ctx.stroke(); ctx.restore();
+
+    // Gold core
+    ctx.save();
+    ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.setLineDash([]);
+    ctx.strokeStyle = GOLD_A;
+    ctx.shadowColor = 'rgba(232,213,163,0.7)'; ctx.shadowBlur = 10;
+    ctx.beginPath();
+    for (let i = 0; i <= drawPts; i++) {
+      const tt = i / totalPts;
+      const bx = (1-tt)*(1-tt)*sb1.x + 2*(1-tt)*tt*cpX + tt*tt*rr1.x;
+      const by = (1-tt)*(1-tt)*sb1.y + 2*(1-tt)*tt*cpY + tt*tt*rr1.y;
+      i === 0 ? ctx.moveTo(bx, by) : ctx.lineTo(bx, by);
+    }
+    ctx.stroke(); ctx.restore();
+
+    // Leading spark while drawing
+    if (archT < 1 && drawPts > 0) {
+      const tt = drawPts / totalPts;
+      const hx = (1-tt)*(1-tt)*sb1.x + 2*(1-tt)*tt*cpX + tt*tt*rr1.x;
+      const hy = (1-tt)*(1-tt)*sb1.y + 2*(1-tt)*tt*cpY + tt*tt*rr1.y;
+      ctx.save(); ctx.fillStyle = '#fffde8';
+      ctx.shadowColor = 'rgba(255,252,210,1)'; ctx.shadowBlur = 18;
+      ctx.beginPath(); ctx.arc(hx, hy, 3.5, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    }
+
+    // Endpoint dots
+    if (archT >= 0.9) {
+      const dotA = (archT - 0.9) / 0.1;
+      [sb1, rr1].forEach(p => {
+        ctx.save(); ctx.fillStyle = `rgba(232,213,163,${dotA * 0.9})`;
+        ctx.shadowColor = `rgba(232,213,163,${dotA * 0.6})`; ctx.shadowBlur = 8;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      });
+    }
+
+    // One-shot pulse ring when draw completes
+    if (pulseT >= 0 && pulseT < 1) {
+      [sb1, rr1].forEach(p => {
+        const glowR = 4 + pulseT * 14, glowA = (1 - pulseT) * 0.65;
+        ctx.save(); ctx.strokeStyle = `rgba(232,213,163,${glowA})`; ctx.lineWidth = 2;
+        ctx.shadowColor = `rgba(232,213,163,${glowA})`; ctx.shadowBlur = 16;
+        ctx.beginPath(); ctx.arc(p.x, p.y, glowR, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+      });
+    }
+  }
+
   // ── Layer 1: soft ambient bleed OUTSIDE the taper (suggests aura around fade zone) ──
   ctx.save();
   ctx.shadowColor = 'rgba(232,213,163,0.28)';
@@ -3839,10 +3917,14 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubb
     const nx = cur.x + (_dragTarget.x - cur.x) * LERP;
     const ny = cur.y + (_dragTarget.y - cur.y) * LERP;
     lines[dragging.lineKey][dragging.pointKey] = { x: nx, y: ny };
-    // Keep bald line horizontal — mirror Y to the other p0.
+    const otherKeyS = dragging.lineKey === 'sideburn' ? 'rear' : 'sideburn';
+    // p0: keep bald line perfectly horizontal
     if (dragging.pointKey === 'p0') {
-      const otherKey = dragging.lineKey === 'sideburn' ? 'rear' : 'sideburn';
-      lines[otherKey].p0 = { ...lines[otherKey].p0, y: ny };
+      lines[otherKeyS].p0 = { ...lines[otherKeyS].p0, y: ny };
+    }
+    // p1: keep top guide points at the same vertical level
+    if (dragging.pointKey === 'p1') {
+      lines[otherKeyS].p1 = { ...lines[otherKeyS].p1, y: ny };
     }
     redraw();
     if (dragging.pointKey === 'p1')
@@ -3879,9 +3961,14 @@ function makeTaperLinesDraggable(canvas, lines, side, W, H, redraw, bubble, bubb
     // Snap to final target so position is exact on release.
     if (_dragTarget) {
       lines[dragging.lineKey][dragging.pointKey] = { ..._dragTarget };
+      const otherKeyE = dragging.lineKey === 'sideburn' ? 'rear' : 'sideburn';
       if (dragging.pointKey === 'p0') {
-        const otherKey = dragging.lineKey === 'sideburn' ? 'rear' : 'sideburn';
-        lines[otherKey].p0 = { ...lines[otherKey].p0, y: _dragTarget.y };
+        lines[otherKeyE].p0 = { ...lines[otherKeyE].p0, y: _dragTarget.y };
+      }
+      if (dragging.pointKey === 'p1') {
+        lines[otherKeyE].p1 = { ...lines[otherKeyE].p1, y: _dragTarget.y };
+        // Trigger the arch draw-on animation after p1 settles
+        lines._archAnim = { t: 0, startTime: performance.now() };
       }
     }
     _dragTarget          = null;
