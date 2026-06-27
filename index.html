@@ -3634,46 +3634,49 @@ function drawTaperShapeOverlay(ctx, W, H, lines) {
     });
   }
 
-  // ── Layer 1: soft ambient bleed OUTSIDE the taper (suggests aura around fade zone) ──
+  // ── Layer 1: outer ambient glow that breathes with phase ──
+  const outerGlow = 0.20 + 0.12 * Math.sin(phase * 0.9);
   ctx.save();
-  ctx.shadowColor = 'rgba(232,213,163,0.28)';
-  ctx.shadowBlur  = 28;
-  ctx.strokeStyle = 'rgba(232,213,163,0.01)';
-  ctx.lineWidth   = 1;
+  ctx.shadowColor = `rgba(232,213,163,${outerGlow})`;
+  ctx.shadowBlur  = 28 + 10 * Math.sin(phase * 0.7);
+  ctx.strokeStyle = 'rgba(232,213,163,0.01)'; ctx.lineWidth = 1;
   taperContourPath(ctx, sb0, sb1, rr1, rr0);
   ctx.stroke();
   ctx.restore();
 
-  // ── Layer 2: multi-layer fill inside the taper ──
+  // ── Layer 2: animated spray-paint fill inside the taper ──
   ctx.save();
   taperContourPath(ctx, sb0, sb1, rr1, rr0);
   ctx.clip();
 
-  // Base gradient: warm dense gold at bald line, dissolves to transparent at crown
+  // Base gradient — breathes opacity up and down subtly
+  const fillPulse = 0.88 + 0.12 * Math.sin(phase * 1.1);
   const gBase = ctx.createLinearGradient(0, maxY, 0, minY);
-  gBase.addColorStop(0,    'rgba(232,213,163,0.42)');
-  gBase.addColorStop(0.35, 'rgba(232,213,163,0.22)');
-  gBase.addColorStop(0.75, 'rgba(232,213,163,0.09)');
-  gBase.addColorStop(1,    'rgba(232,213,163,0.02)');
+  gBase.addColorStop(0,    `rgba(232,213,163,${0.40 * fillPulse})`);
+  gBase.addColorStop(0.35, `rgba(232,213,163,${0.20 * fillPulse})`);
+  gBase.addColorStop(0.75, `rgba(232,213,163,${0.08 * fillPulse})`);
+  gBase.addColorStop(1,    'rgba(232,213,163,0.01)');
   ctx.fillStyle = gBase;
   ctx.fillRect(minX - 2, minY - 2, spanX + 4, spanY + 4);
 
-  // Secondary radial glow near bald line — makes the starting point feel "hot"
+  // Radial hot-spot that slowly shifts upward along the zone
+  const hotY = maxY - spanY * (0.08 + 0.18 * (0.5 + 0.5 * Math.sin(phase * 0.55)));
   const gRadial = ctx.createRadialGradient(
-    (minX + maxX) / 2, maxY, 0,
-    (minX + maxX) / 2, maxY, spanX * 0.7
+    (minX + maxX) / 2, hotY, 0,
+    (minX + maxX) / 2, hotY, spanX * 0.7
   );
-  gRadial.addColorStop(0,   'rgba(232,213,163,0.22)');
-  gRadial.addColorStop(0.6, 'rgba(232,213,163,0.06)');
+  gRadial.addColorStop(0,   `rgba(232,213,163,${0.24 * fillPulse})`);
+  gRadial.addColorStop(0.6, `rgba(232,213,163,${0.05 * fillPulse})`);
   gRadial.addColorStop(1,   'rgba(232,213,163,0)');
   ctx.fillStyle = gRadial;
   ctx.fillRect(minX - 2, minY - 2, spanX + 4, spanY + 4);
 
-  // Subtle diagonal grain — suggests graduated hair texture
-  ctx.globalAlpha = 0.065;
+  // Diagonal shimmer lines that scroll slowly across the zone
+  const shimmerOffset = (phase * 3.5) % 14;
+  ctx.globalAlpha = 0.055 + 0.025 * Math.sin(phase * 1.3);
   ctx.strokeStyle = 'rgba(232,213,163,1)'; ctx.lineWidth = 0.6;
   const grainStep = 14;
-  for (let d = -(spanX + spanY); d <= (spanX + spanY) * 2; d += grainStep) {
+  for (let d = -(spanX + spanY) + shimmerOffset; d <= (spanX + spanY) * 2; d += grainStep) {
     ctx.beginPath();
     ctx.moveTo(minX + d, minY);
     ctx.lineTo(minX + d - spanY, maxY);
@@ -5110,38 +5113,40 @@ async function presentFadePlanStep(i) {
     'detail-mini': '✶ Detail Trim Here',
     'detail-top':  '↑ Light pass here',
   }[zoneType];
-  if (overlayText) {
+  // Band/quad zones already show the animated label via _premiumStepAnim (canvas).
+  // Only use the HTML overlay for detail zones that have no canvas animation.
+  const needsHtmlOverlay = overlayText && zoneType &&
+    (zoneType === 'detail' || zoneType === 'detail-mini' || zoneType === 'detail-top');
+
+  if (needsHtmlOverlay) {
     const wrap = msg.querySelector('.guide-img-wrap');
     if (wrap) {
-      // Compute the zone's center as fractions of the canvas, accounting for offset.
-      const off = { x: state.fadeOffsetXFrac || 0, y: state.fadeOffsetYFrac || 0 };
-      const z = step.zone;
-      let cx = 0.5, cy = 0.5; // fallback: dead center
-      if (z.type === 'band') {
-        cx = (z.startXFrac + z.endXFrac) / 2 + off.x;
-        cy = (z.topFrac   + z.bottomFrac) / 2 + off.y;
-      } else if (z.type === 'quad' || z.type === 'detail-top') {
-        const pts = z.points;
-        cx = pts.reduce((s,p) => s + p.x, 0) / pts.length + off.x;
-        cy = pts.reduce((s,p) => s + p.y, 0) / pts.length + off.y;
-      } else if (z.type === 'detail' || z.type === 'detail-mini') {
-        cx = (z.startXFrac + z.endXFrac) / 2 + off.x;
-        cy = (z.topFrac   + z.bottomFrac) / 2 + off.y;
-      }
-      // Clamp to keep label inside the canvas
-      cx = Math.max(0.1, Math.min(0.9, cx));
-      cy = Math.max(0.08, Math.min(0.92, cy));
-
-      const ov = document.createElement('div');
-      ov.className = 'flick-label-overlay';
-      ov.textContent = overlayText;
-      // Override the CSS position to be exactly at the zone center
-      ov.style.bottom = '';
-      ov.style.top    = `${cy * 100}%`;
-      ov.style.left   = `${cx * 100}%`;
-      ov.style.transform = 'translate(-50%, -50%)';
-      wrap.appendChild(ov);
-      ov.addEventListener('animationend', () => ov.remove());
+      // Wait one frame so the canvas has been laid out and the wrap has real dimensions
+      requestAnimationFrame(() => {
+        const cRect = wrap.getBoundingClientRect();
+        if (!cRect.width || !cRect.height) return;
+        const off = { x: state.fadeOffsetXFrac || 0, y: state.fadeOffsetYFrac || 0 };
+        const z   = step.zone;
+        let cx = 0.5, cy = 0.45;
+        if (z.startXFrac !== undefined) {
+          cx = (z.startXFrac + z.endXFrac) / 2 + off.x;
+          cy = (z.topFrac   + z.bottomFrac) / 2 + off.y;
+        } else if (z.points) {
+          cx = z.points.reduce((s,p) => s + p.x, 0) / z.points.length + off.x;
+          cy = z.points.reduce((s,p) => s + p.y, 0) / z.points.length + off.y;
+        }
+        cx = Math.max(0.1, Math.min(0.9, cx));
+        cy = Math.max(0.1, Math.min(0.9, cy));
+        const ov = document.createElement('div');
+        ov.className   = 'flick-label-overlay';
+        ov.textContent = overlayText;
+        ov.style.position  = 'absolute';
+        ov.style.left      = `${cx * 100}%`;
+        ov.style.top       = `${cy * 100}%`;
+        ov.style.transform = 'translate(-50%, -50%)';
+        wrap.appendChild(ov);
+        ov.addEventListener('animationend', () => ov.remove());
+      });
     }
   }
 
