@@ -5302,21 +5302,13 @@ function addFadePlanWrapUp() {
   // Log to haircut history
   logHaircutHistory();
 
-  // Affiliate tool recommendations by style
-  const tools = {
-    low:  [{ name: 'Wahl Magic Clip', tag: 'Best for low tapers', url: 'https://www.amazon.com/s?k=Wahl+Magic+Clip+cordless' }, { name: 'Wahl Detailer', tag: 'For edge cleanup', url: 'https://www.amazon.com/s?k=Wahl+Detailer+trimmer' }],
-    mid:  [{ name: 'Andis Master', tag: 'Pro-grade mid fades', url: 'https://www.amazon.com/s?k=Andis+Master+clipper' }, { name: 'Wahl Detailer', tag: 'For edge cleanup', url: 'https://www.amazon.com/s?k=Wahl+Detailer+trimmer' }],
-    high: [{ name: 'Andis Fade Combo', tag: 'Best for high fades', url: 'https://www.amazon.com/s?k=Andis+fade+combo+clipper' }, { name: 'Andis Slimline', tag: 'For hairline edges', url: 'https://www.amazon.com/s?k=Andis+Slimline+Pro+trimmer' }],
-    skin: [{ name: 'Andis Fade Combo', tag: 'Essential for skin fades', url: 'https://www.amazon.com/s?k=Andis+fade+combo+clipper' }, { name: 'Babyliss ProFX', tag: 'Zero-gap skin line finish', url: 'https://www.amazon.com/s?k=Babyliss+ProFX+trimmer' }],
-    buzz: [{ name: 'Wahl Clipper Kit', tag: 'All-in-one buzz set', url: 'https://www.amazon.com/s?k=Wahl+clipper+kit+buzz+cut' }],
-  };
-  const toolList = tools[style] || tools.low;
-  const toolsHtml = toolList.map(t =>
-    `<a href="${t.url}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--surface2);border-radius:8px;text-decoration:none;gap:8px;">
-      <span><span style="font-size:12px;font-weight:600;color:var(--text);">${t.name}</span><br><span style="font-size:11px;color:var(--text3);">${t.tag}</span></span>
-      <span style="font-size:11px;color:var(--accent2);white-space:nowrap;">Amazon →</span>
-    </a>`
-  ).join('');
+  const toolsHtml = `<button onclick="openToolsPage();closeSidebar();" style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 14px;background:var(--surface2);border:1px solid rgba(232,213,163,0.18);border-radius:10px;cursor:pointer;text-align:left;gap:10px;">
+    <span>
+      <span style="font-size:13px;font-weight:700;color:var(--text);display:block;margin-bottom:2px;">Barber-Curated Tools</span>
+      <span style="font-size:11px;color:var(--text3);">Clippers, trimmers, mirrors &amp; more</span>
+    </span>
+    <span style="font-size:13px;color:var(--accent2);white-space:nowrap;flex-shrink:0;">View Tools ›</span>
+  </button>`;
 
   // Guard cheat sheet
   const cheatData = {
