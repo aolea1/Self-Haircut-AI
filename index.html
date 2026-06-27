@@ -3634,49 +3634,42 @@ function drawTaperShapeOverlay(ctx, W, H, lines) {
     });
   }
 
-  // ── Layer 1: outer ambient glow that breathes with phase ──
-  const outerGlow = 0.20 + 0.12 * Math.sin(phase * 0.9);
+  // ── Layer 1: soft ambient bleed OUTSIDE the taper ──
   ctx.save();
-  ctx.shadowColor = `rgba(232,213,163,${outerGlow})`;
-  ctx.shadowBlur  = 28 + 10 * Math.sin(phase * 0.7);
+  ctx.shadowColor = 'rgba(232,213,163,0.28)';
+  ctx.shadowBlur  = 28;
   ctx.strokeStyle = 'rgba(232,213,163,0.01)'; ctx.lineWidth = 1;
   taperContourPath(ctx, sb0, sb1, rr1, rr0);
   ctx.stroke();
   ctx.restore();
 
-  // ── Layer 2: animated spray-paint fill inside the taper ──
+  // ── Layer 2: clean gradient fill — no animations inside the taper zone ──
   ctx.save();
   taperContourPath(ctx, sb0, sb1, rr1, rr0);
   ctx.clip();
 
-  // Base gradient — breathes opacity up and down subtly
-  const fillPulse = 0.88 + 0.12 * Math.sin(phase * 1.1);
   const gBase = ctx.createLinearGradient(0, maxY, 0, minY);
-  gBase.addColorStop(0,    `rgba(232,213,163,${0.40 * fillPulse})`);
-  gBase.addColorStop(0.35, `rgba(232,213,163,${0.20 * fillPulse})`);
-  gBase.addColorStop(0.75, `rgba(232,213,163,${0.08 * fillPulse})`);
-  gBase.addColorStop(1,    'rgba(232,213,163,0.01)');
+  gBase.addColorStop(0,    'rgba(232,213,163,0.42)');
+  gBase.addColorStop(0.35, 'rgba(232,213,163,0.22)');
+  gBase.addColorStop(0.75, 'rgba(232,213,163,0.09)');
+  gBase.addColorStop(1,    'rgba(232,213,163,0.02)');
   ctx.fillStyle = gBase;
   ctx.fillRect(minX - 2, minY - 2, spanX + 4, spanY + 4);
 
-  // Radial hot-spot that slowly shifts upward along the zone
-  const hotY = maxY - spanY * (0.08 + 0.18 * (0.5 + 0.5 * Math.sin(phase * 0.55)));
   const gRadial = ctx.createRadialGradient(
-    (minX + maxX) / 2, hotY, 0,
-    (minX + maxX) / 2, hotY, spanX * 0.7
+    (minX + maxX) / 2, maxY, 0,
+    (minX + maxX) / 2, maxY, spanX * 0.7
   );
-  gRadial.addColorStop(0,   `rgba(232,213,163,${0.24 * fillPulse})`);
-  gRadial.addColorStop(0.6, `rgba(232,213,163,${0.05 * fillPulse})`);
+  gRadial.addColorStop(0,   'rgba(232,213,163,0.22)');
+  gRadial.addColorStop(0.6, 'rgba(232,213,163,0.06)');
   gRadial.addColorStop(1,   'rgba(232,213,163,0)');
   ctx.fillStyle = gRadial;
   ctx.fillRect(minX - 2, minY - 2, spanX + 4, spanY + 4);
 
-  // Diagonal shimmer lines that scroll slowly across the zone
-  const shimmerOffset = (phase * 3.5) % 14;
-  ctx.globalAlpha = 0.055 + 0.025 * Math.sin(phase * 1.3);
+  ctx.globalAlpha = 0.065;
   ctx.strokeStyle = 'rgba(232,213,163,1)'; ctx.lineWidth = 0.6;
   const grainStep = 14;
-  for (let d = -(spanX + spanY) + shimmerOffset; d <= (spanX + spanY) * 2; d += grainStep) {
+  for (let d = -(spanX + spanY); d <= (spanX + spanY) * 2; d += grainStep) {
     ctx.beginPath();
     ctx.moveTo(minX + d, minY);
     ctx.lineTo(minX + d - spanY, maxY);
