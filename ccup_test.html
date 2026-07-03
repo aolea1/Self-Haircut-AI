@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>C-Cup 2-Point Test — SelfHaircut.ai</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0d0d0b; font-family: system-ui, sans-serif; color: #f0ede8; padding: 20px; }
+  h1 { font-size: 18px; font-weight: 800; color: #e8d5a3; margin-bottom: 4px; }
+  .sub { font-size: 12px; color: rgba(255,255,255,0.40); margin-bottom: 20px; line-height: 1.7; max-width: 600px; }
+  .sub strong { color: rgba(232,213,163,0.80); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+  .slot {
+    background: #161616; border: 1.5px dashed rgba(232,213,163,0.22);
+    border-radius: 16px; overflow: hidden; position: relative;
+    transition: border-color 0.18s;
+  }
+  .slot.has-photo { border-style: solid; border-color: rgba(232,213,163,0.18); }
+  .slot-header { padding: 10px 14px 0; display: flex; align-items: center; justify-content: space-between; }
+  .slot-label { font-size: 11px; font-weight: 700; color: rgba(232,213,163,0.45); letter-spacing: 0.06em; text-transform: uppercase; }
+  .side-btn {
+    padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 700;
+    border: 1px solid rgba(232,213,163,0.28); background: rgba(232,213,163,0.07);
+    color: rgba(232,213,163,0.70); cursor: pointer; transition: background 0.14s;
+  }
+  .side-btn:hover { background: rgba(232,213,163,0.14); }
+  .canvas-wrap { position: relative; margin: 8px; border-radius: 10px; overflow: hidden; cursor: crosshair; }
+  .canvas-wrap canvas { display: block; width: 100%; }
+  .drop-hint {
+    height: 300px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 8px;
+    color: rgba(232,213,163,0.28); font-size: 13px; pointer-events: none;
+    margin: 8px;
+  }
+  .drop-icon { font-size: 32px; }
+  .step-pills { display: flex; gap: 6px; padding: 8px 14px 4px; flex-wrap: wrap; }
+  .step-pill {
+    padding: 4px 10px; border-radius: 10px; font-size: 11px; font-weight: 700;
+    border: 1px solid; transition: all 0.15s;
+  }
+  .step-pill.waiting { border-color: rgba(255,255,255,0.12); color: rgba(255,255,255,0.28); background: transparent; }
+  .step-pill.active  { border-color: rgba(232,213,163,0.6); color: rgba(232,213,163,0.95); background: rgba(232,213,163,0.12); }
+  .step-pill.done    { border-color: rgba(100,220,140,0.5); color: rgba(120,220,150,0.9);  background: rgba(100,220,140,0.10); }
+  .slot-meta { padding: 6px 14px 10px; font-size: 11px; color: rgba(255,255,255,0.25); line-height: 1.5; }
+  .reset-btn {
+    display: none; margin: 4px 14px 10px; padding: 7px 14px; width: calc(100% - 28px);
+    border-radius: 10px; border: 1px solid rgba(255,80,80,0.3); background: rgba(255,80,80,0.07);
+    color: rgba(255,100,100,0.8); font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .reset-btn.visible { display: block; }
+  input[type=file] { display: none; }
+</style>
+</head>
+<body>
+<h1>C-Cup 2-Point System — Live Test</h1>
+<p class="sub">
+  Drop a side-profile photo, then tap to place two points:<br>
+  <strong>① Bottom of Bar</strong> — where the vertical temple line ends<br>
+  <strong>② Bottom of C-Cup</strong> — where the curve ends near the sideburn<br>
+  The AI generates the C-cup bezier between your two points.<br>
+  Drag either point to adjust. Toggle <strong>Side</strong> if the curve bulges the wrong way.
+</p>
+
+<div class="grid" id="grid"></div>
+
+<script>
+// ── C-CUP CURVE GENERATOR ──
+// Uses a quadratic bezier that PASSES THROUGH the midpoint the user places.
+// At t=0.5 for a quadratic: B(0.5) = 0.25*P0 + 0.5*CP + 0.25*P2
+// So CP = 2*midPt - 0.5*pt1 - 0.5*pt2
+function generateCCup(ctx, W, H, pt1, pt2, midPt) {
+  const cpX = 2 * midPt.x - 0.5 * pt1.x - 0.5 * pt2.x;
+  const cpY = 2 * midPt.y - 0.5 * pt1.y - 0.5 * pt2.y;
+
+  const GOLD = 'rgba(232,213,163,0.97)';
+
+  // Outer glow
+  ctx.save();
+  ctx.shadowColor = 'rgba(232,213,163,0.65)'; ctx.shadowBlur = 18;
+  ctx.strokeStyle = 'rgba(232,213,163,0.25)'; ctx.lineWidth = 8; ctx.lineCap = 'round';
+  ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(pt1.x, pt1.y);
+  ctx.quadraticCurveTo(cpX, cpY, pt2.x, pt2.y);
+  ctx.stroke(); ctx.restore();
+
+  // Main gold line
+  ctx.save();
+  ctx.strokeStyle = GOLD; ctx.lineWidth = 2.8; ctx.lineCap = 'round';
+  ctx.shadowColor = 'rgba(0,0,0,0.95)'; ctx.shadowBlur = 6;
+  ctx.beginPath(); ctx.moveTo(pt1.x, pt1.y);
+  ctx.quadraticCurveTo(cpX, cpY, pt2.x, pt2.y);
+  ctx.stroke(); ctx.restore();
+}
+
+// Default midpoint: offset perpendicular toward the face
+function defaultMidPoint(pt1, pt2, faceDir) {
+  const mx = (pt1.x + pt2.x) / 2;
+  const my = (pt1.y + pt2.y) / 2;
+  const dx = pt2.x - pt1.x, dy = pt2.y - pt1.y;
+  const span = Math.sqrt(dx*dx + dy*dy) || 1;
+  const nx = -dy / span, ny = dx / span;
+  const perpX = (nx * faceDir > 0) ? nx : -nx;
+  const perpY = (ny * faceDir > 0) ? ny : -ny;
+  const bulge = span * 0.28;
+  return { x: mx + perpX * bulge, y: my + perpY * bulge };
+}
+
+// ── DRAW DRAGGABLE POINT ──
+function drawPoint(ctx, p, label, color, isActive) {
+  const RING = isActive ? 16 : 11;
+  // Outer ring
+  ctx.save();
+  ctx.strokeStyle = color; ctx.lineWidth = isActive ? 2 : 1.5;
+  ctx.shadowColor = color; ctx.shadowBlur = isActive ? 18 : 8;
+  ctx.setLineDash([]);
+  ctx.beginPath(); ctx.arc(p.x, p.y, RING, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+  // Fill dot
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.shadowColor = color; ctx.shadowBlur = 12;
+  ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  // Label
+  ctx.save();
+  ctx.font = 'bold 12px system-ui'; ctx.textBaseline = 'middle';
+  const tw = ctx.measureText(label).width;
+  const lx = p.x + (p.x < ctx.canvas.width / 2 ? RING + 6 : -RING - tw - 6);
+  const ly = p.y;
+  ctx.strokeStyle = 'rgba(0,0,0,0.95)'; ctx.lineWidth = 4; ctx.lineJoin = 'round';
+  ctx.strokeText(label, lx, ly);
+  ctx.fillStyle = color; ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 3;
+  ctx.fillText(label, lx, ly);
+  ctx.restore();
+}
+
+// ── SLOT BUILDER ──
+const SLOTS = [
+  { label: 'Slot 1', side: 'right' },
+  { label: 'Slot 2', side: 'left'  },
+  { label: 'Slot 3', side: 'right' },
+  { label: 'Slot 4', side: 'left'  },
+];
+
+const CW = 360, CH = 440;
+const HIT = 22; // px hit radius for drag
+
+function buildSlot(cfg, grid) {
+  let img = null;
+  let pts = [];      // 0 = bottom of bar, 1 = bottom of C-cup
+  let dragging = -1;
+  let side = cfg.side;
+
+  const slot = document.createElement('div');
+  slot.className = 'slot';
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'slot-header';
+  const lbl = document.createElement('div');
+  lbl.className = 'slot-label'; lbl.textContent = cfg.label;
+  const sideBtn = document.createElement('button');
+  sideBtn.className = 'side-btn'; sideBtn.textContent = `Side: ${side}`;
+  sideBtn.onclick = () => { side = side === 'left' ? 'right' : 'left'; sideBtn.textContent = `Side: ${side}`; redraw(); };
+  header.appendChild(lbl); header.appendChild(sideBtn);
+
+  // Step pills
+  const pills = document.createElement('div');
+  pills.className = 'step-pills';
+  pills.innerHTML = `
+    <span class="step-pill active"  id="p1pill-${cfg.label}">① Bottom of Bar</span>
+    <span class="step-pill waiting" id="p2pill-${cfg.label}">② Bottom of C-Cup</span>
+    <span class="step-pill waiting" id="p3pill-${cfg.label}">③ Drag to Shape</span>
+  `;
+
+  // Canvas
+  const wrap = document.createElement('div'); wrap.className = 'canvas-wrap';
+  const canvas = document.createElement('canvas');
+  canvas.width = CW; canvas.height = CH;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#1a1816'; ctx.fillRect(0, 0, CW, CH);
+
+  const hint = document.createElement('div');
+  hint.className = 'drop-hint';
+  hint.innerHTML = `<div class="drop-icon">📷</div><div>Drop photo here or tap to browse</div>`;
+  slot.appendChild(hint);
+
+  wrap.appendChild(canvas);
+
+  // Meta
+  const meta = document.createElement('div');
+  meta.className = 'slot-meta';
+  meta.textContent = 'After placing both points, drag either to refine.';
+
+  // Reset button
+  const resetBtn = document.createElement('button');
+  resetBtn.className = 'reset-btn'; resetBtn.textContent = '↺ Reset points';
+  resetBtn.onclick = () => { pts = []; updatePills(); redraw(); };
+
+  function updatePills() {
+    const p1 = document.getElementById(`p1pill-${cfg.label}`);
+    const p2 = document.getElementById(`p2pill-${cfg.label}`);
+    const p3 = document.getElementById(`p3pill-${cfg.label}`);
+    if (!p1) return;
+    const states = [
+      ['active',  'waiting', 'waiting'],
+      ['done',    'active',  'waiting'],
+      ['done',    'done',    'active' ],
+      ['done',    'done',    'done'   ],
+    ];
+    const s = states[Math.min(pts.length, 3)];
+    p1.className = `step-pill ${s[0]}`;
+    if (p2) p2.className = `step-pill ${s[1]}`;
+    if (p3) p3.className = `step-pill ${s[2]}`;
+    resetBtn.classList.toggle('visible', pts.length > 0);
+  }
+
+  function redraw() {
+    ctx.clearRect(0, 0, CW, CH);
+    if (img) {
+      const scale = Math.min(CW / img.naturalWidth, CH / img.naturalHeight);
+      const iw = img.naturalWidth * scale, ih = img.naturalHeight * scale;
+      ctx.drawImage(img, (CW - iw) / 2, (CH - ih) / 2, iw, ih);
+    } else {
+      ctx.fillStyle = '#1a1816'; ctx.fillRect(0, 0, CW, CH);
+    }
+
+      // Draw curve when all 3 points placed
+    if (pts.length === 3) {
+      generateCCup(ctx, CW, CH, pts[0], pts[1], pts[2]);
+    }
+
+    // Draw points
+    const colors = ['rgba(232,213,163,0.97)', 'rgba(100,200,255,0.97)', 'rgba(180,130,255,0.97)'];
+    const labels = ['Bottom of Bar', 'Bottom of C-Cup', 'Shape Curve'];
+    pts.forEach((p, i) => drawPoint(ctx, p, labels[i], colors[i], dragging === i));
+
+  }
+
+  // Canvas interaction
+  function toCanvas(e) {
+    const r = canvas.getBoundingClientRect();
+    const scaleX = CW / r.width, scaleY = CH / r.height;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: (clientX - r.left) * scaleX, y: (clientY - r.top) * scaleY };
+  }
+
+  function findHit(pos) {
+    for (let i = pts.length - 1; i >= 0; i--) {
+      const dx = pos.x - pts[i].x, dy = pos.y - pts[i].y;
+      if (dx*dx + dy*dy < HIT*HIT) return i;
+    }
+    return -1;
+  }
+
+  function onDown(e) {
+    if (!img) return;
+    e.preventDefault();
+    const pos = toCanvas(e);
+    const hit = findHit(pos);
+    if (hit >= 0) {
+      dragging = hit;
+    } else if (pts.length < 2) {
+      pts.push({ x: pos.x, y: pos.y });
+      // Auto-place midpoint after second dot is set
+      if (pts.length === 2) {
+        const faceDir = side === 'left' ? 1 : -1;
+        pts.push(defaultMidPoint(pts[0], pts[1], faceDir));
+      }
+      updatePills();
+    }
+    redraw();
+  }
+
+  function onMove(e) {
+    if (dragging < 0 || !img) return;
+    e.preventDefault();
+    const pos = toCanvas(e);
+    pts[dragging] = { x: pos.x, y: pos.y };
+    redraw();
+  }
+
+  function onUp() { dragging = -1; redraw(); }
+
+  canvas.addEventListener('mousedown', onDown);
+  canvas.addEventListener('mousemove', onMove);
+  canvas.addEventListener('mouseup',   onUp);
+  canvas.addEventListener('touchstart', onDown, { passive: false });
+  canvas.addEventListener('touchmove',  onMove, { passive: false });
+  canvas.addEventListener('touchend',   onUp);
+
+  // File loading
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file'; fileInput.accept = 'image/*';
+  fileInput.onchange = () => loadFile(fileInput.files[0]);
+
+  function loadFile(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    const newImg = new Image();
+    newImg.onload = () => {
+      img = newImg; pts = []; dragging = -1;
+      slot.classList.add('has-photo');
+      hint.style.display = 'none';
+      updatePills(); redraw();
+    };
+    newImg.src = URL.createObjectURL(file);
+  }
+
+  slot.addEventListener('dragover', e => { e.preventDefault(); slot.classList.add('drag-over'); });
+  slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+  slot.addEventListener('drop', e => { e.preventDefault(); slot.classList.remove('drag-over'); loadFile(e.dataTransfer.files[0]); });
+  // Tap on empty slot → browse
+  hint.addEventListener('click', () => fileInput.click());
+
+  slot.appendChild(header);
+  slot.appendChild(pills);
+  slot.appendChild(wrap);
+  slot.appendChild(meta);
+  slot.appendChild(resetBtn);
+  slot.appendChild(fileInput);
+  grid.appendChild(slot);
+}
+
+const grid = document.getElementById('grid');
+SLOTS.forEach(cfg => buildSlot(cfg, grid));
+</script>
+</body>
+</html>

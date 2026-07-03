@@ -226,6 +226,45 @@ async function detectEarFromPhoto(imgEl) {
     return snap.exists() ? (snap.data().text || '') : '';
   };
 
+  // Credits — stored in users/{uid}.credits
+  window._fbGetCredits = async (uid) => {
+    if (!_db) return 0;
+    const snap = await getDoc(doc(_db, 'users', uid));
+    return snap.exists() ? (snap.data().credits ?? 0) : 0;
+  };
+  // Called on first login — creates user doc with 1 free credit if new
+  window._fbInitUser = async (uid, displayName, email) => {
+    if (!_db) return false;
+    const snap = await getDoc(doc(_db, 'users', uid));
+    if (!snap.exists()) {
+      await setDoc(doc(_db, 'users', uid), { credits: 1, displayName, email, createdAt: Date.now() });
+      return true;
+    }
+    return false;
+  };
+  // Client-side fallback deduct — backend endpoint is authoritative when available
+  window._fbDeductCredit = async (uid) => {
+    if (!_db) return 0;
+    const { updateDoc, increment } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    await updateDoc(doc(_db, 'users', uid), { credits: increment(-1) });
+    const snap = await getDoc(doc(_db, 'users', uid));
+    return snap.exists() ? Math.max(0, snap.data().credits ?? 0) : 0;
+  };
+  window._fbAddCredits = async (uid, amount) => {
+    if (!_db) return 0;
+    const { updateDoc, increment } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    await updateDoc(doc(_db, 'users', uid), { credits: increment(amount) });
+    const snap = await getDoc(doc(_db, 'users', uid));
+    return snap.exists() ? (snap.data().credits ?? 0) : 0;
+  };
+
+  // Promo access — stored in users/{uid}.promoAccess
+  window._fbGetPromoAccess = async (uid) => {
+    if (!_db) return null;
+    const snap = await getDoc(doc(_db, 'users', uid));
+    return snap.exists() ? (snap.data().promoAccess || null) : null;
+  };
+
   // Auth state listener
   if (_auth) {
     onAuthStateChanged(_auth, user => {
@@ -1641,6 +1680,127 @@ body {
   background:rgba(232,213,163,0.10);
   color:rgba(232,213,163,0.92);
 }
+/* Credit badge in topbar */
+.credit-badge {
+  display:none;align-items:center;gap:4px;
+  padding:5px 11px;border-radius:16px;
+  background:rgba(232,213,163,0.08);border:1px solid rgba(232,213,163,0.22);
+  color:rgba(232,213,163,0.78);font-size:12px;font-weight:700;
+  cursor:pointer;transition:background 0.14s,border-color 0.14s;white-space:nowrap;
+}
+.credit-badge.visible { display:flex; }
+.credit-badge:hover { background:rgba(232,213,163,0.14);border-color:rgba(232,213,163,0.38); }
+.credit-badge.low { border-color:rgba(255,140,60,0.45);color:rgba(255,165,80,0.95);background:rgba(255,100,40,0.07); }
+.credit-badge.empty { border-color:rgba(255,90,60,0.5);color:rgba(255,110,80,1);background:rgba(255,60,30,0.09); }
+/* Credit purchase overlay */
+.credit-overlay {
+  position:fixed;inset:0;z-index:1200;
+  background:rgba(0,0,0,0.74);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  display:none;align-items:flex-end;justify-content:center;
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+.credit-overlay.open { display:flex; }
+.credit-sheet {
+  background:var(--surface);border-radius:28px 28px 0 0;
+  padding:28px 22px 40px;width:100%;max-width:480px;
+  border-top:1px solid var(--border2);
+}
+.credit-sheet-title { font-size:20px;font-weight:800;color:var(--text);margin-bottom:6px; }
+.credit-sheet-sub { font-size:13.5px;color:var(--text2);line-height:1.55;margin-bottom:22px; }
+.credit-tier {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:15px 16px;border-radius:14px;
+  background:var(--surface2);border:1px solid var(--border2);
+  cursor:pointer;margin-bottom:10px;transition:border-color 0.15s,background 0.15s;
+}
+.credit-tier:hover { border-color:rgba(232,213,163,0.40);background:rgba(232,213,163,0.05); }
+.credit-tier.featured { border-color:rgba(232,213,163,0.45);background:rgba(232,213,163,0.06); }
+.credit-tier-left {}
+.credit-tier-label { font-size:15px;font-weight:700;color:var(--text); }
+.credit-tier-sub { font-size:12px;color:var(--text3);margin-top:2px; }
+.credit-tier-price { font-size:18px;font-weight:800;color:var(--accent2); }
+.credit-sheet-close {
+  margin-top:14px;width:100%;padding:12px;border-radius:12px;
+  background:none;border:1px solid var(--border2);color:var(--text3);
+  font-size:13px;cursor:pointer;transition:color 0.14s;
+}
+.credit-sheet-close:hover { color:var(--text2); }
+/* Google button in auth modal */
+.auth-google-btn {
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  width:100%;padding:12px 16px;border-radius:12px;
+  background:#fff;border:none;color:#1a1a1a;
+  font-size:14px;font-weight:600;cursor:pointer;
+  transition:opacity 0.15s;margin-bottom:14px;
+}
+.auth-google-btn:hover { opacity:0.88; }
+.auth-or-divider { display:flex;align-items:center;gap:10px;margin-bottom:14px; }
+.auth-or-divider hr { flex:1;border:none;border-top:1px solid var(--border); }
+.auth-or-divider span { font-size:12px;color:var(--text3); }
+/* Sidebar credits */
+.sidebar-credits-row {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:11px 14px;border-radius:12px;
+  background:rgba(232,213,163,0.05);border:1px solid rgba(232,213,163,0.15);
+  margin-bottom:10px;
+}
+.sidebar-credits-label { font-size:11.5px;font-weight:700;color:rgba(232,213,163,0.55);text-transform:uppercase;letter-spacing:0.05em; }
+.sidebar-credits-count { font-size:20px;font-weight:800;color:rgba(232,213,163,0.92); }
+.sidebar-buy-btn {
+  width:100%;padding:11px;border-radius:12px;
+  background:rgba(232,213,163,0.10);border:1.5px solid rgba(232,213,163,0.32);
+  color:rgba(232,213,163,0.92);font-size:13.5px;font-weight:700;
+  cursor:pointer;margin-bottom:14px;transition:background 0.15s;
+}
+.sidebar-buy-btn:hover { background:rgba(232,213,163,0.18); }
+/* Promo active badge in sidebar */
+.promo-active-badge {
+  display:none;align-items:center;gap:8px;
+  padding:11px 14px;border-radius:12px;
+  background:rgba(80,220,130,0.07);border:1px solid rgba(80,220,130,0.28);
+  margin-bottom:10px;
+}
+.promo-active-badge.visible { display:flex; }
+.promo-dot { width:7px;height:7px;border-radius:50%;background:rgba(80,220,130,0.9);flex-shrink:0;box-shadow:0 0 6px rgba(80,220,130,0.7); }
+.promo-badge-text { font-size:12px;font-weight:700;color:rgba(80,220,130,0.9);line-height:1.4; }
+.promo-badge-sub  { font-size:11px;color:rgba(80,220,130,0.55);font-weight:400;margin-top:1px; }
+/* Redeem code section */
+.redeem-section { margin-bottom:12px; }
+.redeem-toggle {
+  font-size:12px;color:var(--text3);background:none;border:none;
+  cursor:pointer;padding:4px 0;text-decoration:underline;transition:color 0.12s;
+  display:block;width:100%;text-align:left;
+}
+.redeem-toggle:hover { color:var(--text2); }
+.redeem-input-row {
+  display:none;align-items:center;gap:8px;margin-top:8px;
+}
+.redeem-input-row.open { display:flex; }
+.redeem-input {
+  flex:1;background:var(--surface2);border:1px solid var(--border2);
+  border-radius:10px;padding:9px 12px;color:var(--text);font-size:13px;
+  outline:none;font-family:'DM Sans',sans-serif;transition:border-color 0.15s;
+  text-transform:uppercase;letter-spacing:0.08em;
+}
+.redeem-input:focus { border-color:rgba(232,213,163,0.38); }
+.redeem-input::placeholder { text-transform:none;letter-spacing:normal; }
+.redeem-submit {
+  padding:9px 14px;border-radius:10px;
+  background:rgba(232,213,163,0.12);border:1px solid rgba(232,213,163,0.32);
+  color:rgba(232,213,163,0.90);font-size:13px;font-weight:700;
+  cursor:pointer;white-space:nowrap;transition:background 0.14s;flex-shrink:0;
+}
+.redeem-submit:hover { background:rgba(232,213,163,0.20); }
+.redeem-submit:disabled { opacity:0.5;cursor:default; }
+.redeem-msg { font-size:11.5px;margin-top:6px;line-height:1.4; }
+.redeem-msg.ok  { color:rgba(80,220,130,0.9); }
+.redeem-msg.err { color:rgba(255,100,80,0.9); }
+/* Topbar promo state on credit badge */
+.credit-badge.promo {
+  border-color:rgba(80,220,130,0.45);
+  color:rgba(80,220,130,0.95);
+  background:rgba(80,220,130,0.08);
+}
 /* ── SAVE MY BEST FADE ── */
 .save-fade-card {
   margin-top: 14px; padding: 16px 18px;
@@ -1978,6 +2138,35 @@ body {
       <button class="sidebar-signout" onclick="sidebarSignOut()">Sign out</button>
     </div>
 
+    <!-- Promo active banner (hidden when no active promo) -->
+    <div class="promo-active-badge" id="sidebarPromoBadge">
+      <div class="promo-dot"></div>
+      <div>
+        <div class="promo-badge-text">Free Access Active</div>
+        <div class="promo-badge-sub" id="sidebarPromoExpiry">—</div>
+      </div>
+    </div>
+
+    <!-- Credits row (hidden while promo is active) -->
+    <div class="sidebar-credits-row" id="sidebarCreditsRow">
+      <div>
+        <div class="sidebar-credits-label">Credits</div>
+        <div class="sidebar-credits-count" id="sidebarCreditCount">—</div>
+      </div>
+      <button class="sidebar-buy-btn" style="width:auto;margin:0;padding:8px 14px;font-size:12.5px;" onclick="showPurchaseScreen();closeSidebar();">Buy Credits</button>
+    </div>
+
+    <!-- Redeem code -->
+    <div class="redeem-section" id="redeemSection">
+      <button class="redeem-toggle" id="redeemToggleBtn" onclick="_toggleRedeemInput()">Redeem access code</button>
+      <div class="redeem-input-row" id="redeemInputRow">
+        <input class="redeem-input" id="redeemCodeInput" type="text" placeholder="Enter code" maxlength="32"
+          onkeydown="if(event.key==='Enter')_submitRedeemCode()">
+        <button class="redeem-submit" id="redeemSubmitBtn" onclick="_submitRedeemCode()">Apply</button>
+      </div>
+      <div class="redeem-msg" id="redeemMsg" style="display:none;"></div>
+    </div>
+
     <div class="sidebar-section-label">My Cuts</div>
     <div id="sidebarCutsList" style="flex:1;overflow-y:auto;min-height:60px;">
       <div style="font-size:12.5px;color:var(--text3);padding:6px 10px;line-height:1.6;">
@@ -2015,6 +2204,9 @@ body {
     </div>
     <button class="topbar-title" onclick="_easedScroll(document.getElementById('chatArea'),0,900)" style="font-family:'Manrope',sans-serif;font-weight:700;font-size:15px;letter-spacing:-0.2px;background:none;border:none;padding:6px 10px;border-radius:10px;cursor:pointer;color:inherit;-webkit-tap-highlight-color:transparent;">SelfHaircut<span style="color:var(--accent2)">.ai</span></button>
     <div class="topbar-right">
+      <button class="credit-badge" id="topbarCreditBadge" onclick="showPurchaseScreen()" title="Credits remaining">
+        ✦ <span id="topbarCreditCount">0</span>
+      </button>
       <button class="auth-avatar-btn" id="authTopbarBtn" onclick="onAuthBtnTap()">
         <span id="authTopbarLabel">Log In</span>
       </button>
@@ -2815,9 +3007,11 @@ async function freeAnalysis(file) {
          <p style="color:var(--text3);font-size:12px;margin-top:6px;">Heuristic analysis ${used}/${FREE_LIMIT} · <span style="color:var(--accent2);cursor:pointer;text-decoration:underline;" onclick="showUpgrade()">Upgrade to Pro</span> for barber-precision placement</p>`,
         null
       );
-      buildFadePlan();
-      state.currentStep = 0;
-      presentFadePlanStep(0);
+      _checkCreditsAndGenerate(() => {
+        buildFadePlan();
+        state.currentStep = 0;
+        presentFadePlanStep(0);
+      });
     } else {
       await startTaperShaping();
     }
@@ -2872,9 +3066,11 @@ async function claudeAnalysis(file, isFreePreview = false) {
     state.fadeGeometry = { earXfrac: 0.50, earTopFrac: 0.38, earBottomFrac: 0.50, earMidFrac: 0.50 };
     state.fadeOffsetXFrac = 0; state.fadeOffsetYFrac = 0;
     addAIMessage(`<p>⭐ <strong>${isFreePreview ? 'Fade Analysis' : 'Pro Analysis'} — ${label}:</strong> ${guide.advice}</p>${footer}`, null);
-    buildFadePlan();
-    state.currentStep = 0;
-    presentFadePlanStep(0);
+    _checkCreditsAndGenerate(() => {
+      buildFadePlan();
+      state.currentStep = 0;
+      presentFadePlanStep(0);
+    });
   } else {
     // Show AI advice as a brief note, then go straight into taper shaping
     addAIMessage(`<p>⭐ <strong>${label}:</strong> ${guide.advice}</p>${footer}`, null);
@@ -4198,9 +4394,294 @@ function finalizeTaperShape(btn) {
 
   const confirmMsg = addAIMessage(`<p>That taper is yours. Every section below is built around the exact shape you just set — let's fade it in together.</p>`, null);
   scrollToMsg(confirmMsg);
-  buildFadePlan();
-  state.currentStep = 0;
-  presentFadePlanStep(0);
+  _checkCreditsAndGenerate(() => {
+    buildFadePlan();
+    state.currentStep = 0;
+    presentFadePlanStep(0);
+  });
+}
+
+// ── CREDIT SYSTEM ──
+// Stripe payment link base URLs — replace REPLACE_STRIPE_* with real Stripe Payment Link URLs
+// Each link should have ?client_reference_id={uid} appended so the backend webhook credits the right user
+const STRIPE_LINKS = {
+  5:  'https://buy.stripe.com/REPLACE_STRIPE_5',
+  15: 'https://buy.stripe.com/REPLACE_STRIPE_15',
+  50: 'https://buy.stripe.com/REPLACE_STRIPE_50',
+};
+
+function _promoTimeRemaining(expiresAt) {
+  const ms = expiresAt - Date.now();
+  if (ms <= 0) return null;
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  if (h > 0) return `${h}h ${m}m remaining`;
+  return `${m}m remaining`;
+}
+
+function _isPromoActive() {
+  const p = window._promoAccess;
+  return p && typeof p.expiresAt === 'number' && p.expiresAt > Date.now();
+}
+
+function _updateCreditDisplay() {
+  const badge        = document.getElementById('topbarCreditBadge');
+  const countEl      = document.getElementById('topbarCreditCount');
+  const sidebarCount = document.getElementById('sidebarCreditCount');
+  const creditsRow   = document.getElementById('sidebarCreditsRow');
+  const promoBadge   = document.getElementById('sidebarPromoBadge');
+  const promoExpiry  = document.getElementById('sidebarPromoExpiry');
+  const redeemSec    = document.getElementById('redeemSection');
+
+  if (!window._currentUser) {
+    if (badge) badge.classList.remove('visible', 'low', 'empty', 'promo');
+    return;
+  }
+
+  const promoActive = _isPromoActive();
+
+  if (promoActive) {
+    // Topbar: green promo badge
+    if (badge)   { badge.classList.add('visible', 'promo'); badge.classList.remove('low', 'empty'); }
+    if (countEl) countEl.textContent = 'Free Access';
+    // Sidebar: show promo banner, hide credits row, hide redeem input
+    if (promoBadge) promoBadge.classList.add('visible');
+    if (creditsRow) creditsRow.style.display = 'none';
+    if (redeemSec)  redeemSec.style.display  = 'none';
+    if (promoExpiry) {
+      const remaining = _promoTimeRemaining(window._promoAccess.expiresAt);
+      promoExpiry.textContent = remaining ? `Expires in ${remaining}` : 'Expiring soon';
+    }
+  } else {
+    // Normal credit display
+    const credits = window._userCredits;
+    if (promoBadge) promoBadge.classList.remove('visible');
+    if (creditsRow) creditsRow.style.display = '';
+    if (redeemSec)  redeemSec.style.display  = '';
+
+    if (credits === null) {
+      if (badge) badge.classList.remove('visible', 'low', 'empty', 'promo');
+      if (sidebarCount) sidebarCount.textContent = '—';
+      return;
+    }
+    if (badge) {
+      badge.classList.add('visible');
+      badge.classList.remove('promo');
+      badge.classList.toggle('low',   credits > 0 && credits <= 2);
+      badge.classList.toggle('empty', credits === 0);
+    }
+    if (countEl)      countEl.textContent      = credits === 0 ? 'No credits' : `${credits} credit${credits === 1 ? '' : 's'}`;
+    if (sidebarCount) sidebarCount.textContent = credits;
+  }
+}
+
+function showPurchaseScreen(titleOverride) {
+  const titleEl = document.getElementById('creditSheetTitle');
+  const subEl   = document.getElementById('creditSheetSub');
+  if (titleOverride && titleEl) titleEl.textContent = titleOverride;
+  if (titleOverride && subEl) subEl.textContent = 'Pick a credit pack to keep going. Credits never expire.';
+  document.getElementById('creditOverlay').classList.add('open');
+}
+
+function closePurchaseScreen() {
+  document.getElementById('creditOverlay').classList.remove('open');
+  const titleEl = document.getElementById('creditSheetTitle');
+  const subEl   = document.getElementById('creditSheetSub');
+  if (titleEl) titleEl.textContent = 'Get more guides';
+  if (subEl)   subEl.textContent   = 'Each guide costs 1 credit. Pick a pack — credits never expire.';
+}
+
+function buyCredits(amount, linkKey) {
+  const user = window._currentUser;
+  if (!user) {
+    closePurchaseScreen();
+    openAuthModal(() => showPurchaseScreen());
+    return;
+  }
+  const baseUrl = STRIPE_LINKS[amount] || linkKey;
+  const url = `${baseUrl}?prefilled_email=${encodeURIComponent(user.email || '')}&client_reference_id=${user.uid}`;
+  window.open(url, '_blank');
+}
+
+// Called right before generating the step-by-step guide.
+// Checks promo access first, then falls through to credit deduction.
+async function _checkCreditsAndGenerate(callback) {
+  // Not logged in → prompt login first
+  if (!window._currentUser) {
+    openAuthModal(async () => { await _checkCreditsAndGenerate(callback); });
+    return;
+  }
+
+  const user = window._currentUser;
+
+  // Load promo + credits together if neither is cached yet
+  if (window._promoAccess === null && window._userCredits === null) {
+    try {
+      const [credits, promo] = await Promise.all([
+        window._fbGetCredits     ? window._fbGetCredits(user.uid)     : Promise.resolve(0),
+        window._fbGetPromoAccess ? window._fbGetPromoAccess(user.uid) : Promise.resolve(null),
+      ]);
+      window._userCredits = credits;
+      window._promoAccess = promo;
+      _updateCreditDisplay();
+    } catch(e) { window._userCredits = 0; }
+  }
+
+  // Active promo → bypass all credit deduction, verify server-side via /use-credit
+  if (_isPromoActive()) {
+    // Still call the backend so it can log usage and verify the promo hasn't expired server-side.
+    // If the endpoint isn't deployed yet we allow through silently.
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(BACKEND_URL + '/use-credit', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ promoOnly: true }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Backend may send back updated promo/credit state
+        if (typeof data.credits === 'number') window._userCredits = data.credits;
+        if (data.promoAccess !== undefined)   window._promoAccess = data.promoAccess;
+        _updateCreditDisplay();
+        // If backend says promo is now expired, fall through to credit check
+        if (data.promoExpired) { await _checkCreditsAndGenerate(callback); return; }
+      }
+    } catch(e) { /* backend not yet wired — allow through */ }
+    callback();
+    return;
+  }
+
+  // No active promo — enforce credits
+  if (window._userCredits === null && window._fbGetCredits) {
+    try { window._userCredits = await window._fbGetCredits(user.uid); _updateCreditDisplay(); }
+    catch(e) { window._userCredits = 0; }
+  }
+
+  if ((window._userCredits ?? 0) <= 0) {
+    showPurchaseScreen('You\'re out of credits');
+    return;
+  }
+
+  // Deduct 1 credit — backend is authoritative, client-side is fallback
+  try {
+    let newCredits;
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(BACKEND_URL + '/use-credit', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) throw new Error('backend unavailable');
+      const data = await res.json();
+      newCredits = data.credits;
+    } catch(e) {
+      if (window._fbDeductCredit) {
+        newCredits = await window._fbDeductCredit(user.uid);
+      } else {
+        newCredits = Math.max(0, (window._userCredits || 1) - 1);
+      }
+    }
+    window._userCredits = newCredits;
+    _updateCreditDisplay();
+    callback();
+  } catch(e) {
+    addAIMessage('<p>Could not verify your credits. Please check your connection and try again.</p>', null);
+  }
+}
+
+// ── PROMO / ACCESS CODE REDEMPTION ──
+function _toggleRedeemInput() {
+  const row = document.getElementById('redeemInputRow');
+  const msg = document.getElementById('redeemMsg');
+  if (!row) return;
+  const opening = !row.classList.contains('open');
+  row.classList.toggle('open', opening);
+  if (opening) {
+    setTimeout(() => document.getElementById('redeemCodeInput')?.focus(), 50);
+  } else {
+    if (msg) { msg.style.display = 'none'; msg.textContent = ''; }
+  }
+}
+
+function _setRedeemMsg(text, type) {
+  const el = document.getElementById('redeemMsg');
+  if (!el) return;
+  el.textContent = text;
+  el.className = `redeem-msg ${type}`;
+  el.style.display = text ? '' : 'none';
+}
+
+async function _submitRedeemCode() {
+  const user = window._currentUser;
+  if (!user) { openAuthModal(null); return; }
+
+  const input = document.getElementById('redeemCodeInput');
+  const btn   = document.getElementById('redeemSubmitBtn');
+  const code  = (input?.value || '').trim().toUpperCase();
+  if (!code) { _setRedeemMsg('Please enter a code.', 'err'); return; }
+
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  _setRedeemMsg('', '');
+
+  try {
+    const token = await user.getIdToken();
+    const res = await fetch(BACKEND_URL + '/redeem-code', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      const errMap = {
+        'already_redeemed': 'You\'ve already redeemed this code.',
+        'invalid_code':     'That code isn\'t valid.',
+        'inactive':         'That code is no longer active.',
+      };
+      _setRedeemMsg(errMap[data.error] || (data.message || 'Code not accepted. Please try again.'), 'err');
+      return;
+    }
+
+    // Success — backend writes promoAccess to Firestore and returns it
+    window._promoAccess = data.promoAccess;
+    _updateCreditDisplay();
+
+    const remaining = _promoTimeRemaining(data.promoAccess?.expiresAt);
+    _setRedeemMsg(`✓ Access activated! ${remaining ? remaining + '.' : ''}`, 'ok');
+
+    // Hide input row, update toggle label
+    const row = document.getElementById('redeemInputRow');
+    if (row) row.classList.remove('open');
+    const toggleBtn = document.getElementById('redeemToggleBtn');
+    if (toggleBtn) toggleBtn.style.display = 'none';
+    if (input) input.value = '';
+
+    // Refresh promo expiry ticker
+    _startPromoTicker();
+
+  } catch(e) {
+    _setRedeemMsg('Could not reach the server. Check your connection and try again.', 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Apply'; }
+  }
+}
+
+// Ticks the "expires in X" display every minute while promo is active
+let _promoTickerInterval = null;
+function _startPromoTicker() {
+  clearInterval(_promoTickerInterval);
+  if (!_isPromoActive()) return;
+  _promoTickerInterval = setInterval(() => {
+    if (!_isPromoActive()) {
+      clearInterval(_promoTickerInterval);
+      window._promoAccess = null;
+      _updateCreditDisplay();
+      return;
+    }
+    _updateCreditDisplay();
+  }, 60000);
 }
 
 // ── UPGRADE ──
@@ -5450,7 +5931,9 @@ document.getElementById('taperExampleModal')?.addEventListener('click', e => {
 let _authMode = 'signin'; // 'signin' | 'signup'
 let _authPendingAction = null; // callback to run after login
 
-window._currentUser = null;
+window._currentUser  = null;
+window._userCredits  = null; // null = not yet loaded
+window._promoAccess  = null; // { code, redeemedAt, expiresAt } or null
 window._onAuthChange = (user) => {
   window._currentUser = user;
   const btn   = document.getElementById('authTopbarBtn');
@@ -5462,11 +5945,9 @@ window._onAuthChange = (user) => {
     btn.classList.add('signed-in');
     const greetEl = document.getElementById('authGreeting');
     if (greetEl && firstName) greetEl.textContent = `Welcome back, ${firstName}`;
-    // Sync sidebar state
     _sidebarUser = { name: user.displayName, email: user.email, photoURL: user.photoURL, uid: user.uid };
     _renderSidebarAuth();
     showPersonalizedGreeting(user);
-    // Load cloud fade and update banner
     if (window._fbGetFade) {
       window._fbGetFade(user.uid).then(fade => {
         if (fade) {
@@ -5475,11 +5956,24 @@ window._onAuthChange = (user) => {
         }
       }).catch(() => {});
     }
+    // Load credit balance and promo access in parallel
+    Promise.all([
+      window._fbGetCredits ? window._fbGetCredits(user.uid).catch(() => 0) : Promise.resolve(0),
+      window._fbGetPromoAccess ? window._fbGetPromoAccess(user.uid).catch(() => null) : Promise.resolve(null),
+    ]).then(([credits, promo]) => {
+      window._userCredits = credits;
+      window._promoAccess = promo;
+      _updateCreditDisplay();
+      if (typeof _startPromoTicker === 'function') _startPromoTicker();
+    });
   } else {
     if (label) label.textContent = 'Log In';
     btn.classList.remove('signed-in');
     const greetEl = document.getElementById('authGreeting');
     if (greetEl) greetEl.textContent = '';
+    window._userCredits = null;
+    window._promoAccess = null;
+    _updateCreditDisplay();
   }
 };
 
@@ -5497,13 +5991,7 @@ function closeAuthModal() {
 }
 function onAuthBtnTap() {
   if (window._currentUser) {
-    // Logged in — show quick menu
-    const signedInAs = window._currentUser.displayName || window._currentUser.email;
-    if (confirm(`Signed in as ${signedInAs}\n\nSign out?`)) {
-      if (window._fbSignOut) window._fbSignOut().catch(() => {});
-      window._currentUser = null;
-      window._onAuthChange(null);
-    }
+    openSidebar();
   } else {
     openAuthModal(null);
   }
@@ -5527,8 +6015,16 @@ function _authShowError(msg) {
   const el = document.getElementById('authError');
   el.textContent = msg; el.style.display = '';
 }
-function _afterAuth(user) {
+async function _afterAuth(user) {
   closeAuthModal();
+  // Initialize new user doc with 1 free credit (no-op for existing users)
+  if (window._fbInitUser) {
+    const isNew = await window._fbInitUser(user.uid, user.displayName, user.email).catch(() => false);
+    if (isNew) {
+      window._userCredits = 1;
+      _updateCreditDisplay();
+    }
+  }
   window._onAuthChange(user);
   if (_authPendingAction) { _authPendingAction(user); _authPendingAction = null; }
 }
@@ -6820,14 +7316,17 @@ function logHaircutHistory() {
 }
 
 function sidebarSignInGoogle() {
-  // Placeholder — wire to Firebase Auth or OAuth when backend is ready.
-  // For now, simulate a successful sign-in with a demo account so the UI is testable.
-  _sidebarUser = { name: 'Demo User', email: 'demo@selfhaircut.ai', photoURL: null };
-  _renderSidebarAuth();
+  closeSidebar();
+  openAuthModal(null);
 }
 
 function sidebarSignOut() {
   _sidebarUser = null;
+  window._userCredits = null;
+  _updateCreditDisplay();
+  if (window._fbSignOut) window._fbSignOut().catch(() => {});
+  window._currentUser = null;
+  window._onAuthChange(null);
   _renderSidebarAuth();
 }
 
@@ -6889,7 +7388,12 @@ function switchShowcase(type, btn) {
       <div class="auth-sheet-sub" id="authSub">Save your fade and access it from any device.</div>
       <div id="authError" class="auth-error" style="display:none"></div>
 
-      <p style="font-size:11.5px;color:var(--text3);text-align:center;margin-bottom:16px;">Social sign-in coming soon.</p>
+      <button class="auth-google-btn" onclick="authWithGoogle()">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-3.59-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
+        Continue with Google
+      </button>
+
+      <div class="auth-or-divider"><hr><span>or use email</span><hr></div>
 
       <div id="authEmailFields">
         <div id="authNameWrap" style="display:none">
@@ -6903,6 +7407,73 @@ function switchShowcase(type, btn) {
           <button onclick="toggleAuthMode()">Create account</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ── CREDIT PURCHASE OVERLAY ── -->
+  <div class="credit-overlay" id="creditOverlay" onclick="if(event.target===this)closePurchaseScreen()">
+    <div class="credit-sheet">
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div>
+          <div class="credit-sheet-title" id="creditSheetTitle" style="margin-bottom:2px;">Launch Sale</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:11px;font-weight:700;background:rgba(255,80,60,0.14);color:rgba(255,120,90,1);border:1px solid rgba(255,80,60,0.3);padding:2px 8px;border-radius:8px;letter-spacing:0.04em;">LIMITED TIME</span>
+            <span style="font-size:12px;color:var(--text3);">Save up to 50%</span>
+          </div>
+        </div>
+        <button onclick="closePurchaseScreen()" style="background:none;border:none;color:var(--text3);font-size:22px;cursor:pointer;line-height:1;padding:4px;">×</button>
+      </div>
+
+      <div class="credit-sheet-sub" id="creditSheetSub" style="margin-bottom:16px;">Each credit = one full haircut guide. Credits never expire.</div>
+
+      <!-- 5 credits -->
+      <div class="credit-tier" onclick="buyCredits(5,'REPLACE_STRIPE_5')">
+        <div class="credit-tier-left">
+          <div class="credit-tier-label">5 Credits</div>
+          <div class="credit-tier-sub">5 full haircut guides</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:12px;color:var(--text3);text-decoration:line-through;margin-bottom:1px;">$19.99</div>
+          <div class="credit-tier-price">$9.99</div>
+        </div>
+      </div>
+
+      <!-- 15 credits — most popular -->
+      <div class="credit-tier" style="border-color:rgba(130,200,255,0.38);background:rgba(100,180,255,0.05);" onclick="buyCredits(15,'REPLACE_STRIPE_15')">
+        <div class="credit-tier-left">
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px;">
+            <span class="credit-tier-label">15 Credits</span>
+            <span style="font-size:10px;font-weight:700;background:rgba(100,180,255,0.18);color:rgba(130,200,255,1);border:1px solid rgba(100,180,255,0.35);padding:2px 7px;border-radius:7px;letter-spacing:0.04em;">MOST POPULAR</span>
+          </div>
+          <div class="credit-tier-sub">15 full haircut guides · $1.67 each</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:12px;color:var(--text3);text-decoration:line-through;margin-bottom:1px;">$39.99</div>
+          <div class="credit-tier-price" style="color:rgba(130,200,255,1);">$24.99</div>
+        </div>
+      </div>
+
+      <!-- 50 credits — best value -->
+      <div class="credit-tier" style="border-color:rgba(232,213,163,0.45);background:rgba(232,213,163,0.06);" onclick="buyCredits(50,'REPLACE_STRIPE_50')">
+        <div class="credit-tier-left">
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px;">
+            <span class="credit-tier-label">50 Credits</span>
+            <span style="font-size:10px;font-weight:700;background:rgba(232,213,163,0.18);color:var(--accent2);border:1px solid rgba(232,213,163,0.38);padding:2px 7px;border-radius:7px;letter-spacing:0.04em;">BEST VALUE</span>
+          </div>
+          <div class="credit-tier-sub">50 full haircut guides · $1.40 each</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:12px;color:var(--text3);text-decoration:line-through;margin-bottom:1px;">$99.99</div>
+          <div class="credit-tier-price">$69.99</div>
+        </div>
+      </div>
+
+      <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:10px;margin-bottom:14px;line-height:1.6;">
+        Limited-time pricing · Secure checkout via Stripe
+      </div>
+
+      <button class="credit-sheet-close" onclick="closePurchaseScreen()">Maybe later</button>
     </div>
   </div>
 
