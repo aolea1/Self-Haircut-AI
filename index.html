@@ -1107,6 +1107,79 @@ body {
 }
 .crop-btn-cancel:hover{background:rgba(255,80,80,0.08);color:rgba(255,100,100,0.95);}
 /* ── TOOLS PAGE ── */
+/* ── TAPER PREVIEW OVERLAY ── */
+#taperPreviewOverlay {
+  position:fixed;inset:0;z-index:9100;background:rgba(0,0,0,0.92);
+  display:none;flex-direction:column;align-items:center;justify-content:flex-end;
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+#taperPreviewOverlay.open { display:flex; }
+.tp-sheet {
+  width:100%;max-width:520px;
+  background:var(--surface);border-radius:28px 28px 0 0;
+  border-top:1px solid var(--border2);
+  padding:24px 20px 36px;
+  max-height:92vh;overflow-y:auto;
+}
+.tp-eyebrow {
+  font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;
+  color:var(--accent2);text-align:center;margin-bottom:8px;
+}
+.tp-title {
+  font-size:19px;font-weight:800;color:var(--text);text-align:center;margin-bottom:16px;
+}
+.tp-ba-wrap {
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;
+}
+.tp-ba-panel {
+  position:relative;border-radius:14px;overflow:hidden;
+  background:var(--surface2);border:1px solid var(--border2);
+  aspect-ratio:3/4;
+}
+.tp-ba-panel img {
+  width:100%;height:100%;object-fit:cover;display:block;
+}
+.tp-panel-tag {
+  position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+  font-size:10px;font-weight:800;letter-spacing:0.10em;
+  background:rgba(0,0,0,0.62);color:rgba(255,255,255,0.88);
+  padding:3px 9px;border-radius:8px;white-space:nowrap;
+  backdrop-filter:blur(4px);
+}
+.tp-after-loading {
+  width:100%;height:100%;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:10px;
+  color:var(--text3);font-size:12px;text-align:center;padding:12px;
+}
+.tp-spinner {
+  width:28px;height:28px;border:2.5px solid rgba(232,213,163,0.18);
+  border-top-color:var(--accent2);border-radius:50%;
+  animation:spin 0.85s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+.tp-after-fail {
+  width:100%;height:100%;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:8px;
+  color:var(--text3);font-size:12px;text-align:center;padding:16px;
+}
+.tp-disclaimer {
+  font-size:11px;color:var(--text3);text-align:center;line-height:1.55;
+  margin-bottom:18px;
+}
+.tp-cta-btn {
+  width:100%;padding:15px;border-radius:16px;
+  background:var(--accent2);border:none;color:#0d0d0d;
+  font-size:15px;font-weight:800;cursor:pointer;
+  transition:opacity 0.15s;letter-spacing:0.01em;
+}
+.tp-cta-btn:hover { opacity:0.88; }
+.tp-cta-btn:disabled { opacity:0.38;cursor:default; }
+.tp-skip {
+  margin-top:12px;width:100%;background:none;border:none;
+  color:var(--text3);font-size:12.5px;cursor:pointer;transition:color 0.12s;
+}
+.tp-skip:hover { color:var(--text2); }
+
 #toolsPage {
   position:fixed;inset:0;z-index:9200;background:var(--bg);
   display:none;flex-direction:column;overflow:hidden;
@@ -2987,7 +3060,88 @@ async function analyzePhoto(file) {
   state.phase = 'guide-shown';
   state.lastPhotoFile = croppedFile;
   state.profileSide = await detectProfileSide(croppedFile);
+  await showTaperPreview(croppedFile);
   await startTaperShaping();
+}
+
+// ── TAPER PREVIEW ──
+let _taperPreviewResolve = null;
+
+function _onTaperPreviewContinue() {
+  document.getElementById('taperPreviewOverlay').classList.remove('open');
+  if (_taperPreviewResolve) { _taperPreviewResolve(); _taperPreviewResolve = null; }
+}
+
+async function showTaperPreview(croppedFile) {
+  return new Promise(async (resolve) => {
+    _taperPreviewResolve = resolve;
+
+    // Show overlay with before photo immediately
+    const overlay = document.getElementById('taperPreviewOverlay');
+    const beforeImg = document.getElementById('tpBeforeImg');
+    const afterPanel = document.getElementById('tpAfterPanel');
+    const ctaBtn = document.getElementById('tpCtaBtn');
+
+    // Reset state
+    ctaBtn.disabled = true;
+    ctaBtn.textContent = 'Show Me How To Get This Look →';
+    afterPanel.innerHTML = `<div class="tp-after-loading" id="tpAfterLoading">
+      <div class="tp-spinner"></div>
+      <div>Creating your<br>taper preview…</div>
+    </div>`;
+
+    // Show before photo
+    const beforeUrl = URL.createObjectURL(croppedFile);
+    beforeImg.src = beforeUrl;
+    overlay.classList.add('open');
+
+    // Kick off backend preview generation
+    try {
+      const fd = new FormData();
+      fd.append('photo', croppedFile);
+
+      const res = await fetch(BACKEND_URL + '/generate-preview', {
+        method: 'POST',
+        body: fd,
+        signal: AbortSignal.timeout(45000), // 45s max
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      if (!data.previewUrl) throw new Error('No preview URL returned');
+
+      // Load the AI image, then reveal
+      const afterImg = new Image();
+      afterImg.onload = () => {
+        afterPanel.innerHTML = '';
+        afterImg.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+        afterPanel.appendChild(afterImg);
+
+        const tag = document.createElement('div');
+        tag.className = 'tp-panel-tag';
+        tag.textContent = 'AFTER';
+        afterPanel.appendChild(tag);
+
+        ctaBtn.disabled = false;
+      };
+      afterImg.onerror = () => _showTaperPreviewFail(afterPanel, ctaBtn);
+      afterImg.src = data.previewUrl;
+
+    } catch(e) {
+      _showTaperPreviewFail(afterPanel, ctaBtn);
+    }
+  });
+}
+
+function _showTaperPreviewFail(afterPanel, ctaBtn) {
+  afterPanel.innerHTML = `<div class="tp-after-fail">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+    <div style="color:rgba(255,255,255,0.32);font-size:12px;line-height:1.5;">Preview<br>unavailable</div>
+    <div class="tp-panel-tag" style="position:static;transform:none;margin-top:4px;">AFTER</div>
+  </div>`;
+  ctaBtn.disabled = false;
+  ctaBtn.textContent = 'Continue to Guide →';
 }
 
 async function freeAnalysis(file) {
@@ -7407,6 +7561,36 @@ function switchShowcase(type, btn) {
           <button onclick="toggleAuthMode()">Create account</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ── TAPER PREVIEW OVERLAY ── -->
+  <div id="taperPreviewOverlay">
+    <div class="tp-sheet">
+      <div class="tp-eyebrow">Your potential result</div>
+      <div class="tp-title">How your taper could look</div>
+
+      <div class="tp-ba-wrap">
+        <!-- BEFORE -->
+        <div class="tp-ba-panel">
+          <img id="tpBeforeImg" src="" alt="Before">
+          <div class="tp-panel-tag">BEFORE</div>
+        </div>
+        <!-- AFTER -->
+        <div class="tp-ba-panel" id="tpAfterPanel">
+          <div class="tp-after-loading" id="tpAfterLoading">
+            <div class="tp-spinner"></div>
+            <div>Creating your<br>taper preview…</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tp-disclaimer">Preview only. Final result depends on your hair type, starting length, and how closely you follow the guide.</div>
+
+      <button class="tp-cta-btn" id="tpCtaBtn" disabled onclick="_onTaperPreviewContinue()">
+        Show Me How To Get This Look →
+      </button>
+      <button class="tp-skip" onclick="_onTaperPreviewContinue()">Skip preview and start guide</button>
     </div>
   </div>
 
