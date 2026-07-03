@@ -3097,17 +3097,34 @@ async function showTaperPreview(croppedFile) {
 
     // Kick off backend preview generation
     try {
+      console.log('[TaperPreview] Cropped image received —', croppedFile.name, `${(croppedFile.size/1024).toFixed(1)} KB`, croppedFile.type);
+
       const fd = new FormData();
       fd.append('photo', croppedFile);
+
+      console.log('[TaperPreview] Sending image to AI preview generator:', BACKEND_URL + '/generate-preview');
+
+      const controller = new AbortController();
+      const timeoutId  = setTimeout(() => controller.abort(), 45000);
 
       const res = await fetch(BACKEND_URL + '/generate-preview', {
         method: 'POST',
         body: fd,
-        signal: AbortSignal.timeout(45000), // 45s max
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      console.log('[TaperPreview] AI preview response received — HTTP', res.status);
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        console.error('[TaperPreview] Backend error:', res.status, errBody);
+        throw new Error(`HTTP ${res.status}: ${errBody.error || 'unknown'}`);
+      }
+
       const data = await res.json();
+      console.log('[TaperPreview] Response parsed — previewUrl present:', !!data.previewUrl,
+        data.previewUrl ? `(${(data.previewUrl.length/1024).toFixed(0)} KB)` : '');
 
       if (!data.previewUrl) throw new Error('No preview URL returned');
 
@@ -3124,11 +3141,16 @@ async function showTaperPreview(croppedFile) {
         afterPanel.appendChild(tag);
 
         ctaBtn.disabled = false;
+        console.log('[TaperPreview] Frontend preview image displayed ✓');
       };
-      afterImg.onerror = () => _showTaperPreviewFail(afterPanel, ctaBtn);
+      afterImg.onerror = (e) => {
+        console.error('[TaperPreview] Failed to load preview image into <img>:', e);
+        _showTaperPreviewFail(afterPanel, ctaBtn);
+      };
       afterImg.src = data.previewUrl;
 
     } catch(e) {
+      console.error('[TaperPreview] Preview generation failed:', e.message);
       _showTaperPreviewFail(afterPanel, ctaBtn);
     }
   });
