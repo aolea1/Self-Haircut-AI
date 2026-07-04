@@ -1237,11 +1237,12 @@ body {
   width:100%;height:100%;object-fit:cover;display:block;
 }
 .tp-panel-tag {
-  position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
-  font-size:10px;font-weight:800;letter-spacing:0.10em;
+  position:absolute;bottom:8px;left:6px;right:6px;
+  font-size:10px;font-weight:800;letter-spacing:0.10em;text-align:center;
   background:rgba(0,0,0,0.62);color:rgba(255,255,255,0.88);
-  padding:3px 9px;border-radius:8px;white-space:nowrap;
+  padding:3px 6px;border-radius:8px;
   backdrop-filter:blur(4px);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 .tp-after-loading {
   width:100%;height:100%;display:flex;flex-direction:column;
@@ -1260,11 +1261,12 @@ body {
   color:var(--text3);font-size:12px;text-align:center;padding:16px;
 }
 .tp-estimated-label {
-  position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
-  font-size:9.5px;font-weight:700;letter-spacing:0.06em;
-  background:rgba(13,13,13,0.72);color:rgba(232,213,163,0.75);
-  padding:3px 9px;border-radius:8px;white-space:nowrap;
+  position:absolute;bottom:28px;left:6px;right:6px;
+  font-size:8.5px;font-weight:700;letter-spacing:0.05em;text-align:center;
+  background:rgba(13,13,13,0.80);color:rgba(232,213,163,0.80);
+  padding:3px 6px;border-radius:6px;
   backdrop-filter:blur(4px);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 /* ── FADE SCORE ── */
 .fade-score-card {
@@ -3305,136 +3307,103 @@ async function showTaperPreview(croppedFile) {
 }
 
 function _showTaperPreviewFail(afterPanel, ctaBtn) {
-  // Always try canvas fallback first — only show hard error if image itself is broken
   const beforeImg = document.getElementById('tpBeforeImg');
   if (!beforeImg || (!beforeImg.complete && !beforeImg.src)) {
-    _showHardPreviewFail(afterPanel, ctaBtn);
+    // Photo itself didn't load — hide the whole section, skip silently to guide
+    _hideTaperPreviewAndContinue();
     return;
   }
   const drawFallback = () => {
     try {
-      const canvas = _buildCanvasTaperOverlay(beforeImg);
+      const canvas = _buildCanvasFadeSimulation(beforeImg);
       afterPanel.innerHTML = '';
       canvas.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
       afterPanel.appendChild(canvas);
-      const tag = document.createElement('div');
-      tag.className = 'tp-estimated-label';
-      tag.textContent = 'ESTIMATED PREVIEW';
-      afterPanel.appendChild(tag);
+      const estTag = document.createElement('div');
+      estTag.className = 'tp-estimated-label';
+      estTag.textContent = 'SIMULATED';
+      afterPanel.appendChild(estTag);
       const afterTag = document.createElement('div');
       afterTag.className = 'tp-panel-tag';
       afterTag.textContent = 'AFTER';
       afterPanel.appendChild(afterTag);
       ctaBtn.disabled = false;
-      ctaBtn.textContent = 'Show Me How To Get This Look →';
+      ctaBtn.textContent = 'Start the Guide to Get This Look →';
     } catch(e) {
-      console.error('[TaperPreview] Canvas fallback failed:', e.message);
-      _showHardPreviewFail(afterPanel, ctaBtn);
+      console.error('[TaperPreview] Canvas simulation failed:', e.message);
+      _hideTaperPreviewAndContinue();
     }
   };
   if (beforeImg.complete && beforeImg.naturalWidth > 0) {
     drawFallback();
   } else {
-    beforeImg.onload = drawFallback;
-    beforeImg.onerror = () => _showHardPreviewFail(afterPanel, ctaBtn);
+    beforeImg.onload  = drawFallback;
+    beforeImg.onerror = () => _hideTaperPreviewAndContinue();
   }
 }
 
-function _showHardPreviewFail(afterPanel, ctaBtn) {
-  // Only shown when the uploaded image itself cannot be loaded
-  afterPanel.innerHTML = `<div class="tp-after-fail">
-    <div style="color:rgba(255,255,255,0.3);font-size:12px;line-height:1.6;">Could not load<br>your photo</div>
-    <div class="tp-panel-tag" style="position:static;transform:none;margin-top:4px;">AFTER</div>
-  </div>`;
-  ctaBtn.disabled = false;
-  ctaBtn.textContent = 'Continue to Guide →';
+// If we can't produce a meaningful "after", close the overlay silently and continue
+function _hideTaperPreviewAndContinue() {
+  const overlay = document.getElementById('taperPreviewOverlay');
+  if (overlay) overlay.classList.remove('open');
+  if (typeof _onTaperPreviewContinue === 'function') _onTaperPreviewContinue();
 }
 
-// Draws the cropped photo with a taper guide overlay — used as fallback when AI preview fails
-function _buildCanvasTaperOverlay(img) {
+// Pixel-level simulation of a low taper fade on the cropped photo.
+// Darkens the sideburn/ear zone progressively to mimic closely-clipped hair,
+// creating a clear visible difference from the uncut "before" image.
+function _buildCanvasFadeSimulation(img) {
   const W = img.naturalWidth  || 400;
   const H = img.naturalHeight || 500;
 
-  const canvas = document.createElement('canvas');
-  canvas.width  = W;
-  canvas.height = H;
-  const ctx = canvas.getContext('2d');
-
-  // 1. Draw photo
+  const offscreen = document.createElement('canvas');
+  offscreen.width  = W;
+  offscreen.height = H;
+  const ctx = offscreen.getContext('2d', { willReadFrequently: true });
   ctx.drawImage(img, 0, 0, W, H);
 
-  // 2. Detect approximate profile side: sample brightness on left vs right strip
-  const sampleY = Math.round(H * 0.5);
-  const sampleH = Math.round(H * 0.2);
-  const leftData  = ctx.getImageData(0,            sampleY, Math.round(W*0.12), sampleH).data;
-  const rightData = ctx.getImageData(Math.round(W*0.88), sampleY, Math.round(W*0.12), sampleH).data;
-  let leftBright = 0, rightBright = 0;
-  for (let i = 0; i < leftData.length;  i += 4) leftBright  += leftData[i]  + leftData[i+1]  + leftData[i+2];
-  for (let i = 0; i < rightData.length; i += 4) rightBright += rightData[i] + rightData[i+1] + rightData[i+2];
-  // Face is usually brighter than background; face on left = profile facing right
-  const faceOnLeft = leftBright >= rightBright;
+  // Taper zone boundaries
+  const blendTopY  = Math.round(H * 0.44); // where the fade begins (long hair ends)
+  const taperLineY = Math.round(H * 0.62); // approximate bald guideline
+  const zoneH      = H - blendTopY;
 
-  // 3. Taper zone: y ~= 55-62% of height, positioned near the ear side
-  const lineY   = H * 0.60;
-  const padLeft = faceOnLeft ? W * 0.08 : W * 0.18;
-  const padRight= faceOnLeft ? W * 0.18 : W * 0.08;
-  const sx = padLeft, ex = W - padRight;
-  // Slight bow toward the ear side
-  const cpX = (sx + ex) / 2;
-  const cpY = lineY + H * 0.018;
+  const imageData = ctx.getImageData(0, blendTopY, W, zoneH);
+  const data      = imageData.data;
 
-  // 4. Gradient fade-zone overlay below the taper line
-  const grad = ctx.createLinearGradient(0, lineY - H*0.04, 0, H);
-  grad.addColorStop(0,   'rgba(0,0,0,0)');
-  grad.addColorStop(0.3, 'rgba(0,0,0,0.28)');
-  grad.addColorStop(1,   'rgba(0,0,0,0.50)');
+  for (let row = 0; row < zoneH; row++) {
+    const absY = blendTopY + row;
+    let factor; // 0 = no change, 1 = fully dark
+
+    if (absY <= taperLineY) {
+      // Blend zone: smooth ease-in from 0 → 0.52
+      const t = (absY - blendTopY) / (taperLineY - blendTopY);
+      factor = t * t * 0.52;
+    } else {
+      // Bald zone: 0.52 → 0.88 (very close cut / near-scalp)
+      const t = (absY - taperLineY) / (H - taperLineY);
+      factor = 0.52 + t * 0.36;
+    }
+
+    for (let col = 0; col < W; col++) {
+      const i = (row * W + col) * 4;
+      data[i]   = Math.round(data[i]   * (1 - factor));
+      data[i+1] = Math.round(data[i+1] * (1 - factor));
+      data[i+2] = Math.round(data[i+2] * (1 - factor));
+      // alpha unchanged
+    }
+  }
+
+  ctx.putImageData(imageData, 0, blendTopY);
+
+  // Soft feather line at the taper boundary — a subtle bright line shows the "clean edge"
+  const grad = ctx.createLinearGradient(0, taperLineY - 6, 0, taperLineY + 6);
+  grad.addColorStop(0,   'rgba(255,255,255,0)');
+  grad.addColorStop(0.5, 'rgba(255,255,255,0.12)');
+  grad.addColorStop(1,   'rgba(255,255,255,0)');
   ctx.fillStyle = grad;
-  ctx.fillRect(0, lineY - H*0.04, W, H - (lineY - H*0.04));
+  ctx.fillRect(0, taperLineY - 6, W, 12);
 
-  // 5. Subtle grid texture in the fade zone
-  ctx.save();
-  ctx.globalAlpha = 0.07;
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth   = 0.6;
-  for (let x = 0; x <= W; x += 16) { ctx.beginPath(); ctx.moveTo(x, lineY); ctx.lineTo(x, H); ctx.stroke(); }
-  for (let y = lineY; y <= H; y += 16) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
-  ctx.restore();
-
-  // 6. Glow pass
-  ctx.save();
-  ctx.strokeStyle    = 'rgba(232,213,163,0.30)';
-  ctx.lineWidth      = 9;
-  ctx.lineCap        = 'round';
-  ctx.shadowColor    = 'rgba(232,213,163,0.55)';
-  ctx.shadowBlur     = 18;
-  ctx.beginPath();
-  ctx.moveTo(sx, lineY); ctx.quadraticCurveTo(cpX, cpY, ex, lineY);
-  ctx.stroke();
-  ctx.restore();
-
-  // 7. Gold core line
-  ctx.save();
-  ctx.strokeStyle = 'rgba(232,213,163,0.95)';
-  ctx.lineWidth   = 2.8;
-  ctx.lineCap     = 'round';
-  ctx.shadowColor = 'rgba(0,0,0,0.9)';
-  ctx.shadowBlur  = 5;
-  ctx.beginPath();
-  ctx.moveTo(sx, lineY); ctx.quadraticCurveTo(cpX, cpY, ex, lineY);
-  ctx.stroke();
-  ctx.restore();
-
-  // 8. Endpoint dots
-  [{ x: sx, y: lineY }, { x: ex, y: lineY }].forEach(p => {
-    ctx.save();
-    ctx.fillStyle  = 'rgba(232,213,163,0.95)';
-    ctx.shadowColor = 'rgba(232,213,163,0.7)';
-    ctx.shadowBlur  = 8;
-    ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill();
-    ctx.restore();
-  });
-
-  return canvas;
+  return offscreen;
 }
 
 async function freeAnalysis(file) {
@@ -8026,8 +7995,8 @@ function switchShowcase(type, btn) {
   <!-- ── TAPER PREVIEW OVERLAY ── -->
   <div id="taperPreviewOverlay">
     <div class="tp-sheet">
-      <div class="tp-eyebrow">Your potential result</div>
-      <div class="tp-title">How your taper could look</div>
+      <div class="tp-eyebrow">Your Estimated Low Taper Result</div>
+      <div class="tp-title">Approximate Result After Following The Guide</div>
 
       <div class="tp-ba-wrap">
         <!-- BEFORE -->
