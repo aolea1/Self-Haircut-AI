@@ -291,6 +291,7 @@ async function detectEarFromPhoto(imgEl) {
   --red: #ff5f3d;
   --sidebar-w: 240px;
   --topbar-h: 57px;
+  --guide-progress-h: 0px;
   --inputdock-h: 130px;
 }
 
@@ -487,9 +488,105 @@ body {
 .icon-btn svg { width: 16px; height: 16px; }
 
 /* ── CHAT AREA ── */
+/* ── GUIDE PROGRESS BANNER ── */
+.guide-progress-banner {
+  position: fixed;
+  top: var(--topbar-h);
+  left: 0; right: 0;
+  z-index: 90;
+  background: rgba(13,13,13,0.96);
+  border-bottom: 1px solid rgba(232,213,163,0.13);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 10px 20px 12px;
+  display: none;
+  animation: gpBannerIn 0.32s cubic-bezier(0.22,1,0.36,1) both;
+}
+.guide-progress-banner.visible { display: block; }
+.guide-progress-banner.complete { border-bottom-color: rgba(100,200,130,0.25); }
+@keyframes gpBannerIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.gp-top-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 7px;
+  gap: 8px;
+}
+.gp-step-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(232,213,163,0.55);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.gp-pct-label {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--accent2);
+  transition: color 0.4s;
+  white-space: nowrap;
+}
+.gp-pct-label.complete { color: #6fd68a; }
+.gp-bar-track {
+  height: 4px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 7px;
+}
+.gp-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(232,213,163,0.7), rgba(232,213,163,1));
+  width: 0%;
+  transition: width 0.9s cubic-bezier(0.22,1,0.36,1), background 0.5s;
+}
+.gp-bar-fill.complete {
+  background: linear-gradient(90deg, #4fc76a, #6fd68a);
+}
+.gp-motivate {
+  font-size: 11.5px;
+  color: rgba(255,255,255,0.38);
+  line-height: 1.4;
+  transition: color 0.4s;
+  overflow: hidden;
+  max-height: 32px;
+}
+.gp-motivate.complete { color: rgba(111,214,138,0.75); }
+
+/* complete card shown inside the banner when 100% */
+.gp-complete-card {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding-top: 7px;
+}
+.gp-complete-card.visible { display: flex; }
+.gp-complete-check {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: rgba(111,214,138,0.15);
+  border: 1.5px solid rgba(111,214,138,0.5);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  color: #6fd68a;
+  font-size: 14px;
+  animation: checkPop 0.45s cubic-bezier(0.34,1.56,0.64,1) 0.15s both;
+}
+@keyframes checkPop {
+  from { transform: scale(0.4); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+.gp-complete-text { font-size: 13px; font-weight: 700; color: rgba(111,214,138,0.9); }
+.gp-complete-sub  { font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 1px; }
+
 .chat-area {
   position: absolute;
-  top: var(--topbar-h);
+  top: calc(var(--topbar-h) + var(--guide-progress-h));
   bottom: 0;
   left: 0; right: 0;
   overflow-y: scroll;
@@ -2317,6 +2414,25 @@ body {
       </button>
     </div>
   </header>
+
+  <!-- Guide progress banner — shown during active fade guide, hidden otherwise -->
+  <div class="guide-progress-banner" id="guideProgressBanner" role="progressbar" aria-label="Guide progress">
+    <div class="gp-top-row">
+      <span class="gp-step-label" id="gpStepLabel">Step 1 of 6</span>
+      <span class="gp-pct-label"  id="gpPctLabel">15% Complete</span>
+    </div>
+    <div class="gp-bar-track">
+      <div class="gp-bar-fill" id="gpBarFill"></div>
+    </div>
+    <div class="gp-motivate" id="gpMotivate"></div>
+    <div class="gp-complete-card" id="gpCompleteCard">
+      <div class="gp-complete-check">✓</div>
+      <div>
+        <div class="gp-complete-text" id="gpCompleteText">Low Taper Blueprint Complete ✓</div>
+        <div class="gp-complete-sub">Clean up, step back, and admire your work.</div>
+      </div>
+    </div>
+  </div>
 
   <div class="chat-area" id="chatArea">
 
@@ -5854,11 +5970,101 @@ function buildCoachingCard(step, stepIndex) {
   </div>`;
 }
 
+// ── Guide Progress Banner ─────────────────────────────────────────────────────
+const _GP_PCTS    = [15, 30, 50, 70, 85, 100];
+const _GP_MOTIVES = [
+  "Your taper guide is set. Let's build the fade from the bottom up.",
+  "Good start. Keep your pressure light and consistent.",
+  "Halfway there. The hardest part is already behind you.",
+  "Great progress. The blend is really coming together now.",
+  "Almost done. One light final pass will lock everything in.",
+  "You did it. Step back and take a look.",
+];
+
+function _gpBannerEl()  { return document.getElementById('guideProgressBanner'); }
+function _gpBarFillEl() { return document.getElementById('gpBarFill'); }
+function _gpPctLabelEl(){ return document.getElementById('gpPctLabel'); }
+function _gpStepLabelEl(){ return document.getElementById('gpStepLabel'); }
+function _gpMotivateEl(){ return document.getElementById('gpMotivate'); }
+function _gpCompleteCardEl(){ return document.getElementById('gpCompleteCard'); }
+
+function _gpSetHeight(px) {
+  document.documentElement.style.setProperty('--guide-progress-h', px + 'px');
+}
+
+function _updateGuideProgress(stepIndex, total) {
+  const banner   = _gpBannerEl();
+  if (!banner) return;
+
+  const pct      = _GP_PCTS[Math.min(stepIndex, _GP_PCTS.length - 1)] || 15;
+  const motive   = _GP_MOTIVES[Math.min(stepIndex, _GP_MOTIVES.length - 1)] || '';
+  const stepNum  = stepIndex + 1;
+
+  // Reset complete state
+  banner.classList.remove('complete');
+  _gpBarFillEl().classList.remove('complete');
+  _gpPctLabelEl().classList.remove('complete');
+  _gpMotivateEl().classList.remove('complete');
+  _gpCompleteCardEl().classList.remove('visible');
+  _gpMotivateEl().style.display = '';
+
+  _gpStepLabelEl().textContent = `Step ${stepNum} of ${total}`;
+  _gpPctLabelEl().textContent  = `${pct}% Complete`;
+  _gpMotivateEl().textContent  = motive;
+
+  // Show banner (starts transition)
+  if (!banner.classList.contains('visible')) {
+    banner.classList.add('visible');
+  }
+
+  // Animate bar — defer one frame so the transition fires even on first show
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      _gpBarFillEl().style.width = pct + '%';
+      _gpSetHeight(banner.offsetHeight);
+    });
+  });
+}
+
+function _showGuideComplete(styleLabel) {
+  const banner = _gpBannerEl();
+  if (!banner) return;
+
+  banner.classList.add('complete', 'visible');
+  _gpBarFillEl().classList.add('complete');
+  _gpPctLabelEl().classList.add('complete');
+  _gpMotivateEl().classList.add('complete');
+
+  _gpStepLabelEl().textContent = 'Guide Complete';
+  _gpPctLabelEl().textContent  = '100% Complete';
+  _gpMotivateEl().style.display = 'none';
+
+  const completeCard = _gpCompleteCardEl();
+  document.getElementById('gpCompleteText').textContent = `${styleLabel} Blueprint Complete ✓`;
+  completeCard.classList.add('visible');
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      _gpBarFillEl().style.width = '100%';
+      _gpSetHeight(banner.offsetHeight);
+    });
+  });
+}
+
+function _hideGuideProgress() {
+  const banner = _gpBannerEl();
+  if (!banner) return;
+  banner.classList.remove('visible', 'complete');
+  _gpBarFillEl().style.width = '0%';
+  _gpSetHeight(0);
+}
+
 async function presentFadePlanStep(i) {
   const plan = state.fadePlan;
   if (!plan || !plan[i]) return;
   state.currentStep = i;
   const step = plan[i];
+  _updateGuideProgress(i, plan.length);
 
   addTyping('Getting your next section ready');
   const offset = { x: state.fadeOffsetXFrac, y: state.fadeOffsetYFrac };
@@ -6183,6 +6389,7 @@ function _buildFadeScoreCardHtml() {
 function addFadePlanWrapUp() {
   const style = state.taperStyle || 'low';
   const styleLabel = { low: 'Low Taper', mid: 'Mid Taper', high: 'High Taper', skin: 'Skin Fade', buzz: 'Buzz Cut' }[style] || 'Taper';
+  _showGuideComplete(styleLabel);
 
   // Log to haircut history
   logHaircutHistory();
@@ -7619,6 +7826,7 @@ function resetChat() {
   state.taperStyle = null; state.tools = null; state.phase = 'intro'; state.shownPhotoTip = false;
   state.fadePlan = null; state.currentStep = 0; state.lastPhotoFile = null; state.nextFileHandler = null;
   state.guideLine = null; state.taperLines = null; state.profileSide = null; state.fadeGeometry = null; state.fadeOffsetXFrac = 0; state.fadeOffsetYFrac = 0;
+  _hideGuideProgress();
   messagesWrap.innerHTML = ''; messagesWrap.classList.remove('visible');
   chatArea.scrollTop = 0; uploadPreview.innerHTML = '';
   uploadPreview.classList.remove('has-files');
