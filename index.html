@@ -1109,7 +1109,7 @@ body {
 }
 .messages-wrap.visible {
   display: block;
-  animation: messagesReveal 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: messagesReveal 0.2s ease forwards;
 }
 @keyframes messagesReveal {
   from { opacity: 0; transform: translateY(18px); }
@@ -1273,7 +1273,7 @@ body {
   margin-bottom:16px;padding:18px 18px 14px;
   background:linear-gradient(135deg,rgba(232,213,163,0.07),rgba(232,213,163,0.03));
   border:1px solid rgba(232,213,163,0.20);border-radius:18px;
-  animation:coachCardIn 0.38s cubic-bezier(0.22,1,0.36,1) both;
+  animation:coachCardIn 0.15s ease both;
 }
 .fs-header {
   display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;
@@ -1753,7 +1753,7 @@ body {
 .need-help-panel {
   margin-top: 10px; padding: 14px;
   background: rgba(232,213,163,0.04); border: 1px solid rgba(232,213,163,0.14);
-  border-radius: 20px; animation: coachCardIn 0.32s cubic-bezier(0.22,1,0.36,1) both;
+  border-radius: 20px; animation: coachCardIn 0.15s ease both;
 }
 .need-help-label {
   font-size: 11px; font-weight: 600; color: rgba(232,213,163,0.4);
@@ -1778,7 +1778,7 @@ body {
 .need-help-item.open .need-help-item-chevron { transform: rotate(180deg); color: rgba(232,213,163,0.55); }
 .need-help-item-a {
   max-height: 0; overflow: hidden;
-  transition: max-height 0.32s cubic-bezier(0.22,1,0.36,1);
+  transition: max-height 0.15s ease;
 }
 .need-help-item.open .need-help-item-a { max-height: 200px; }
 .need-help-item-a-inner {
@@ -1790,7 +1790,7 @@ body {
   margin-top: 14px; padding: 16px;
   background: rgba(232,213,163,0.045); border: 1px solid rgba(232,213,163,0.16);
   border-radius: 20px; text-align: center;
-  animation: coachCardIn 0.38s cubic-bezier(0.22,1,0.36,1) both;
+  animation: coachCardIn 0.15s ease both;
 }
 .feedback-title { font-size: 14px; font-weight: 700; color: rgba(232,213,163,0.88); margin-bottom: 12px; }
 .feedback-btns { display: flex; gap: 10px; justify-content: center; }
@@ -1813,7 +1813,7 @@ body {
   width:100%;max-width:480px;padding:28px 24px 40px;
   background:#161616;border-radius:24px 24px 0 0;
   border-top:1px solid rgba(255,255,255,0.10);
-  animation:sheetUp 0.32s cubic-bezier(0.22,1,0.36,1) both;
+  animation:sheetUp 0.15s ease both;
 }
 @keyframes sheetUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
 .auth-sheet-title {
@@ -2010,7 +2010,7 @@ body {
   margin-top: 14px; padding: 16px 18px;
   background: rgba(232,213,163,0.06); border: 1px solid rgba(232,213,163,0.22);
   border-radius: 20px; text-align: center;
-  animation: coachCardIn 0.38s cubic-bezier(0.22,1,0.36,1) both;
+  animation: coachCardIn 0.15s ease both;
 }
 .save-fade-title { font-size: 15px; font-weight: 700; color: rgba(232,213,163,0.92); margin-bottom: 4px; }
 .save-fade-sub   { font-size: 13px; color: rgba(232,213,163,0.52); margin-bottom: 14px; }
@@ -2063,9 +2063,9 @@ body {
   border-radius: 20px;
   margin-bottom: 14px;
   overflow: hidden;
-  animation: coachCardIn 0.38s cubic-bezier(0.22,1,0.36,1) both;
+  animation: coachCardIn 0.15s ease both;
 }
-@keyframes coachCardIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+@keyframes coachCardIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
 .coaching-col {
   flex: 1; display: flex; flex-direction: column;
   align-items: center; padding: 11px 6px 10px; gap: 0;
@@ -2208,7 +2208,7 @@ body {
   display: flex; align-items: center; gap: 8px; padding: 10px 14px;
   background: rgba(232,213,163,0.08); border: 1px solid rgba(232,213,163,0.28);
   border-radius: 10px; margin-bottom: 8px;
-  animation: stepDoneIn 0.3s cubic-bezier(0.22,1,0.36,1) both;
+  animation: stepDoneIn 0.15s ease both;
 }
 .step-done-flash-icon { font-size: 16px; color: rgba(232,213,163,0.95); }
 .step-done-flash-text { font-size: 12.5px; font-weight: 700; color: rgba(232,213,163,0.85); }
@@ -2222,7 +2222,7 @@ body {
   background: rgba(232,213,163,0.055); border: 1px solid rgba(232,213,163,0.16);
   border-radius: 18px; cursor: pointer; user-select: none;
   transition: background 0.18s, border-color 0.18s;
-  animation: stepDoneIn 0.3s cubic-bezier(0.22,1,0.36,1) both;
+  animation: stepDoneIn 0.15s ease both;
 }
 .step-collapse-badge:hover { background: rgba(232,213,163,0.10); border-color: rgba(232,213,163,0.28); }
 .msg.step-collapsed .step-collapse-badge { display: flex; }
@@ -2645,7 +2645,7 @@ function _easedScroll(container, targetTop, duration) {
 // Chat appends — fast and responsive, barely noticed.
 function scrollBottom(force) {
   if (force || !userScrolledUp) {
-    requestAnimationFrame(() => { _easedScroll(chatArea, chatArea.scrollHeight, 550); });
+    requestAnimationFrame(() => { _easedScroll(chatArea, chatArea.scrollHeight, 200); });
   }
 }
 
@@ -2655,7 +2655,7 @@ function scrollToMsg(el) {
   requestAnimationFrame(() => requestAnimationFrame(() => {
     const chatRect = chatArea.getBoundingClientRect();
     const elTop    = el.getBoundingClientRect().top - chatRect.top + chatArea.scrollTop;
-    _easedScroll(chatArea, elTop - 32, 950);
+    _easedScroll(chatArea, elTop - 32, 300);
   }));
 }
 
@@ -3883,13 +3883,8 @@ function markEarPosition(file) {
             state._mpDetection = null;
           }
 
-          // Premium "Mapping your taper…" transition before handing off.
-          msg.querySelector('.msg-text').innerHTML =
-            `<p style="display:flex;align-items:center;gap:8px;margin:4px 0;"><span class="generating-spinner"></span> Mapping your taper…</p>`;
-          setTimeout(() => {
-            msg.remove();
-            resolve({ earXfrac, earTopFrac, earBottomFrac });
-          }, 600);
+          msg.remove();
+          resolve({ earXfrac, earTopFrac, earBottomFrac });
         };
 
         nextBtn.addEventListener('click', () => {
@@ -5739,7 +5734,6 @@ async function showMidStepDetailCheck(i) {
     dimZone: step.dimZone, // keep the already-completed area dimmed
   };
 
-  addTyping('');
   const offset = { x: state.fadeOffsetXFrac, y: state.fadeOffsetYFrac };
   const { canvas, ctx, W, H } = await loadScaledCanvas(state.lastPhotoFile);
   // Draw image, dim completed-below area, then the amber detail zone
@@ -6035,10 +6029,8 @@ async function presentFadePlanStep(i) {
   const step = plan[i];
   _updateGuideProgress(i, plan.length);
 
-  addTyping('Getting your next section ready');
   const offset = { x: state.fadeOffsetXFrac, y: state.fadeOffsetYFrac };
   const canvas = await renderStepCanvas(state.lastPhotoFile, step, state.guideLine, offset);
-  removeTyping();
 
   const guardRow = step.guard === 'None'
     ? `<div class="fade-step-row"><span class="fade-step-icon">🪒</span><div><strong>Guard: None</strong> — bare blade, this is your bald guideline</div></div>`
@@ -6147,7 +6139,7 @@ async function presentFadePlanStep(i) {
 
   // Show lever tutorial the first time this lever position appears.
   if (step.lever && step.lever !== 'n/a') {
-    setTimeout(() => showLeverTutorial(step.lever), 700);
+    setTimeout(() => showLeverTutorial(step.lever), 200);
   }
 }
 
@@ -6233,15 +6225,13 @@ function completeFadeStep(i) {
     scrollToMsg(wrapMsg);
 
     // Optional C-cup step
-    setTimeout(() => {
-      const ccMsg = addAIMessage(`<div class="save-fade-card" style="margin:0;">
-        <div class="save-fade-title">Optional Finishing Step</div>
-        <div style="font-size:18px;font-weight:800;color:var(--text);margin:4px 0 6px;">Shape Your C-Cup</div>
-        <div class="save-fade-sub" style="margin-bottom:14px;">Generate a lineup guide around the ear for a cleaner finish.</div>
-        <button class="save-fade-btn" onclick="showCCupGuide(this)">Generate C-Cup Guide →</button>
-      </div>`, null);
-      scrollToMsg(ccMsg);
-    }, 600);
+    const ccMsg = addAIMessage(`<div class="save-fade-card" style="margin:0;">
+      <div class="save-fade-title">Optional Finishing Step</div>
+      <div style="font-size:18px;font-weight:800;color:var(--text);margin:4px 0 6px;">Shape Your C-Cup</div>
+      <div class="save-fade-sub" style="margin-bottom:14px;">Generate a lineup guide around the ear for a cleaner finish.</div>
+      <button class="save-fade-btn" onclick="showCCupGuide(this)">Generate C-Cup Guide →</button>
+    </div>`, null);
+    scrollToMsg(ccMsg);
 
     addFadePlanWrapUp();
     return;
@@ -6273,10 +6263,8 @@ async function reviewProgressPhoto(file, i) {
 
   // No ear re-marking needed — the locked taper shape is the anchor.
   // Show the current step overlay at the same position the user set.
-  addTyping(STEP_REVIEW_COPY[i].checking);
   state.fadeOffsetXFrac = 0;
   state.fadeOffsetYFrac = 0;
-  removeTyping();
   addAIMessage(`${reviewCardHtml(i, true)}<p style="margin-top:10px;">${STEP_REVIEW_COPY[i].pass}</p>`, null);
   presentFadePlanStep(i + 1);
 }
@@ -6405,7 +6393,7 @@ function addFadePlanWrapUp() {
   }, 60000);
 
   // Feedback card + Save My Best Fade (only for logged-in users)
-  setTimeout(() => {
+  {
     const saveFadeHtml = window._currentUser ? `
     <div class="save-fade-card" style="margin-top:10px;">
       <div class="save-fade-title">💈 Save My Best Fade</div>
@@ -6427,7 +6415,7 @@ function addFadePlanWrapUp() {
       </div>
     </div>${saveFadeHtml}`, null);
     scrollToMsg(fbMsg);
-  }, 300);
+  }
 }
 
 
