@@ -4883,31 +4883,31 @@ async function _checkCreditsAndGenerate(callback) {
     return;
   }
 
-  // Deduct 1 credit — backend is authoritative, client-side is fallback
-  try {
-    let newCredits;
+  // Deduct 1 credit optimistically — start the guide immediately, settle in background
+  window._userCredits = Math.max(0, (window._userCredits || 1) - 1);
+  _updateCreditDisplay();
+  callback(); // ← guide starts now, no waiting on network
+
+  // Background settlement: sync the real credit count from the server
+  ;(async () => {
     try {
       const token = await user.getIdToken();
       const res = await fetch(BACKEND_URL + '/use-credit', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
       });
-      if (!res.ok) throw new Error('backend unavailable');
-      const data = await res.json();
-      newCredits = data.credits;
-    } catch(e) {
-      if (window._fbDeductCredit) {
-        newCredits = await window._fbDeductCredit(user.uid);
-      } else {
-        newCredits = Math.max(0, (window._userCredits || 1) - 1);
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data.credits === 'number') {
+          window._userCredits = data.credits;
+          _updateCreditDisplay();
+        }
       }
+    } catch(e) {
+      // Backend unreachable — client-side deduction already applied, acceptable
+      if (window._fbDeductCredit) window._fbDeductCredit(user.uid).catch(() => {});
     }
-    window._userCredits = newCredits;
-    _updateCreditDisplay();
-    callback();
-  } catch(e) {
-    addAIMessage('<p>Could not verify your credits. Please check your connection and try again.</p>', null);
-  }
+  })();
 }
 
 // ── PROMO / ACCESS CODE REDEMPTION ──
