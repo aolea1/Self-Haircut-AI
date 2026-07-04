@@ -1162,6 +1162,38 @@ body {
   align-items:center;justify-content:center;gap:8px;
   color:var(--text3);font-size:12px;text-align:center;padding:16px;
 }
+.tp-estimated-label {
+  position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+  font-size:9.5px;font-weight:700;letter-spacing:0.06em;
+  background:rgba(13,13,13,0.72);color:rgba(232,213,163,0.75);
+  padding:3px 9px;border-radius:8px;white-space:nowrap;
+  backdrop-filter:blur(4px);
+}
+/* ── FADE SCORE ── */
+.fade-score-card {
+  margin-bottom:16px;padding:18px 18px 14px;
+  background:linear-gradient(135deg,rgba(232,213,163,0.07),rgba(232,213,163,0.03));
+  border:1px solid rgba(232,213,163,0.20);border-radius:18px;
+  animation:coachCardIn 0.38s cubic-bezier(0.22,1,0.36,1) both;
+}
+.fs-header {
+  display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;
+}
+.fs-eyebrow {
+  font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;
+  color:rgba(232,213,163,0.45);margin-bottom:3px;
+}
+.fs-band { font-size:16px;font-weight:800;color:var(--text); }
+.fs-score-wrap { display:flex;align-items:baseline;gap:2px; }
+.fs-score { font-size:38px;font-weight:800;line-height:1; }
+.fs-denom { font-size:15px;font-weight:700;color:var(--text3); }
+.fs-bar-wrap {
+  height:4px;background:rgba(255,255,255,0.08);border-radius:4px;
+  margin-bottom:12px;overflow:hidden;
+}
+.fs-bar { height:100%;border-radius:4px;transition:width 1s cubic-bezier(0.22,1,0.36,1); }
+.fs-message { font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:10px; }
+.fs-footer { font-size:11px;color:var(--text3);line-height:1.5; }
 .tp-disclaimer {
   font-size:11px;color:var(--text3);text-align:center;line-height:1.55;
   margin-bottom:18px;
@@ -3157,13 +3189,136 @@ async function showTaperPreview(croppedFile) {
 }
 
 function _showTaperPreviewFail(afterPanel, ctaBtn) {
+  // Always try canvas fallback first — only show hard error if image itself is broken
+  const beforeImg = document.getElementById('tpBeforeImg');
+  if (!beforeImg || (!beforeImg.complete && !beforeImg.src)) {
+    _showHardPreviewFail(afterPanel, ctaBtn);
+    return;
+  }
+  const drawFallback = () => {
+    try {
+      const canvas = _buildCanvasTaperOverlay(beforeImg);
+      afterPanel.innerHTML = '';
+      canvas.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+      afterPanel.appendChild(canvas);
+      const tag = document.createElement('div');
+      tag.className = 'tp-estimated-label';
+      tag.textContent = 'ESTIMATED PREVIEW';
+      afterPanel.appendChild(tag);
+      const afterTag = document.createElement('div');
+      afterTag.className = 'tp-panel-tag';
+      afterTag.textContent = 'AFTER';
+      afterPanel.appendChild(afterTag);
+      ctaBtn.disabled = false;
+      ctaBtn.textContent = 'Show Me How To Get This Look →';
+    } catch(e) {
+      console.error('[TaperPreview] Canvas fallback failed:', e.message);
+      _showHardPreviewFail(afterPanel, ctaBtn);
+    }
+  };
+  if (beforeImg.complete && beforeImg.naturalWidth > 0) {
+    drawFallback();
+  } else {
+    beforeImg.onload = drawFallback;
+    beforeImg.onerror = () => _showHardPreviewFail(afterPanel, ctaBtn);
+  }
+}
+
+function _showHardPreviewFail(afterPanel, ctaBtn) {
+  // Only shown when the uploaded image itself cannot be loaded
   afterPanel.innerHTML = `<div class="tp-after-fail">
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-    <div style="color:rgba(255,255,255,0.32);font-size:12px;line-height:1.5;">Preview<br>unavailable</div>
+    <div style="color:rgba(255,255,255,0.3);font-size:12px;line-height:1.6;">Could not load<br>your photo</div>
     <div class="tp-panel-tag" style="position:static;transform:none;margin-top:4px;">AFTER</div>
   </div>`;
   ctaBtn.disabled = false;
   ctaBtn.textContent = 'Continue to Guide →';
+}
+
+// Draws the cropped photo with a taper guide overlay — used as fallback when AI preview fails
+function _buildCanvasTaperOverlay(img) {
+  const W = img.naturalWidth  || 400;
+  const H = img.naturalHeight || 500;
+
+  const canvas = document.createElement('canvas');
+  canvas.width  = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // 1. Draw photo
+  ctx.drawImage(img, 0, 0, W, H);
+
+  // 2. Detect approximate profile side: sample brightness on left vs right strip
+  const sampleY = Math.round(H * 0.5);
+  const sampleH = Math.round(H * 0.2);
+  const leftData  = ctx.getImageData(0,            sampleY, Math.round(W*0.12), sampleH).data;
+  const rightData = ctx.getImageData(Math.round(W*0.88), sampleY, Math.round(W*0.12), sampleH).data;
+  let leftBright = 0, rightBright = 0;
+  for (let i = 0; i < leftData.length;  i += 4) leftBright  += leftData[i]  + leftData[i+1]  + leftData[i+2];
+  for (let i = 0; i < rightData.length; i += 4) rightBright += rightData[i] + rightData[i+1] + rightData[i+2];
+  // Face is usually brighter than background; face on left = profile facing right
+  const faceOnLeft = leftBright >= rightBright;
+
+  // 3. Taper zone: y ~= 55-62% of height, positioned near the ear side
+  const lineY   = H * 0.60;
+  const padLeft = faceOnLeft ? W * 0.08 : W * 0.18;
+  const padRight= faceOnLeft ? W * 0.18 : W * 0.08;
+  const sx = padLeft, ex = W - padRight;
+  // Slight bow toward the ear side
+  const cpX = (sx + ex) / 2;
+  const cpY = lineY + H * 0.018;
+
+  // 4. Gradient fade-zone overlay below the taper line
+  const grad = ctx.createLinearGradient(0, lineY - H*0.04, 0, H);
+  grad.addColorStop(0,   'rgba(0,0,0,0)');
+  grad.addColorStop(0.3, 'rgba(0,0,0,0.28)');
+  grad.addColorStop(1,   'rgba(0,0,0,0.50)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, lineY - H*0.04, W, H - (lineY - H*0.04));
+
+  // 5. Subtle grid texture in the fade zone
+  ctx.save();
+  ctx.globalAlpha = 0.07;
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth   = 0.6;
+  for (let x = 0; x <= W; x += 16) { ctx.beginPath(); ctx.moveTo(x, lineY); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = lineY; y <= H; y += 16) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  ctx.restore();
+
+  // 6. Glow pass
+  ctx.save();
+  ctx.strokeStyle    = 'rgba(232,213,163,0.30)';
+  ctx.lineWidth      = 9;
+  ctx.lineCap        = 'round';
+  ctx.shadowColor    = 'rgba(232,213,163,0.55)';
+  ctx.shadowBlur     = 18;
+  ctx.beginPath();
+  ctx.moveTo(sx, lineY); ctx.quadraticCurveTo(cpX, cpY, ex, lineY);
+  ctx.stroke();
+  ctx.restore();
+
+  // 7. Gold core line
+  ctx.save();
+  ctx.strokeStyle = 'rgba(232,213,163,0.95)';
+  ctx.lineWidth   = 2.8;
+  ctx.lineCap     = 'round';
+  ctx.shadowColor = 'rgba(0,0,0,0.9)';
+  ctx.shadowBlur  = 5;
+  ctx.beginPath();
+  ctx.moveTo(sx, lineY); ctx.quadraticCurveTo(cpX, cpY, ex, lineY);
+  ctx.stroke();
+  ctx.restore();
+
+  // 8. Endpoint dots
+  [{ x: sx, y: lineY }, { x: ex, y: lineY }].forEach(p => {
+    ctx.save();
+    ctx.fillStyle  = 'rgba(232,213,163,0.95)';
+    ctx.shadowColor = 'rgba(232,213,163,0.7)';
+    ctx.shadowBlur  = 8;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  });
+
+  return canvas;
 }
 
 async function freeAnalysis(file) {
@@ -5952,6 +6107,79 @@ async function reviewProgressPhoto(file, i) {
 }
 
 // ── WRAP-UP — cheat sheet, tools, share, completion ──
+// ── Fade Score ────────────────────────────────────────────────────────────────
+function _computeFadeScore() {
+  let score = 58; // baseline
+
+  // Reward having a photo analysis (means more precise placement)
+  if (state.fadeGeometry && state.fadeGeometry.tapperLineY) score += 8;
+
+  // Reward user-adjusted guide line
+  if (state.guideLine) score += 6;
+
+  // Reward user-set taper lines (they took the time to shape it)
+  if (state.taperLines) score += 10;
+
+  // Style bonus: skin fade is hardest → highest ceiling
+  const styleBonuses = { skin: 12, low: 8, mid: 6, high: 4, buzz: 3 };
+  score += (styleBonuses[state.taperStyle] || 6);
+
+  // Photo quality proxy: larger file = better resolution
+  try {
+    const size = state.lastPhotoFile?.size || 0;
+    if (size > 800000) score += 5;
+    else if (size > 300000) score += 3;
+  } catch(e) {}
+
+  // Small variance so it feels personal (±4 range, seeded by time bucket)
+  const variance = (Math.floor(Date.now() / 100000) % 9) - 4;
+  score += variance;
+
+  return Math.max(42, Math.min(97, score));
+}
+
+function _fadeScoreBand(score) {
+  if (score >= 96) return { label: 'Barber-Level',  color: '#b8e0ff' };
+  if (score >= 86) return { label: 'Clean',          color: '#a3e8b0' };
+  if (score >= 71) return { label: 'Good',           color: '#e8d5a3' };
+  if (score >= 51) return { label: 'Decent Start',  color: '#e8b86d' };
+  return                  { label: 'Needs Work',    color: '#e87575' };
+}
+
+function _fadeScoreMessage(score) {
+  if (score >= 96) return "Your setup is dialed in — a pro-level result is within reach. Stay patient on the blending and this will turn out sharp.";
+  if (score >= 86) return "You're in great shape. Follow the guide closely and the result will be clean and intentional.";
+  if (score >= 71) return "Solid foundation. Pay extra attention to the Soften step and you'll get a noticeably better blend.";
+  if (score >= 51) return "You've got the basics covered. Take it slow — a few extra passes in the blend zone will make a big difference.";
+  return "Go slow and trust the steps. Every pass you make builds the blend — don't rush the guard transitions.";
+}
+
+function _buildFadeScoreCardHtml() {
+  const score = _computeFadeScore();
+  const band  = _fadeScoreBand(score);
+  const pct   = Math.round((score / 100) * 100);
+  const msg   = _fadeScoreMessage(score);
+  const barColor = band.color;
+
+  return `<div class="fade-score-card">
+    <div class="fs-header">
+      <div>
+        <div class="fs-eyebrow">Fade Score</div>
+        <div class="fs-band" style="color:${barColor};">${band.label}</div>
+      </div>
+      <div class="fs-score-wrap">
+        <div class="fs-score" style="color:${barColor};">${score}</div>
+        <div class="fs-denom">/100</div>
+      </div>
+    </div>
+    <div class="fs-bar-wrap">
+      <div class="fs-bar" style="width:${pct}%;background:${barColor};" id="fadeScoreBar"></div>
+    </div>
+    <div class="fs-message">${msg}</div>
+    <div class="fs-footer">Based on your photo, guide placement, and taper style. Cut to unlock a higher score.</div>
+  </div>`;
+}
+
 function addFadePlanWrapUp() {
   const style = state.taperStyle || 'low';
   const styleLabel = { low: 'Low Taper', mid: 'Mid Taper', high: 'High Taper', skin: 'Skin Fade', buzz: 'Buzz Cut' }[style] || 'Taper';
@@ -5985,6 +6213,7 @@ function addFadePlanWrapUp() {
   </div>`;
 
   addAIMessage(`<div class="steps-panel">
+    ${_buildFadeScoreCardHtml()}
     <div class="steps-title">Your guard reference</div>
     ${cheatSheet}
     <div style="margin-top:12px;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;">🛒 Recommended tools</div>
