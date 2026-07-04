@@ -3295,115 +3295,24 @@ async function showTaperPreview(croppedFile) {
       };
       afterImg.onerror = (e) => {
         console.error('[TaperPreview] Failed to load preview image into <img>:', e);
-        _showTaperPreviewFail(afterPanel, ctaBtn);
+        _showTaperPreviewFail();
       };
       afterImg.src = data.previewUrl;
 
     } catch(e) {
       console.error('[TaperPreview] Preview generation failed:', e.message);
-      _showTaperPreviewFail(afterPanel, ctaBtn);
+      _showTaperPreviewFail();
     }
   });
 }
 
-function _showTaperPreviewFail(afterPanel, ctaBtn) {
-  const beforeImg = document.getElementById('tpBeforeImg');
-  if (!beforeImg || (!beforeImg.complete && !beforeImg.src)) {
-    // Photo itself didn't load — hide the whole section, skip silently to guide
-    _hideTaperPreviewAndContinue();
-    return;
-  }
-  const drawFallback = () => {
-    try {
-      const canvas = _buildCanvasFadeSimulation(beforeImg);
-      afterPanel.innerHTML = '';
-      canvas.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
-      afterPanel.appendChild(canvas);
-      const estTag = document.createElement('div');
-      estTag.className = 'tp-estimated-label';
-      estTag.textContent = 'SIMULATED';
-      afterPanel.appendChild(estTag);
-      const afterTag = document.createElement('div');
-      afterTag.className = 'tp-panel-tag';
-      afterTag.textContent = 'AFTER';
-      afterPanel.appendChild(afterTag);
-      ctaBtn.disabled = false;
-      ctaBtn.textContent = 'Start the Guide to Get This Look →';
-    } catch(e) {
-      console.error('[TaperPreview] Canvas simulation failed:', e.message);
-      _hideTaperPreviewAndContinue();
-    }
-  };
-  if (beforeImg.complete && beforeImg.naturalWidth > 0) {
-    drawFallback();
-  } else {
-    beforeImg.onload  = drawFallback;
-    beforeImg.onerror = () => _hideTaperPreviewAndContinue();
-  }
-}
-
-// If we can't produce a meaningful "after", close the overlay silently and continue
-function _hideTaperPreviewAndContinue() {
+// AI preview failed — skip the section entirely rather than show a fake result.
+// The overlay is hidden and the guide starts immediately.
+function _showTaperPreviewFail() {
+  console.log('[TaperPreview] AI unavailable — skipping preview, starting guide');
   const overlay = document.getElementById('taperPreviewOverlay');
   if (overlay) overlay.classList.remove('open');
   if (typeof _onTaperPreviewContinue === 'function') _onTaperPreviewContinue();
-}
-
-// Pixel-level simulation of a low taper fade on the cropped photo.
-// Darkens the sideburn/ear zone progressively to mimic closely-clipped hair,
-// creating a clear visible difference from the uncut "before" image.
-function _buildCanvasFadeSimulation(img) {
-  const W = img.naturalWidth  || 400;
-  const H = img.naturalHeight || 500;
-
-  const offscreen = document.createElement('canvas');
-  offscreen.width  = W;
-  offscreen.height = H;
-  const ctx = offscreen.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(img, 0, 0, W, H);
-
-  // Taper zone boundaries
-  const blendTopY  = Math.round(H * 0.44); // where the fade begins (long hair ends)
-  const taperLineY = Math.round(H * 0.62); // approximate bald guideline
-  const zoneH      = H - blendTopY;
-
-  const imageData = ctx.getImageData(0, blendTopY, W, zoneH);
-  const data      = imageData.data;
-
-  for (let row = 0; row < zoneH; row++) {
-    const absY = blendTopY + row;
-    let factor; // 0 = no change, 1 = fully dark
-
-    if (absY <= taperLineY) {
-      // Blend zone: smooth ease-in from 0 → 0.52
-      const t = (absY - blendTopY) / (taperLineY - blendTopY);
-      factor = t * t * 0.52;
-    } else {
-      // Bald zone: 0.52 → 0.88 (very close cut / near-scalp)
-      const t = (absY - taperLineY) / (H - taperLineY);
-      factor = 0.52 + t * 0.36;
-    }
-
-    for (let col = 0; col < W; col++) {
-      const i = (row * W + col) * 4;
-      data[i]   = Math.round(data[i]   * (1 - factor));
-      data[i+1] = Math.round(data[i+1] * (1 - factor));
-      data[i+2] = Math.round(data[i+2] * (1 - factor));
-      // alpha unchanged
-    }
-  }
-
-  ctx.putImageData(imageData, 0, blendTopY);
-
-  // Soft feather line at the taper boundary — a subtle bright line shows the "clean edge"
-  const grad = ctx.createLinearGradient(0, taperLineY - 6, 0, taperLineY + 6);
-  grad.addColorStop(0,   'rgba(255,255,255,0)');
-  grad.addColorStop(0.5, 'rgba(255,255,255,0.12)');
-  grad.addColorStop(1,   'rgba(255,255,255,0)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, taperLineY - 6, W, 12);
-
-  return offscreen;
 }
 
 async function freeAnalysis(file) {

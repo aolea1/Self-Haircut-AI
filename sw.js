@@ -1,4 +1,4 @@
-const CACHE = 'shc-v20';
+const CACHE = 'shc-v21';
 const ASSETS = ['/', '/index.html', '/crop_example.mp4', '/taper_example.mp4'];
 
 self.addEventListener('install', e => {
