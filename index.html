@@ -1269,6 +1269,99 @@ body {
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 /* ── FADE SCORE ── */
+/* ── BARBER REPORT ── */
+.barber-report {
+  background:var(--surface2);border:1px solid var(--border2);border-radius:18px;
+  overflow:hidden;margin-top:4px;animation:coachCardIn 0.32s cubic-bezier(0.22,1,0.36,1) both;
+}
+.br-header {
+  padding:14px 16px 10px;border-bottom:1px solid var(--border2);
+  background:linear-gradient(135deg,rgba(232,213,163,0.06),transparent);
+}
+.br-eyebrow {
+  font-size:10px;font-weight:700;letter-spacing:0.10em;text-transform:uppercase;
+  color:var(--accent2);margin-bottom:4px;
+}
+.br-title { font-size:16px;font-weight:800;color:var(--text); }
+.br-rows { padding:12px 16px 4px;display:flex;flex-direction:column;gap:12px; }
+.br-row { display:flex;flex-direction:column;gap:3px; }
+.br-row-label {
+  font-size:10px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;
+  color:var(--text3);
+}
+.br-row-value { font-size:13px;font-weight:700;color:var(--text); }
+.br-row-desc { font-size:12px;color:var(--text2);line-height:1.55; }
+.br-difficulty-easy   { color:#6ddb8e; }
+.br-difficulty-moderate { color:#e8d5a3; }
+.br-difficulty-advanced { color:#e87575; }
+.br-notes {
+  padding:12px 16px 14px;border-top:1px solid var(--border2);
+  display:flex;flex-direction:column;gap:6px;
+}
+.br-notes-label {
+  font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;
+  color:var(--accent2);margin-bottom:2px;
+}
+.br-note {
+  font-size:12px;color:var(--text2);line-height:1.55;
+  padding-left:12px;position:relative;
+}
+.br-note::before {
+  content:'';position:absolute;left:0;top:7px;
+  width:4px;height:4px;border-radius:50%;background:var(--accent2);
+}
+/* ── GRADE FADE CARD ── */
+.grade-fade-card {
+  padding:18px;background:linear-gradient(135deg,rgba(109,219,142,0.07),rgba(109,219,142,0.02));
+  border:1px solid rgba(109,219,142,0.25);border-radius:18px;margin-bottom:16px;
+  animation:coachCardIn 0.32s cubic-bezier(0.22,1,0.36,1) both;
+}
+.gf-title { font-size:16px;font-weight:800;color:var(--text);margin-bottom:4px; }
+.gf-sub { font-size:12px;color:var(--text2);line-height:1.55;margin-bottom:14px; }
+.gf-checks { display:flex;flex-direction:column;gap:5px;margin-bottom:14px; }
+.gf-check { font-size:12px;color:var(--text2); }
+.gf-check span { color:#6ddb8e;font-weight:700;margin-right:6px; }
+.gf-btn {
+  width:100%;padding:12px;background:rgba(109,219,142,0.12);
+  border:1px solid rgba(109,219,142,0.35);border-radius:12px;
+  color:#6ddb8e;font-size:13px;font-weight:700;cursor:pointer;
+  transition:background 0.2s;
+}
+.gf-btn:hover { background:rgba(109,219,142,0.2); }
+/* ── FADE GRADE RESULT ── */
+.fade-grade-card {
+  background:var(--surface2);border:1px solid var(--border2);border-radius:18px;
+  overflow:hidden;margin-top:4px;animation:coachCardIn 0.32s cubic-bezier(0.22,1,0.36,1) both;
+}
+.fg-score-row {
+  padding:18px 18px 14px;display:flex;align-items:center;justify-content:space-between;
+  background:linear-gradient(135deg,rgba(232,213,163,0.07),transparent);
+  border-bottom:1px solid var(--border2);
+}
+.fg-score-num { font-size:48px;font-weight:800;line-height:1; }
+.fg-score-label { font-size:14px;font-weight:700;margin-top:2px; }
+.fg-score-denom { font-size:13px;color:var(--text3);font-weight:600; }
+.fg-sections { padding:14px 16px;display:flex;flex-direction:column;gap:14px; }
+.fg-section-title {
+  font-size:10px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;
+  color:var(--text3);margin-bottom:6px;
+}
+.fg-well-item,.fg-improve-item {
+  font-size:12px;color:var(--text2);line-height:1.55;
+  padding-left:14px;position:relative;margin-bottom:4px;
+}
+.fg-well-item::before { content:'✓';position:absolute;left:0;color:#6ddb8e;font-weight:700; }
+.fg-improve-item::before { content:'→';position:absolute;left:0;color:var(--accent2);font-weight:700; }
+.fg-big-improvement {
+  padding:12px;background:rgba(232,213,163,0.06);border:1px solid rgba(232,213,163,0.18);
+  border-radius:12px;font-size:12px;color:var(--text2);line-height:1.6;
+}
+.fg-rec {
+  padding:12px;background:rgba(109,219,142,0.06);border:1px solid rgba(109,219,142,0.2);
+  border-radius:12px;font-size:12px;color:var(--text2);line-height:1.6;
+}
+.fg-motivational { font-size:12px;color:var(--text3);line-height:1.6;font-style:italic; }
+
 .fade-score-card {
   margin-bottom:16px;padding:18px 18px 14px;
   background:linear-gradient(135deg,rgba(232,213,163,0.07),rgba(232,213,163,0.03));
@@ -3417,14 +3510,15 @@ async function claudeAnalysis(file, isFreePreview = false) {
     state.fadeGeometry = { earXfrac: 0.50, earTopFrac: 0.38, earBottomFrac: 0.50, earMidFrac: 0.50 };
     state.fadeOffsetXFrac = 0; state.fadeOffsetYFrac = 0;
     addAIMessage(`<p>⭐ <strong>${isFreePreview ? 'Fade Analysis' : 'Pro Analysis'} — ${label}:</strong> ${guide.advice}</p>${footer}`, null);
+    _fetchAndShowBarberReport(file); // runs in background, non-blocking
     _checkCreditsAndGenerate(() => {
       buildFadePlan();
       state.currentStep = 0;
       presentFadePlanStep(0);
     });
   } else {
-    // Show AI advice as a brief note, then go straight into taper shaping
     addAIMessage(`<p>⭐ <strong>${label}:</strong> ${guide.advice}</p>${footer}`, null);
+    _fetchAndShowBarberReport(file); // runs in background, non-blocking
     await startTaperShaping();
   }
 }
@@ -6203,6 +6297,144 @@ async function reviewProgressPhoto(file, i) {
 
 // ── WRAP-UP — cheat sheet, tools, share, completion ──
 // ── Fade Score ────────────────────────────────────────────────────────────────
+// ── BARBER REPORT ─────────────────────────────────────────────────────────────
+async function _fetchAndShowBarberReport(photoFile) {
+  if (!photoFile) return;
+  const fd = new FormData();
+  fd.append('photo', photoFile);
+  try {
+    const res = await fetch(BACKEND_URL + '/barber-report', { method: 'POST', body: fd });
+    if (!res.ok) return;
+    const r = await res.json();
+    const msg = addAIMessage(_buildBarberReportHtml(r), null);
+    scrollToMsg(msg);
+  } catch(e) {
+    console.warn('[BarberReport] Failed:', e.message);
+  }
+}
+
+function _buildBarberReportHtml(r) {
+  const diffClass = {
+    'Easy': 'br-difficulty-easy',
+    'Moderate': 'br-difficulty-moderate',
+    'Advanced': 'br-difficulty-advanced',
+  }[r.taperDifficulty?.level] || '';
+
+  const rows = [
+    r.density && { label: 'Hair Density', value: r.density.level, desc: r.density.explanation },
+    r.texture  && { label: 'Hair Texture', value: r.texture.type,  desc: r.texture.explanation },
+    r.hairLoss && { label: 'Hair Loss', value: r.hairLoss.level, desc: r.hairLoss.explanation },
+    r.sideburnThickness && { label: 'Sideburn Thickness', value: r.sideburnThickness.level, desc: r.sideburnThickness.explanation },
+    r.headShape && r.headShape.confidence !== 'low' && { label: 'Head Shape', value: r.headShape.shape, desc: r.headShape.explanation },
+    r.growthDirection && { label: 'Growth Direction', value: r.growthDirection.direction, desc: r.growthDirection.explanation },
+    r.taperDifficulty && { label: 'Taper Difficulty', value: `<span class="${diffClass}">${r.taperDifficulty.level}</span>`, desc: r.taperDifficulty.explanation },
+  ].filter(Boolean);
+
+  const rowsHtml = rows.map(row => `
+    <div class="br-row">
+      <div class="br-row-label">${row.label}</div>
+      <div class="br-row-value">${row.value}</div>
+      ${row.desc ? `<div class="br-row-desc">${row.desc}</div>` : ''}
+    </div>`).join('');
+
+  const notesHtml = (r.barberNotes || []).map(n =>
+    `<div class="br-note">${n}</div>`).join('');
+
+  return `<div class="barber-report">
+    <div class="br-header">
+      <div class="br-eyebrow">Your Personalized Barber Report</div>
+      <div class="br-title">Hair Analysis</div>
+    </div>
+    <div class="br-rows">${rowsHtml}</div>
+    ${notesHtml ? `<div class="br-notes"><div class="br-notes-label">Barber Notes</div>${notesHtml}</div>` : ''}
+  </div>`;
+}
+
+// ── GRADE FADE ────────────────────────────────────────────────────────────────
+function _showGradeFadeCard() {
+  const html = `<div class="grade-fade-card">
+    <div class="br-eyebrow" style="margin-bottom:6px;">Get Your Fade Graded</div>
+    <div class="gf-title">How'd the haircut turn out?</div>
+    <div class="gf-sub">Upload a photo of your finished cut and I'll analyze it like a barber.</div>
+    <div class="gf-checks">
+      <div class="gf-check"><span>✓</span>What you did well</div>
+      <div class="gf-check"><span>✓</span>What needs improvement</div>
+      <div class="gf-check"><span>✓</span>Where the blend could be smoother</div>
+      <div class="gf-check"><span>✓</span>Your personalized Fade Score</div>
+    </div>
+    <button class="gf-btn" onclick="triggerGradeFadeUpload()">Analyze My Finished Fade →</button>
+  </div>`;
+  const msg = addAIMessage(html, null);
+  scrollToMsg(msg);
+}
+
+function triggerGradeFadeUpload() {
+  state.nextFileHandler = async (file) => {
+    state.nextFileHandler = null;
+    const typingMsg = addAIMessage('<p style="color:var(--text3);">Analyzing your finished fade…</p>', null);
+    try {
+      const fd = new FormData();
+      fd.append('photo', file);
+      const res = await fetch(BACKEND_URL + '/grade-fade', { method: 'POST', body: fd });
+      typingMsg.remove();
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const grade = await res.json();
+      const msg = addAIMessage(_buildGradeResultHtml(grade), null);
+      scrollToMsg(msg);
+    } catch(e) {
+      typingMsg.remove();
+      addAIMessage('<p>Couldn\'t analyze the photo — make sure it\'s a clear side profile and try again.</p>', null);
+    }
+  };
+  document.getElementById('fileInput')?.click();
+}
+
+function _buildGradeResultHtml(g) {
+  const score = g.overallScore || 0;
+  const band = score >= 96 ? { label:'Barber-Level', color:'#b8e0ff' }
+             : score >= 86 ? { label:'Clean',         color:'#6ddb8e' }
+             : score >= 71 ? { label:'Good',           color:'#e8d5a3' }
+             : score >= 51 ? { label:'Decent Start',   color:'#e8b86d' }
+             :               { label:'Needs Work',     color:'#e87575' };
+
+  const wellItems = (g.whatYouDidWell || []).map(w => `<div class="fg-well-item">${w}</div>`).join('');
+
+  const metrics = [
+    g.guidelinePlacement && { label: 'Guideline Placement', score: g.guidelinePlacement.score, note: g.guidelinePlacement.assessment },
+    g.blendQuality       && { label: 'Blend Quality',       score: g.blendQuality.score,       note: g.blendQuality.assessment },
+    g.sideburnShape      && { label: 'Sideburn Shape',      score: g.sideburnShape.score,      note: g.sideburnShape.assessment },
+    g.fadeConsistency    && { label: 'Fade Consistency',    score: g.fadeConsistency.score,    note: g.fadeConsistency.assessment },
+    g.cleanupQuality     && { label: 'Cleanup Quality',     score: g.cleanupQuality.score,     note: g.cleanupQuality.assessment },
+  ].filter(Boolean);
+
+  const metricsHtml = metrics.map(m => `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px;">${m.label}</div>
+        <div style="font-size:11px;color:var(--text2);line-height:1.5;">${m.note}</div>
+      </div>
+      <div style="font-size:16px;font-weight:800;color:${m.score>=80?'#6ddb8e':m.score>=60?'#e8d5a3':'#e87575'};flex-shrink:0;">${m.score}</div>
+    </div>`).join('');
+
+  return `<div class="fade-grade-card">
+    <div class="fg-score-row">
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--text3);margin-bottom:4px;">Fade Score</div>
+        <div class="fg-score-label" style="color:${band.color};">${band.label}</div>
+        <div class="fg-score-denom">/100</div>
+      </div>
+      <div class="fg-score-num" style="color:${band.color};">${score}</div>
+    </div>
+    <div class="fg-sections">
+      ${metricsHtml}
+      ${wellItems ? `<div><div class="fg-section-title">What You Did Well</div>${wellItems}</div>` : ''}
+      ${g.biggestImprovement ? `<div><div class="fg-section-title">Biggest Improvement Area</div><div class="fg-big-improvement">${g.biggestImprovement}</div></div>` : ''}
+      ${g.barberRecommendation ? `<div><div class="fg-section-title">Barber Recommendation</div><div class="fg-rec">${g.barberRecommendation}</div></div>` : ''}
+      ${g.motivationalNote ? `<div class="fg-motivational">${g.motivationalNote}</div>` : ''}
+    </div>
+  </div>`;
+}
+
 function _computeFadeScore() {
   let score = 58; // baseline
 
@@ -6307,6 +6539,8 @@ function addFadePlanWrapUp() {
     <button class="opt-btn" onclick="shareGuide(this)" style="flex:1;min-width:100px;">↗ Share</button>
     <button class="opt-btn" onclick="copyGuideSteps(this,'${style}')" style="flex:1;min-width:100px;">📋 Copy steps</button>
   </div>`;
+
+  _showGradeFadeCard();
 
   addAIMessage(`<div class="steps-panel">
     ${_buildFadeScoreCardHtml()}
