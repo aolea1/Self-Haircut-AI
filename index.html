@@ -6481,8 +6481,10 @@ function triggerGradeFadeUpload() {
         const errData = await res.json().catch(() => ({}));
         if (errData.error === 'AI not configured') {
           addAIMessage('<p style="color:var(--text2);">The AI analysis service isn\'t configured yet. Please try again later.</p>', null);
+        } else if (errData.error === 'unusable_photo') {
+          addAIMessage(`<p style="color:var(--text2);">${errData.reason || 'The photo couldn\'t be analyzed — make sure at least the fade/ear area is visible and try again.'}</p>`, null);
         } else {
-          addAIMessage('<p style="color:var(--text2);">Couldn\'t analyze the photo — try a clearer side-profile shot with good lighting.</p>', null);
+          addAIMessage('<p style="color:var(--text2);">Analysis failed — please try again.</p>', null);
         }
         return;
       }
@@ -6524,6 +6526,13 @@ function _buildGradeResultHtml(g) {
       <div style="font-size:16px;font-weight:800;color:${m.score>=80?'#6ddb8e':m.score>=60?'#e8d5a3':'#e87575'};flex-shrink:0;">${m.score}</div>
     </div>`).join('');
 
+  const conf = g.confidence || 'high';
+  const confColor = conf === 'high' ? '#6ddb8e' : conf === 'medium' ? '#e8d5a3' : '#e8b86d';
+  const confLabel = conf === 'high' ? 'High Confidence' : conf === 'medium' ? 'Medium Confidence' : 'Low Confidence';
+  const confNote  = conf === 'low'
+    ? `<div style="font-size:11px;color:var(--text3);margin-top:10px;padding:8px 10px;background:rgba(232,184,109,0.08);border-radius:7px;line-height:1.5;">I can still review this, but a clearer side-profile photo would make the score more accurate.</div>`
+    : '';
+
   return `<div class="fade-grade-card">
     <div class="fg-score-row">
       <div>
@@ -6531,8 +6540,12 @@ function _buildGradeResultHtml(g) {
         <div class="fg-score-label" style="color:${band.color};">${band.label}</div>
         <div class="fg-score-denom">/100</div>
       </div>
-      <div class="fg-score-num" style="color:${band.color};">${score}</div>
+      <div style="text-align:right;">
+        <div class="fg-score-num" style="color:${band.color};">${score}</div>
+        <div style="font-size:10px;font-weight:600;color:${confColor};margin-top:2px;">Analysis: ${confLabel}</div>
+      </div>
     </div>
+    ${confNote}
     <div class="fg-sections">
       ${metricsHtml}
       ${wellItems ? `<div><div class="fg-section-title">What You Did Well</div>${wellItems}</div>` : ''}
