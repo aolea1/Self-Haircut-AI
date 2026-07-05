@@ -232,12 +232,12 @@ async function detectEarFromPhoto(imgEl) {
     const snap = await getDoc(doc(_db, 'users', uid));
     return snap.exists() ? (snap.data().credits ?? 0) : 0;
   };
-  // Called on first login — creates user doc with 1 free credit if new
+  // Called on first login — creates user doc with freeGuideUsed: false for new accounts
   window._fbInitUser = async (uid, displayName, email) => {
     if (!_db) return false;
     const snap = await getDoc(doc(_db, 'users', uid));
     if (!snap.exists()) {
-      await setDoc(doc(_db, 'users', uid), { credits: 1, displayName, email, createdAt: Date.now() });
+      await setDoc(doc(_db, 'users', uid), { credits: 0, freeGuideUsed: false, displayName, email, createdAt: Date.now() });
       return true;
     }
     return false;
@@ -4989,42 +4989,63 @@ async function _checkCreditsAndGenerate(callback) {
     return;
   }
 
-  // No active promo — enforce credits strictly
-  if (window._userCredits === null && window._fbGetCredits) {
-    try { window._userCredits = await window._fbGetCredits(user.uid); _updateCreditDisplay(); }
-    catch(e) { window._userCredits = 0; }
-  }
+  // No active promo — check server for free guide or credits
+  // Must be synchronous with server to prevent gaming via refresh/device switch
+  try {
+    const token = await user.getIdToken();
+    const res = await fetch(BACKEND_URL + '/use-credit', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    });
 
-  if ((window._userCredits ?? 0) <= 0) {
-    showPurchaseScreen('You\'re out of credits');
-    return;
-  }
-
-  // Deduct 1 credit optimistically — start the guide immediately, settle in background
-  window._userCredits = Math.max(0, (window._userCredits || 1) - 1);
-  _updateCreditDisplay();
-  callback(); // ← guide starts now, no waiting on network
-
-  // Background settlement: sync the real credit count from the server
-  ;(async () => {
-    try {
-      const token = await user.getIdToken();
-      const res = await fetch(BACKEND_URL + '/use-credit', {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (typeof data.credits === 'number') {
-          window._userCredits = data.credits;
-          _updateCreditDisplay();
-        }
-      }
-    } catch(e) {
-      // Backend unreachable — client-side deduction already applied, acceptable
-      if (window._fbDeductCredit) window._fbDeductCredit(user.uid).catch(() => {});
+    if (res.status === 402) {
+      showPurchaseScreen('You\'ve used your free guide. Purchase credits to generate another personalized haircut blueprint.');
+      return;
     }
-  })();
+
+    if (!res.ok) {
+      // Backend error — fall back to client-side credit check
+      if ((window._userCredits ?? 0) <= 0) {
+        showPurchaseScreen('You\'re out of credits');
+        return;
+      }
+      window._userCredits = Math.max(0, (window._userCredits || 1) - 1);
+      _updateCreditDisplay();
+      callback();
+      return;
+    }
+
+    const data = await res.json();
+
+    if (data.usedFreeGuide) {
+      // First ever guide — let them through, then show a note after
+      window._userCredits = data.credits ?? 0;
+      _updateCreditDisplay();
+      callback();
+      // Show a gentle "free guide used" message in chat after the guide starts
+      setTimeout(() => {
+        addAIMessage('<p style="font-size:12px;color:var(--text3);">This was your free guide. When you\'re ready for your next cut, grab some credits from the menu — they never expire.</p>', null);
+      }, 3000);
+      return;
+    }
+
+    if (typeof data.credits === 'number') {
+      window._userCredits = data.credits;
+      _updateCreditDisplay();
+    }
+    callback();
+
+  } catch(e) {
+    // Network unreachable — allow through with client-side fallback
+    if ((window._userCredits ?? 0) <= 0) {
+      showPurchaseScreen('You\'re out of credits');
+      return;
+    }
+    window._userCredits = Math.max(0, (window._userCredits || 1) - 1);
+    _updateCreditDisplay();
+    callback();
+    if (window._fbDeductCredit) window._fbDeductCredit(user.uid).catch(() => {});
+  }
 }
 
 // ── PROMO / ACCESS CODE REDEMPTION ──
