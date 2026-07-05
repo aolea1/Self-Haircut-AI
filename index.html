@@ -2582,6 +2582,7 @@ if (inputDock && chatArea) {
 let started = false;
 let pendingFiles = [];
 let _chatHistory = []; // rolling window for /chat context
+let _aiPreviewEnabled = false; // set true after /health confirms openai: true
 let userScrolledUp = false;
 
 const FREE_CLAUDE_LIMIT = 2; // first N free analyses use real Claude
@@ -2604,6 +2605,12 @@ const state = {
 };
 
 const BACKEND_URL = 'https://selfhaircut-backend.onrender.com';
+
+// Check AI preview availability once on load — no spinner shown if AI is off
+fetch(BACKEND_URL + '/health', { signal: AbortSignal.timeout(5000) })
+  .then(r => r.json())
+  .then(d => { _aiPreviewEnabled = d.openai === true; })
+  .catch(() => { _aiPreviewEnabled = false; });
 const FREE_LIMIT = 5;
 
 // ── INPUT ──
@@ -3247,39 +3254,36 @@ function _onTaperPreviewContinue() {
 }
 
 async function showTaperPreview(croppedFile) {
+  // Skip entirely if AI isn't available — no spinner, no overlay, no wait
+  if (!_aiPreviewEnabled) {
+    return;
+  }
+
   return new Promise(async (resolve) => {
     _taperPreviewResolve = resolve;
 
-    // Show overlay with before photo immediately
-    const overlay = document.getElementById('taperPreviewOverlay');
+    const overlay   = document.getElementById('taperPreviewOverlay');
     const beforeImg = document.getElementById('tpBeforeImg');
     const afterPanel = document.getElementById('tpAfterPanel');
-    const ctaBtn = document.getElementById('tpCtaBtn');
+    const ctaBtn    = document.getElementById('tpCtaBtn');
 
-    // Reset state
     ctaBtn.disabled = true;
-    ctaBtn.textContent = 'Show Me How To Get This Look →';
-    afterPanel.innerHTML = `<div class="tp-after-loading" id="tpAfterLoading">
+    ctaBtn.textContent = 'Start the Guide to Get This Look →';
+    afterPanel.innerHTML = `<div class="tp-after-loading">
       <div class="tp-spinner"></div>
-      <div>Creating your<br>taper preview…</div>
+      <div>Generating your<br>low taper preview…</div>
     </div>`;
 
-    // Show before photo
     const beforeUrl = URL.createObjectURL(croppedFile);
     beforeImg.src = beforeUrl;
     overlay.classList.add('open');
 
-    // Kick off backend preview generation
     try {
-      console.log('[TaperPreview] Cropped image received —', croppedFile.name, `${(croppedFile.size/1024).toFixed(1)} KB`, croppedFile.type);
-
       const fd = new FormData();
       fd.append('photo', croppedFile);
 
-      console.log('[TaperPreview] Sending image to AI preview generator:', BACKEND_URL + '/generate-preview');
-
       const controller = new AbortController();
-      const timeoutId  = setTimeout(() => controller.abort(), 45000);
+      const timeoutId  = setTimeout(() => controller.abort(), 20000);
 
       const res = await fetch(BACKEND_URL + '/generate-preview', {
         method: 'POST',
@@ -3288,52 +3292,34 @@ async function showTaperPreview(croppedFile) {
       });
       clearTimeout(timeoutId);
 
-      console.log('[TaperPreview] AI preview response received — HTTP', res.status);
-
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({}));
-        console.error('[TaperPreview] Backend error:', res.status, errBody);
-        throw new Error(`HTTP ${res.status}: ${errBody.error || 'unknown'}`);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const data = await res.json();
-      console.log('[TaperPreview] Response parsed — previewUrl present:', !!data.previewUrl,
-        data.previewUrl ? `(${(data.previewUrl.length/1024).toFixed(0)} KB)` : '');
+      if (!data.previewUrl) throw new Error('No preview URL');
 
-      if (!data.previewUrl) throw new Error('No preview URL returned');
-
-      // Load the AI image, then reveal
       const afterImg = new Image();
       afterImg.onload = () => {
         afterPanel.innerHTML = '';
         afterImg.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
         afterPanel.appendChild(afterImg);
-
         const tag = document.createElement('div');
         tag.className = 'tp-panel-tag';
         tag.textContent = 'AFTER';
         afterPanel.appendChild(tag);
-
         ctaBtn.disabled = false;
-        console.log('[TaperPreview] Frontend preview image displayed ✓');
       };
-      afterImg.onerror = (e) => {
-        console.error('[TaperPreview] Failed to load preview image into <img>:', e);
-        _showTaperPreviewFail();
-      };
+      afterImg.onerror = () => _showTaperPreviewFail();
       afterImg.src = data.previewUrl;
 
     } catch(e) {
-      console.error('[TaperPreview] Preview generation failed:', e.message);
+      console.warn('[TaperPreview] Failed:', e.message);
       _showTaperPreviewFail();
     }
   });
 }
 
-// AI preview failed — skip the section entirely rather than show a fake result.
-// The overlay is hidden and the guide starts immediately.
 function _showTaperPreviewFail() {
-  console.log('[TaperPreview] AI unavailable — skipping preview, starting guide');
+  // Close silently — a failed preview is worse than no preview
   const overlay = document.getElementById('taperPreviewOverlay');
   if (overlay) overlay.classList.remove('open');
   if (typeof _onTaperPreviewContinue === 'function') _onTaperPreviewContinue();
