@@ -670,11 +670,16 @@ body {
 
 /* ── MOBILE COLLAPSED INPUT BAR ── */
 .input-collapsed-bar {
-  display: none;
+  display: flex;
   align-items: center;
   gap: 10px;
   padding: 11px 14px;
   cursor: text;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: max-height 0.2s ease, opacity 0.18s ease;
 }
 .input-collapsed-text {
   flex: 1;
@@ -692,19 +697,30 @@ body {
 
 @media (max-width: 767px) {
   .input-dock {
-    transition: padding 0.18s ease;
+    transition: padding 0.2s ease;
   }
+  .input-main, .input-actions, .input-hint, .upload-preview {
+    max-height: 200px;
+    opacity: 1;
+    overflow: hidden;
+    transition: max-height 0.2s ease, opacity 0.15s ease;
+  }
+  .input-wrap {
+    transition: border-radius 0.2s ease;
+  }
+
+  /* Collapsed state */
   .input-dock.collapsed {
     padding: 6px 16px calc(8px + env(safe-area-inset-bottom, 0px));
   }
-  .input-dock.collapsed .input-wrap {
-    border-radius: 24px;
+  .input-dock.collapsed .input-wrap      { border-radius: 24px; }
+  .input-dock.collapsed .input-main      { max-height: 0; opacity: 0; }
+  .input-dock.collapsed .input-actions   { max-height: 0; opacity: 0; }
+  .input-dock.collapsed .input-hint      { max-height: 0; opacity: 0; }
+  .input-dock.collapsed .upload-preview  { max-height: 0; opacity: 0; }
+  .input-dock.collapsed .input-collapsed-bar {
+    max-height: 56px; opacity: 1; pointer-events: auto;
   }
-  .input-dock.collapsed .input-main    { display: none; }
-  .input-dock.collapsed .input-actions { display: none; }
-  .input-dock.collapsed .input-hint    { display: none; }
-  .input-dock.collapsed .upload-preview { display: none; }
-  .input-dock.collapsed .input-collapsed-bar { display: flex; }
 }
 
 /* ── CAMERA CAPTURE MODAL ── */
@@ -2839,56 +2855,49 @@ let _chatHistory = []; // rolling window for /chat context
 
   let collapsed    = false;
   let keyboardOpen = false;
-  let collapseTimer = null;
-  let maxVH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  let maxVH        = window.visualViewport ? window.visualViewport.height : window.innerHeight;
 
   const isMobileWidth = () => window.innerWidth <= 767;
 
-  // Track keyboard via visualViewport shrinkage
+  // Keyboard detection via visualViewport shrinkage
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', () => {
       const h = window.visualViewport.height;
       maxVH = Math.max(maxVH, h);
       const wasOpen = keyboardOpen;
-      keyboardOpen = (maxVH - h) > 150;
-      if (keyboardOpen && !wasOpen) _expandInput(false); // keyboard opened → expand, no focus
+      keyboardOpen  = (maxVH - h) > 150;
+      if (keyboardOpen && !wasOpen) _expandInput(false);
     }, { passive: true });
   }
 
   window._expandInput = function(focusInput) {
-    clearTimeout(collapseTimer);
-    if (!collapsed && focusInput) { chatInput?.focus(); return; }
     collapsed = false;
     dock.classList.remove('collapsed');
-    if (focusInput) setTimeout(() => chatInput?.focus(), 50);
+    if (focusInput) setTimeout(() => chatInput?.focus(), 30);
   };
 
   function _collapse() {
-    if (!isMobileWidth()) return;
-    if (keyboardOpen) return;
-    if (chatInput?.value.trim()) return;
-    if (pendingFiles.length > 0) return;
+    if (!isMobileWidth())                  return;
+    if (keyboardOpen)                       return;
+    if (chatInput?.value.trim())            return;
+    if (pendingFiles.length > 0)            return;
     if (document.activeElement === chatInput) return;
     collapsed = true;
     dock.classList.add('collapsed');
   }
 
-  function scheduleCollapse() {
+  // Collapse immediately on scroll — CSS transition handles the smoothness
+  chatArea?.addEventListener('scroll', () => {
     if (!isMobileWidth() || collapsed) return;
-    clearTimeout(collapseTimer);
-    collapseTimer = setTimeout(_collapse, 350);
-  }
+    _collapse();
+  }, { passive: true });
 
-  // Collapse on chat scroll
-  chatArea?.addEventListener('scroll', scheduleCollapse, { passive: true });
-
-  // Never collapse while user is typing or focused
   chatInput?.addEventListener('focus', () => _expandInput(false));
-  chatInput?.addEventListener('input', () => { _expandInput(false); });
-  chatInput?.addEventListener('blur',  () => { setTimeout(scheduleCollapse, 500); });
+  chatInput?.addEventListener('input', () => _expandInput(false));
 
-  // Expand on window resize away from mobile
-  window.addEventListener('resize', () => { if (!isMobileWidth()) { collapsed = false; dock.classList.remove('collapsed'); } }, { passive: true });
+  window.addEventListener('resize', () => {
+    if (!isMobileWidth()) { collapsed = false; dock.classList.remove('collapsed'); }
+  }, { passive: true });
 })();
 let _aiPreviewEnabled = false; // set true after /health confirms openai: true
 let userScrolledUp = false;
