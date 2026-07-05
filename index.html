@@ -6061,7 +6061,6 @@ function buildCoachingCard(step, stepIndex) {
 }
 
 // ── Guide Progress Banner ─────────────────────────────────────────────────────
-const _GP_PCTS    = [15, 30, 50, 70, 85, 100];
 const _GP_MOTIVES = [
   "Your taper guide is set. Let's build the fade from the bottom up.",
   "Good start. Keep your pressure light and consistent.",
@@ -6086,7 +6085,7 @@ function _updateGuideProgress(stepIndex, total) {
   const banner   = _gpBannerEl();
   if (!banner) return;
 
-  const pct      = _GP_PCTS[Math.min(stepIndex, _GP_PCTS.length - 1)] || 15;
+  const pct      = Math.round(((stepIndex + 1) / (total + 1)) * 100);
   const motive   = _GP_MOTIVES[Math.min(stepIndex, _GP_MOTIVES.length - 1)] || '';
   const stepNum  = stepIndex + 1;
 
@@ -6478,13 +6477,21 @@ function triggerGradeFadeUpload() {
       fd.append('photo', file);
       const res = await fetch(BACKEND_URL + '/grade-fade', { method: 'POST', body: fd });
       typingMsg.remove();
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        if (errData.error === 'AI not configured') {
+          addAIMessage('<p style="color:var(--text2);">The AI analysis service isn\'t configured yet. Please try again later.</p>', null);
+        } else {
+          addAIMessage('<p style="color:var(--text2);">Couldn\'t analyze the photo — try a clearer side-profile shot with good lighting.</p>', null);
+        }
+        return;
+      }
       const grade = await res.json();
       const msg = addAIMessage(_buildGradeResultHtml(grade), null);
       scrollToMsg(msg);
     } catch(e) {
-      typingMsg.remove();
-      addAIMessage('<p>Couldn\'t analyze the photo — make sure it\'s a clear side profile and try again.</p>', null);
+      typingMsg?.remove();
+      addAIMessage('<p style="color:var(--text2);">Couldn\'t reach the analysis server — check your connection and try again.</p>', null);
     }
   };
   document.getElementById('fileInput')?.click();
@@ -6642,13 +6649,16 @@ function addFadePlanWrapUp() {
   </div>`;
 
   addAIMessage(`<div class="steps-panel">
-    ${_buildFadeScoreCardHtml()}
     <div class="steps-title">Your guard reference</div>
     ${cheatSheet}
     <div style="margin-top:12px;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;">🛒 Recommended tools</div>
     <div style="display:flex;flex-direction:column;gap:6px;">${toolsHtml}</div>
     ${shareBtn}
   </div>`, null);
+
+  // Prompt them to upload a finished photo for their real Fade Score
+  setTimeout(() => _showGradeFadeCard(), 1200);
+
   setTimeout(() => {
     if (state.phase === 'guide-shown') {
       addAIMessage("<p>How's it looking? If anything needs work — a line, a blend, an edge — tell me and we'll sort it out.</p>", null);
