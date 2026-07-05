@@ -1379,6 +1379,81 @@ body {
   border-radius:12px;font-size:12px;color:var(--text2);line-height:1.6;
 }
 .fg-motivational { font-size:12px;color:var(--text3);line-height:1.6;font-style:italic; }
+.fg-lineup-row {
+  padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05);
+  display:flex;flex-direction:column;gap:4px;
+}
+.fg-lineup-row:last-child { border-bottom:none; }
+.fg-lineup-label { font-size:12px;font-weight:700;color:var(--text); }
+.fg-lineup-assess { font-size:11px;color:var(--text2);line-height:1.55; }
+.fg-lineup-tip {
+  font-size:11px;color:rgba(232,213,163,0.75);line-height:1.5;
+  padding:6px 8px;background:rgba(232,213,163,0.05);
+  border-left:2px solid rgba(232,213,163,0.3);border-radius:0 6px 6px 0;margin-top:4px;
+}
+
+/* ── FADE FINISH UPSELL CARD ── */
+.fade-finish-upsell {
+  padding:20px;
+  background:linear-gradient(135deg,rgba(232,213,163,0.06),rgba(232,213,163,0.02));
+  border:1px solid rgba(232,213,163,0.28);border-radius:18px;
+  animation:coachCardIn 0.32s cubic-bezier(0.22,1,0.36,1) both;
+}
+.ffu-eyebrow {
+  font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;
+  color:rgba(232,213,163,0.6);margin-bottom:10px;
+}
+.ffu-headline {
+  font-size:17px;font-weight:800;color:var(--text);margin-bottom:5px;line-height:1.25;
+}
+.ffu-sub { font-size:12px;color:var(--text2);line-height:1.55;margin-bottom:16px; }
+.ffu-package-name {
+  display:inline-block;font-size:12px;font-weight:700;
+  color:#e8d5a3;background:rgba(232,213,163,0.1);
+  border:1px solid rgba(232,213,163,0.25);border-radius:20px;
+  padding:4px 12px;margin-bottom:16px;
+}
+.ffu-checks { display:flex;flex-direction:column;gap:0;margin-bottom:18px; }
+.ffu-section-label {
+  font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;
+  color:var(--text3);margin:12px 0 6px;
+}
+.ffu-section-label:first-child { margin-top:0; }
+.ffu-check {
+  font-size:12px;color:var(--text2);padding:3px 0 3px 18px;position:relative;line-height:1.5;
+}
+.ffu-check::before {
+  content:'✓';position:absolute;left:0;
+  color:#e8d5a3;font-weight:700;font-size:11px;
+}
+.ffu-divider {
+  height:1px;background:rgba(255,255,255,0.07);margin:14px 0;
+}
+.ffu-unlock-btn {
+  width:100%;padding:13px;
+  background:linear-gradient(135deg,rgba(232,213,163,0.18),rgba(232,213,163,0.10));
+  border:1px solid rgba(232,213,163,0.45);border-radius:12px;
+  color:#e8d5a3;font-size:13.5px;font-weight:800;cursor:pointer;
+  transition:background 0.2s,border-color 0.2s;letter-spacing:-0.01em;
+  margin-bottom:10px;
+}
+.ffu-unlock-btn:hover { background:rgba(232,213,163,0.22);border-color:rgba(232,213,163,0.6); }
+.ffu-unlock-btn:disabled { opacity:0.5;cursor:not-allowed; }
+.ffu-later-btn {
+  width:100%;padding:9px;background:transparent;border:none;
+  color:var(--text3);font-size:12px;cursor:pointer;transition:color 0.2s;
+}
+.ffu-later-btn:hover { color:var(--text2); }
+.ffu-upload-state { text-align:center;padding:8px 0; }
+.ffu-upload-title { font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px; }
+.ffu-upload-sub { font-size:12px;color:var(--text2);line-height:1.55;margin-bottom:14px; }
+.ffu-upload-btn {
+  width:100%;padding:13px;
+  background:rgba(109,219,142,0.12);border:1px solid rgba(109,219,142,0.35);
+  border-radius:12px;color:#6ddb8e;font-size:13px;font-weight:700;cursor:pointer;
+  transition:background 0.2s;
+}
+.ffu-upload-btn:hover { background:rgba(109,219,142,0.2); }
 
 .fade-score-card {
   margin-bottom:16px;padding:18px 18px 14px;
@@ -6556,6 +6631,213 @@ function _buildGradeResultHtml(g) {
   </div>`;
 }
 
+// ── FADE FINISH PACKAGE ───────────────────────────────────────────────────────
+
+function _showFadeFinishUpsell() {
+  const html = `<div class="fade-finish-upsell" id="fadeFinishUpsell">
+    <div class="ffu-eyebrow">Premium Add-On · 1 Credit</div>
+    <div class="ffu-headline">Want To Finish Like A Barber?</div>
+    <div class="ffu-sub">Unlock the final touch-up package for your haircut.</div>
+    <div class="ffu-package-name">Fade Finish Package +1 Credit</div>
+    <div class="ffu-checks">
+      <div class="ffu-section-label">Fade Analysis</div>
+      <div class="ffu-check">Upload your finished haircut</div>
+      <div class="ffu-check">Get your Fade Score</div>
+      <div class="ffu-check">See what you did well</div>
+      <div class="ffu-check">Find the biggest area to fix</div>
+      <div class="ffu-check">Get personalized barber recommendations</div>
+      <div class="ffu-section-label">Lineup Guidance</div>
+      <div class="ffu-check">Front lineup guide</div>
+      <div class="ffu-check">Temple lineup guide</div>
+      <div class="ffu-check">Sideburn cleanup guide</div>
+      <div class="ffu-check">Beard connection guidance if visible</div>
+    </div>
+    <div class="ffu-divider"></div>
+    <button class="ffu-unlock-btn" onclick="_unlockFadeFinish(this)">Unlock Fade Finish Package</button>
+    <button class="ffu-later-btn" onclick="this.closest('.fade-finish-upsell').remove()">Maybe Later</button>
+  </div>`;
+  const msg = addAIMessage(html, null);
+  scrollToMsg(msg);
+}
+
+async function _unlockFadeFinish(btn) {
+  if (!window._currentUser) {
+    openAuthModal(async () => {
+      const card = document.getElementById('fadeFinishUpsell');
+      if (card) _unlockFadeFinish(card.querySelector('.ffu-unlock-btn'));
+    });
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Checking credits…';
+
+  try {
+    const token = await window._currentUser.getIdToken();
+    const res   = await fetch(BACKEND_URL + '/deduct-credit', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    });
+
+    if (res.status === 402) {
+      btn.disabled = false;
+      btn.textContent = 'Unlock Fade Finish Package';
+      showPurchaseScreen('You need 1 credit to unlock the Fade Finish Package.');
+      return;
+    }
+
+    if (!res.ok) {
+      btn.disabled = false;
+      btn.textContent = 'Unlock Fade Finish Package';
+      return;
+    }
+
+    const data = await res.json();
+    if (typeof data.credits === 'number') {
+      window._userCredits = data.credits;
+      _updateCreditDisplay();
+    }
+
+    // Replace upsell card content with upload prompt
+    const card = document.getElementById('fadeFinishUpsell');
+    if (card) {
+      card.innerHTML = `
+        <div class="ffu-upload-state">
+          <div class="ffu-eyebrow" style="margin-bottom:10px;">Fade Finish Package · Unlocked</div>
+          <div class="ffu-upload-title">Upload Your Finished Fade</div>
+          <div class="ffu-upload-sub">I'll analyze your haircut like a barber and show you exactly where to improve.</div>
+          <button class="ffu-upload-btn" onclick="_triggerFadeFinishUpload(this.closest('.fade-finish-upsell'))">
+            Upload Finished Haircut →
+          </button>
+        </div>`;
+    }
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'Unlock Fade Finish Package';
+  }
+}
+
+function _triggerFadeFinishUpload(card) {
+  state.nextFileHandler = async (file) => {
+    state.nextFileHandler = null;
+
+    // Show loading state inside the card
+    if (card) {
+      card.innerHTML = `<div style="text-align:center;padding:16px 0;">
+        <div class="ffu-eyebrow" style="margin-bottom:8px;">Analyzing Your Haircut</div>
+        <div style="font-size:13px;color:var(--text2);">Reading your fade like a barber…</div>
+      </div>`;
+    }
+
+    try {
+      const token = await window._currentUser?.getIdToken();
+      const fd    = new FormData();
+      fd.append('photo', file);
+      const res = await fetch(BACKEND_URL + '/fade-finish', {
+        method: 'POST',
+        headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+        body: fd,
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = errData.error === 'unusable_photo'
+          ? (errData.reason || 'The photo couldn\'t be read — try a clearer shot of your fade area.')
+          : errData.error === 'AI not configured'
+            ? 'The analysis service isn\'t ready yet. Try again later.'
+            : 'Analysis failed — please try again.';
+        if (card) card.innerHTML = `<p style="color:var(--text2);font-size:13px;padding:8px 0;">${errMsg}</p>`;
+        return;
+      }
+
+      const data = await res.json();
+      if (card) {
+        card.outerHTML = _buildFadeFinishResultHtml(data);
+        scrollBottom();
+      }
+    } catch(e) {
+      if (card) card.innerHTML = `<p style="color:var(--text2);font-size:13px;padding:8px 0;">Couldn't reach the server — check your connection and try again.</p>`;
+    }
+  };
+  document.getElementById('fileInput')?.click();
+}
+
+function _buildFadeFinishResultHtml(g) {
+  const score = g.overallScore || 0;
+  const band  = score >= 96 ? { label:'Barber-Level', color:'#b8e0ff' }
+              : score >= 86 ? { label:'Clean',         color:'#6ddb8e' }
+              : score >= 71 ? { label:'Good',           color:'#e8d5a3' }
+              : score >= 51 ? { label:'Decent Start',   color:'#e8b86d' }
+              :               { label:'Needs Work',     color:'#e87575' };
+
+  const conf      = g.confidence || 'high';
+  const confColor = conf === 'high' ? '#6ddb8e' : conf === 'medium' ? '#e8d5a3' : '#e8b86d';
+  const confLabel = conf === 'high' ? 'High' : conf === 'medium' ? 'Medium' : 'Low';
+  const confNote  = conf === 'low'
+    ? `<div style="font-size:11px;color:var(--text3);margin-top:10px;padding:8px 10px;background:rgba(232,184,109,0.08);border-radius:7px;line-height:1.5;">I can still review this, but a clearer side-profile photo would make the score more accurate.</div>`
+    : '';
+
+  const metrics = [
+    g.guidelinePlacement && { label:'Guideline Placement', score:g.guidelinePlacement.score, note:g.guidelinePlacement.assessment },
+    g.blendQuality       && { label:'Blend Quality',       score:g.blendQuality.score,       note:g.blendQuality.assessment },
+    g.sideburnShape      && { label:'Sideburn Shape',      score:g.sideburnShape.score,      note:g.sideburnShape.assessment },
+    g.fadeConsistency    && { label:'Fade Consistency',    score:g.fadeConsistency.score,    note:g.fadeConsistency.assessment },
+    g.cleanupQuality     && { label:'Cleanup Quality',     score:g.cleanupQuality.score,     note:g.cleanupQuality.assessment },
+  ].filter(Boolean);
+
+  const metricsHtml = metrics.map(m => `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px;">${m.label}</div>
+        <div style="font-size:11px;color:var(--text2);line-height:1.5;">${m.note}</div>
+      </div>
+      <div style="font-size:16px;font-weight:800;color:${m.score>=80?'#6ddb8e':m.score>=60?'#e8d5a3':'#e87575'};flex-shrink:0;">${m.score}</div>
+    </div>`).join('');
+
+  const wellItems = (g.whatYouDidWell || []).map(w => `<div class="fg-well-item">${w}</div>`).join('');
+
+  // Lineup section
+  const lu = g.lineup || {};
+  const lineupRows = [
+    { key:'frontHairline',    label:'Front Hairline' },
+    { key:'temples',          label:'Temples' },
+    { key:'sideburnCleanup',  label:'Sideburn Cleanup' },
+    { key:'beardConnection',  label:'Beard Connection' },
+  ].map(({ key, label }) => {
+    const item = lu[key];
+    if (!item) return '';
+    const tip = item.tip ? `<div class="fg-lineup-tip">💡 ${item.tip}</div>` : '';
+    return `<div class="fg-lineup-row">
+      <div class="fg-lineup-label">${label}</div>
+      <div class="fg-lineup-assess">${item.assessment || ''}</div>
+      ${tip}
+    </div>`;
+  }).join('');
+
+  return `<div class="fade-grade-card">
+    <div class="fg-score-row">
+      <div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--text3);margin-bottom:4px;">Fade Finish · Fade Score</div>
+        <div class="fg-score-label" style="color:${band.color};">${band.label}</div>
+        <div class="fg-score-denom">/100</div>
+      </div>
+      <div style="text-align:right;">
+        <div class="fg-score-num" style="color:${band.color};">${score}</div>
+        <div style="font-size:10px;font-weight:600;color:${confColor};margin-top:2px;">Confidence: ${confLabel}</div>
+      </div>
+    </div>
+    ${confNote ? `<div style="padding:0 16px;">${confNote}</div>` : ''}
+    <div class="fg-sections">
+      ${metricsHtml}
+      ${wellItems ? `<div><div class="fg-section-title">What You Did Well</div>${wellItems}</div>` : ''}
+      ${g.biggestImprovement ? `<div><div class="fg-section-title">Biggest Area To Fix</div><div class="fg-big-improvement">${g.biggestImprovement}</div></div>` : ''}
+      ${g.barberRecommendation ? `<div><div class="fg-section-title">Barber Recommendation</div><div class="fg-rec">${g.barberRecommendation}</div></div>` : ''}
+      ${lineupRows ? `<div><div class="fg-section-title">Lineup Guidance</div>${lineupRows}</div>` : ''}
+      ${g.motivationalNote ? `<div class="fg-motivational">${g.motivationalNote}</div>` : ''}
+    </div>
+  </div>`;
+}
+
 function _computeFadeScore() {
   let score = 58; // baseline
 
@@ -6669,8 +6951,8 @@ function addFadePlanWrapUp() {
     ${shareBtn}
   </div>`, null);
 
-  // Prompt them to upload a finished photo for their real Fade Score
-  setTimeout(() => _showGradeFadeCard(), 1200);
+  // Show Fade Finish Package upsell after guide completion
+  setTimeout(() => _showFadeFinishUpsell(), 1200);
 
   setTimeout(() => {
     if (state.phase === 'guide-shown') {
