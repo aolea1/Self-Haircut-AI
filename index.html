@@ -1395,13 +1395,14 @@ body {
 /* ── FADE FINISH UPSELL CARD ── */
 .fade-finish-upsell {
   padding:20px;
-  background:linear-gradient(135deg,rgba(232,213,163,0.06),rgba(232,213,163,0.02));
-  border:1px solid rgba(232,213,163,0.28);border-radius:18px;
+  background:linear-gradient(135deg,rgba(109,219,142,0.09),rgba(109,219,142,0.03));
+  border:1px solid rgba(109,219,142,0.35);border-radius:18px;
+  box-shadow:0 0 28px rgba(109,219,142,0.12), 0 0 8px rgba(109,219,142,0.07);
   animation:coachCardIn 0.32s cubic-bezier(0.22,1,0.36,1) both;
 }
 .ffu-eyebrow {
   font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;
-  color:rgba(232,213,163,0.6);margin-bottom:10px;
+  color:rgba(109,219,142,0.7);margin-bottom:10px;
 }
 .ffu-headline {
   font-size:17px;font-weight:800;color:var(--text);margin-bottom:5px;line-height:1.25;
@@ -1409,14 +1410,14 @@ body {
 .ffu-sub { font-size:12px;color:var(--text2);line-height:1.55;margin-bottom:16px; }
 .ffu-package-name {
   display:inline-block;font-size:12px;font-weight:700;
-  color:#e8d5a3;background:rgba(232,213,163,0.1);
-  border:1px solid rgba(232,213,163,0.25);border-radius:20px;
+  color:#6ddb8e;background:rgba(109,219,142,0.1);
+  border:1px solid rgba(109,219,142,0.3);border-radius:20px;
   padding:4px 12px;margin-bottom:16px;
 }
 .ffu-checks { display:flex;flex-direction:column;gap:0;margin-bottom:18px; }
 .ffu-section-label {
   font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;
-  color:var(--text3);margin:12px 0 6px;
+  color:rgba(109,219,142,0.55);margin:12px 0 6px;
 }
 .ffu-section-label:first-child { margin-top:0; }
 .ffu-check {
@@ -1424,21 +1425,25 @@ body {
 }
 .ffu-check::before {
   content:'✓';position:absolute;left:0;
-  color:#e8d5a3;font-weight:700;font-size:11px;
+  color:#6ddb8e;font-weight:700;font-size:11px;
 }
 .ffu-divider {
-  height:1px;background:rgba(255,255,255,0.07);margin:14px 0;
+  height:1px;background:rgba(109,219,142,0.12);margin:14px 0;
 }
 .ffu-unlock-btn {
   width:100%;padding:13px;
-  background:linear-gradient(135deg,rgba(232,213,163,0.18),rgba(232,213,163,0.10));
-  border:1px solid rgba(232,213,163,0.45);border-radius:12px;
-  color:#e8d5a3;font-size:13.5px;font-weight:800;cursor:pointer;
-  transition:background 0.2s,border-color 0.2s;letter-spacing:-0.01em;
+  background:linear-gradient(135deg,rgba(109,219,142,0.22),rgba(109,219,142,0.12));
+  border:1px solid rgba(109,219,142,0.5);border-radius:12px;
+  color:#6ddb8e;font-size:13.5px;font-weight:800;cursor:pointer;
+  transition:background 0.2s,border-color 0.2s,box-shadow 0.2s;letter-spacing:-0.01em;
   margin-bottom:10px;
+  box-shadow:0 0 14px rgba(109,219,142,0.15);
 }
-.ffu-unlock-btn:hover { background:rgba(232,213,163,0.22);border-color:rgba(232,213,163,0.6); }
-.ffu-unlock-btn:disabled { opacity:0.5;cursor:not-allowed; }
+.ffu-unlock-btn:hover {
+  background:rgba(109,219,142,0.28);border-color:rgba(109,219,142,0.7);
+  box-shadow:0 0 22px rgba(109,219,142,0.25);
+}
+.ffu-unlock-btn:disabled { opacity:0.5;cursor:not-allowed;box-shadow:none; }
 .ffu-later-btn {
   width:100%;padding:9px;background:transparent;border:none;
   color:var(--text3);font-size:12px;cursor:pointer;transition:color 0.2s;
@@ -6424,15 +6429,6 @@ function completeFadeStep(i) {
   if (i === plan.length - 1) {
     const wrapMsg = addAIMessage(`<p>That's your full fade — built around your taper. Take a final look in the mirror from both sides. If anything needs a touch-up, let me know and we'll fix it together.</p>`, null);
     scrollToMsg(wrapMsg);
-
-    // Optional C-cup step
-    const ccMsg = addAIMessage(`<div class="save-fade-card" style="margin:0;">
-      <div class="save-fade-title">Optional Finishing Step</div>
-      <div style="font-size:18px;font-weight:800;color:var(--text);margin:4px 0 6px;">Shape Your C-Cup</div>
-      <div class="save-fade-sub" style="margin-bottom:14px;">Generate a lineup guide around the ear for a cleaner finish.</div>
-      <button class="save-fade-btn" onclick="showCCupGuide(this)">Generate C-Cup Guide →</button>
-    </div>`, null);
-    scrollToMsg(ccMsg);
 
     addFadePlanWrapUp();
     return;
