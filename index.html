@@ -237,7 +237,7 @@ async function detectEarFromPhoto(imgEl) {
     if (!_db) return false;
     const snap = await getDoc(doc(_db, 'users', uid));
     if (!snap.exists()) {
-      await setDoc(doc(_db, 'users', uid), { credits: 0, freeGuideUsed: false, displayName, email, createdAt: Date.now() });
+      await setDoc(doc(_db, 'users', uid), { credits: 0, freeGuideUsed: false, freeGuideStartedAt: null, freeGuideExpiresAt: null, displayName, email, createdAt: Date.now() });
       return true;
     }
     return false;
@@ -263,6 +263,15 @@ async function detectEarFromPhoto(imgEl) {
     if (!_db) return null;
     const snap = await getDoc(doc(_db, 'users', uid));
     return snap.exists() ? (snap.data().promoAccess || null) : null;
+  };
+
+  // Free guide status — reads freeGuideUsed + freeGuideExpiresAt from Firestore
+  window._fbGetFreeGuideStatus = async (uid) => {
+    if (!_db) return null;
+    const snap = await getDoc(doc(_db, 'users', uid));
+    if (!snap.exists()) return null;
+    const d = snap.data();
+    return { freeGuideUsed: d.freeGuideUsed, freeGuideExpiresAt: d.freeGuideExpiresAt ?? null };
   };
 
   // Auth state listener
@@ -803,6 +812,15 @@ body {
   max-width: 430px;
   width: 100%;
   margin-bottom: 28px;
+}
+.lp-free-cta {
+  font-size: 13px;
+  color: rgba(232,213,163,0.8);
+  font-weight: 500;
+  margin: -16px 0 18px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .lp-cta {
   display: inline-flex; align-items: center; gap: 10px;
@@ -2444,6 +2462,15 @@ body {
       </div>
     </div>
 
+    <!-- Free guide banner (hidden when not applicable) -->
+    <div class="promo-active-badge" id="sidebarFreeGuideBadge">
+      <div class="promo-dot"></div>
+      <div>
+        <div class="promo-badge-text">Free Guide</div>
+        <div class="promo-badge-sub" id="sidebarFreeGuideExpiry">—</div>
+      </div>
+    </div>
+
     <!-- Credits row (hidden while promo is active) -->
     <div class="sidebar-credits-row" id="sidebarCreditsRow">
       <div>
@@ -2540,6 +2567,7 @@ body {
         <p id="authGreeting" style="font-size:13.5px;font-weight:600;color:rgba(232,213,163,0.70);margin-bottom:6px;min-height:0;"></p>
         <h1 class="lp-h1">Stop Paying $50 For A Cleanup</h1>
         <p class="lp-sub">Upload a picture. Shape your taper. Follow the fade.</p>
+        <p id="heroFreeGuideCta" class="lp-free-cta" style="display:none;">Make a free account and get your first guide free.</p>
         <div class="lp-upload-row">
           <button class="lp-upload-btn" onclick="triggerUpload()">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -4880,22 +4908,51 @@ function _updateCreditDisplay() {
 
   const promoActive = _isPromoActive();
 
+  const fgExp     = window._freeGuideExpiresAt;
+  const fgActive  = fgExp && fgExp !== 'available' && fgExp > Date.now();
+  const fgAvail   = fgExp === 'available';
+
+  // Sidebar free guide badge (separate from promo badge)
+  const fgBadge   = document.getElementById('sidebarFreeGuideBadge');
+  const fgExpiry  = document.getElementById('sidebarFreeGuideExpiry');
+
   if (promoActive) {
     // Topbar: green promo badge
     if (badge)   { badge.classList.add('visible', 'promo'); badge.classList.remove('low', 'empty'); }
     if (countEl) countEl.textContent = 'Free Access';
-    // Sidebar: show promo banner, hide credits row, hide redeem input
+    // Sidebar
     if (promoBadge) promoBadge.classList.add('visible');
+    if (fgBadge)    fgBadge.classList.remove('visible');
     if (creditsRow) creditsRow.style.display = 'none';
     if (redeemSec)  redeemSec.style.display  = 'none';
     if (promoExpiry) {
       const remaining = _promoTimeRemaining(window._promoAccess.expiresAt);
       promoExpiry.textContent = remaining ? `Expires in ${remaining}` : 'Expiring soon';
     }
+  } else if (fgActive) {
+    // Free guide session in progress
+    if (badge)   { badge.classList.add('visible', 'promo'); badge.classList.remove('low', 'empty'); }
+    const mins = Math.ceil((fgExp - Date.now()) / 60000);
+    if (countEl) countEl.textContent = `Free Guide — ${mins}m`;
+    if (promoBadge) promoBadge.classList.remove('visible');
+    if (fgBadge)    fgBadge.classList.add('visible');
+    if (creditsRow) creditsRow.style.display = 'none';
+    if (redeemSec)  redeemSec.style.display  = '';
+    if (fgExpiry) fgExpiry.textContent = `${mins} minute${mins === 1 ? '' : 's'} remaining`;
+  } else if (fgAvail) {
+    // Free guide not yet started
+    if (badge)   { badge.classList.add('visible', 'promo'); badge.classList.remove('low', 'empty'); }
+    if (countEl) countEl.textContent = 'Free Guide';
+    if (promoBadge) promoBadge.classList.remove('visible');
+    if (fgBadge)    fgBadge.classList.add('visible');
+    if (creditsRow) creditsRow.style.display = 'none';
+    if (redeemSec)  redeemSec.style.display  = '';
+    if (fgExpiry) fgExpiry.textContent = 'Tap to start your free guided haircut';
   } else {
     // Normal credit display
     const credits = window._userCredits;
     if (promoBadge) promoBadge.classList.remove('visible');
+    if (fgBadge)    fgBadge.classList.remove('visible');
     if (creditsRow) creditsRow.style.display = '';
     if (redeemSec)  redeemSec.style.display  = '';
 
@@ -5018,14 +5075,21 @@ async function _checkCreditsAndGenerate(callback) {
     const data = await res.json();
 
     if (data.usedFreeGuide) {
-      // First ever guide — let them through, then show a note after
-      window._userCredits = data.credits ?? 0;
+      // Session just started — 1-hour window now open
+      window._userCredits        = data.credits ?? 0;
+      window._freeGuideExpiresAt = data.freeGuideExpiresAt ?? null;
+      _updateCreditDisplay();
+      _startFreeGuideTicker();
+      callback();
+      return;
+    }
+
+    if (data.freeGuideActive) {
+      // Still within the free guide session window
+      window._userCredits        = data.credits ?? 0;
+      window._freeGuideExpiresAt = data.freeGuideExpiresAt ?? null;
       _updateCreditDisplay();
       callback();
-      // Show a gentle "free guide used" message in chat after the guide starts
-      setTimeout(() => {
-        addAIMessage('<p style="font-size:12px;color:var(--text3);">This was your free guide. When you\'re ready for your next cut, grab some credits from the menu — they never expire.</p>', null);
-      }, 3000);
       return;
     }
 
@@ -5135,6 +5199,22 @@ function _startPromoTicker() {
     if (!_isPromoActive()) {
       clearInterval(_promoTickerInterval);
       window._promoAccess = null;
+      _updateCreditDisplay();
+      return;
+    }
+    _updateCreditDisplay();
+  }, 60000);
+}
+
+let _freeGuideTickerInterval = null;
+function _startFreeGuideTicker() {
+  clearInterval(_freeGuideTickerInterval);
+  const fgExp = window._freeGuideExpiresAt;
+  if (!fgExp || fgExp === 'available' || fgExp <= Date.now()) return;
+  _freeGuideTickerInterval = setInterval(() => {
+    if (!window._freeGuideExpiresAt || window._freeGuideExpiresAt <= Date.now()) {
+      clearInterval(_freeGuideTickerInterval);
+      window._freeGuideExpiresAt = null;
       _updateCreditDisplay();
       return;
     }
@@ -6659,9 +6739,10 @@ document.getElementById('taperExampleModal')?.addEventListener('click', e => {
 let _authMode = 'signin'; // 'signin' | 'signup'
 let _authPendingAction = null; // callback to run after login
 
-window._currentUser  = null;
-window._userCredits  = null; // null = not yet loaded
-window._promoAccess  = null; // { code, redeemedAt, expiresAt } or null
+window._currentUser       = null;
+window._userCredits       = null; // null = not yet loaded
+window._promoAccess       = null; // { code, redeemedAt, expiresAt } or null
+window._freeGuideExpiresAt = null; // null | 'available' | timestamp (ms)
 window._onAuthChange = (user) => {
   window._currentUser = user;
   const btn   = document.getElementById('authTopbarBtn');
@@ -6675,6 +6756,8 @@ window._onAuthChange = (user) => {
     if (greetEl && firstName) greetEl.textContent = `Welcome back, ${firstName}`;
     _sidebarUser = { name: user.displayName, email: user.email, photoURL: user.photoURL, uid: user.uid };
     _renderSidebarAuth();
+    const heroCta = document.getElementById('heroFreeGuideCta');
+    if (heroCta) heroCta.style.display = 'none';
     showPersonalizedGreeting(user);
     if (window._fbGetFade) {
       window._fbGetFade(user.uid).then(fade => {
@@ -6684,31 +6767,50 @@ window._onAuthChange = (user) => {
         }
       }).catch(() => {});
     }
-    // Load credit balance and promo access in parallel
+    // Load credit balance, promo access, and free guide status in parallel
     Promise.all([
-      window._fbGetCredits ? window._fbGetCredits(user.uid).catch(() => 0) : Promise.resolve(0),
-      window._fbGetPromoAccess ? window._fbGetPromoAccess(user.uid).catch(() => null) : Promise.resolve(null),
-    ]).then(([credits, promo]) => {
+      window._fbGetCredits        ? window._fbGetCredits(user.uid).catch(() => 0)        : Promise.resolve(0),
+      window._fbGetPromoAccess    ? window._fbGetPromoAccess(user.uid).catch(() => null)  : Promise.resolve(null),
+      window._fbGetFreeGuideStatus? window._fbGetFreeGuideStatus(user.uid).catch(() => null): Promise.resolve(null),
+    ]).then(([credits, promo, fgStatus]) => {
       window._userCredits = credits;
       window._promoAccess = promo;
+      if (fgStatus !== null) {
+        if (fgStatus.freeGuideUsed === false) {
+          window._freeGuideExpiresAt = 'available';
+        } else if (fgStatus.freeGuideUsed === true && fgStatus.freeGuideExpiresAt > Date.now()) {
+          window._freeGuideExpiresAt = fgStatus.freeGuideExpiresAt;
+        } else {
+          window._freeGuideExpiresAt = null;
+        }
+      }
       _updateCreditDisplay();
       if (typeof _startPromoTicker === 'function') _startPromoTicker();
+      _startFreeGuideTicker();
     });
   } else {
     if (label) label.textContent = 'Log In';
     btn.classList.remove('signed-in');
     const greetEl = document.getElementById('authGreeting');
     if (greetEl) greetEl.textContent = '';
-    window._userCredits = null;
-    window._promoAccess = null;
+    window._userCredits        = null;
+    window._promoAccess        = null;
+    window._freeGuideExpiresAt = null;
     _updateCreditDisplay();
+    const heroCta = document.getElementById('heroFreeGuideCta');
+    if (heroCta) { heroCta.style.display = ''; heroCta.onclick = () => openAuthModal(null); }
   }
 };
 
 function openAuthModal(pendingAction) {
   _authPendingAction = pendingAction || null;
-  _authMode = 'signin';
+  _authMode = 'signup';
   _applyAuthMode();
+  // When triggered mid-flow (e.g. guide generation), update subtitle to mention free guide
+  if (pendingAction) {
+    const subEl = document.getElementById('authSub');
+    if (subEl) subEl.textContent = 'Create a free account and get your first guide free.';
+  }
   document.getElementById('authOverlay').classList.add('open');
   setTimeout(() => document.getElementById('authEmail')?.focus(), 350);
 }
@@ -6749,7 +6851,8 @@ async function _afterAuth(user) {
   if (window._fbInitUser) {
     const isNew = await window._fbInitUser(user.uid, user.displayName, user.email).catch(() => false);
     if (isNew) {
-      window._userCredits = 1;
+      window._userCredits = 0;
+      window._freeGuideExpiresAt = 'available';
       _updateCreditDisplay();
     }
   }
