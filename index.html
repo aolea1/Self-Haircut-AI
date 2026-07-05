@@ -2869,12 +2869,20 @@ async function sendMessage() {
     });
     removeTyping();
     if (res.ok) {
-      const data = await res.json();
-      const reply = data.reply || "I didn't catch that — try rephrasing?";
+      const raw = await res.json();
+      // Backend returns { reply, options } — options may be null or an array
+      let reply = '', options = null;
+      if (raw.reply) {
+        reply = raw.reply;
+        options = Array.isArray(raw.options) && raw.options.length ? raw.options : null;
+      } else {
+        // Fallback: backend returned plain text or unexpected shape
+        reply = raw.toString();
+      }
       _chatHistory.push({ role: 'user', content: text });
       _chatHistory.push({ role: 'assistant', content: reply });
       if (_chatHistory.length > 20) _chatHistory = _chatHistory.slice(-20);
-      addAIMessage(`<p>${reply.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')}</p>`, null);
+      addAIMessage(`<p>${reply.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')}</p>`, options);
     } else {
       addAIMessage('<p>I\'m having trouble connecting right now. Ask me anything about haircuts and I\'ll do my best to help.</p>', null);
     }
