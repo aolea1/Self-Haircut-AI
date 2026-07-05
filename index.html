@@ -668,6 +668,45 @@ body {
 .attach-btn.camera-desktop-btn { display:inline-flex; }
 @media (pointer:coarse) { .attach-btn.camera-desktop-btn { display:none; } }
 
+/* ── MOBILE COLLAPSED INPUT BAR ── */
+.input-collapsed-bar {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  cursor: text;
+}
+.input-collapsed-text {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text3);
+  font-family: 'DM Sans', sans-serif;
+  user-select: none;
+}
+.input-collapsed-icon {
+  width: 30px; height: 30px; border-radius: 8px;
+  background: var(--accent); display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; opacity: 0.5;
+}
+.input-collapsed-icon svg { width: 13px; height: 13px; stroke: #0d0d0d; }
+
+@media (max-width: 767px) {
+  .input-dock {
+    transition: padding 0.18s ease;
+  }
+  .input-dock.collapsed {
+    padding: 6px 16px calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+  .input-dock.collapsed .input-wrap {
+    border-radius: 24px;
+  }
+  .input-dock.collapsed .input-main    { display: none; }
+  .input-dock.collapsed .input-actions { display: none; }
+  .input-dock.collapsed .input-hint    { display: none; }
+  .input-dock.collapsed .upload-preview { display: none; }
+  .input-dock.collapsed .input-collapsed-bar { display: flex; }
+}
+
 /* ── CAMERA CAPTURE MODAL ── */
 #arModal {
   position: fixed; inset: 0; z-index: 9999;
@@ -2723,6 +2762,15 @@ body {
 
   <div class="input-dock">
     <div class="input-wrap">
+      <!-- Compact bar shown on mobile when collapsed -->
+      <div class="input-collapsed-bar" id="inputCollapsedBar" onclick="_expandInput(true)">
+        <span class="input-collapsed-text">Need help? Tap to ask…</span>
+        <div class="input-collapsed-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round">
+            <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+          </svg>
+        </div>
+      </div>
       <div class="upload-preview" id="uploadPreview"></div>
       <div class="input-main">
         <textarea class="chat-textarea" id="chatInput"
@@ -2783,6 +2831,65 @@ if (inputDock && chatArea) {
 let started = false;
 let pendingFiles = [];
 let _chatHistory = []; // rolling window for /chat context
+
+// ── MOBILE COLLAPSIBLE INPUT ──────────────────────────────────────────────────
+(function() {
+  const dock = document.querySelector('.input-dock');
+  if (!dock) return;
+
+  let collapsed    = false;
+  let keyboardOpen = false;
+  let collapseTimer = null;
+  let maxVH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+
+  const isMobileWidth = () => window.innerWidth <= 767;
+
+  // Track keyboard via visualViewport shrinkage
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+      const h = window.visualViewport.height;
+      maxVH = Math.max(maxVH, h);
+      const wasOpen = keyboardOpen;
+      keyboardOpen = (maxVH - h) > 150;
+      if (keyboardOpen && !wasOpen) _expandInput(false); // keyboard opened → expand, no focus
+    }, { passive: true });
+  }
+
+  window._expandInput = function(focusInput) {
+    clearTimeout(collapseTimer);
+    if (!collapsed && focusInput) { chatInput?.focus(); return; }
+    collapsed = false;
+    dock.classList.remove('collapsed');
+    if (focusInput) setTimeout(() => chatInput?.focus(), 50);
+  };
+
+  function _collapse() {
+    if (!isMobileWidth()) return;
+    if (keyboardOpen) return;
+    if (chatInput?.value.trim()) return;
+    if (pendingFiles.length > 0) return;
+    if (document.activeElement === chatInput) return;
+    collapsed = true;
+    dock.classList.add('collapsed');
+  }
+
+  function scheduleCollapse() {
+    if (!isMobileWidth() || collapsed) return;
+    clearTimeout(collapseTimer);
+    collapseTimer = setTimeout(_collapse, 350);
+  }
+
+  // Collapse on chat scroll
+  chatArea?.addEventListener('scroll', scheduleCollapse, { passive: true });
+
+  // Never collapse while user is typing or focused
+  chatInput?.addEventListener('focus', () => _expandInput(false));
+  chatInput?.addEventListener('input', () => { _expandInput(false); });
+  chatInput?.addEventListener('blur',  () => { setTimeout(scheduleCollapse, 500); });
+
+  // Expand on window resize away from mobile
+  window.addEventListener('resize', () => { if (!isMobileWidth()) { collapsed = false; dock.classList.remove('collapsed'); } }, { passive: true });
+})();
 let _aiPreviewEnabled = false; // set true after /health confirms openai: true
 let userScrolledUp = false;
 
