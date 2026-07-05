@@ -6561,8 +6561,6 @@ function addFadePlanWrapUp() {
     <button class="opt-btn" onclick="copyGuideSteps(this,'${style}')" style="flex:1;min-width:100px;">📋 Copy steps</button>
   </div>`;
 
-  _showGradeFadeCard();
-
   addAIMessage(`<div class="steps-panel">
     ${_buildFadeScoreCardHtml()}
     <div class="steps-title">Your guard reference</div>
@@ -6571,38 +6569,12 @@ function addFadePlanWrapUp() {
     <div style="display:flex;flex-direction:column;gap:6px;">${toolsHtml}</div>
     ${shareBtn}
   </div>`, null);
-  // 8. How's it going check-in after 60s
   setTimeout(() => {
     if (state.phase === 'guide-shown') {
       addAIMessage("<p>How's it looking? If anything needs work — a line, a blend, an edge — tell me and we'll sort it out.</p>", null);
       scrollBottom();
     }
   }, 60000);
-
-  // Feedback card + Save My Best Fade (only for logged-in users)
-  {
-    const saveFadeHtml = window._currentUser ? `
-    <div class="save-fade-card" style="margin-top:10px;">
-      <div class="save-fade-title">💈 Save My Best Fade</div>
-      <div class="save-fade-sub">Come back anytime and recreate this exact fade.</div>
-      <button class="save-fade-btn" onclick="saveBestFade(this)">Save This Fade</button>
-    </div>` : `
-    <div style="margin-top:12px;text-align:center;">
-      <button class="save-fade-btn" style="font-size:13px;padding:11px;" onclick="openAuthModal(()=>{})">
-        Create a free account to save this fade →
-      </button>
-    </div>`;
-
-    const fbMsg = addAIMessage(`<div class="feedback-card">
-      <div class="feedback-title">How did your taper come out?</div>
-      <div class="feedback-btns">
-        <button class="feedback-btn" onclick="submitFeedback(this,'great')" title="Great">👍</button>
-        <button class="feedback-btn" onclick="submitFeedback(this,'okay')" title="Okay">😐</button>
-        <button class="feedback-btn" onclick="submitFeedback(this,'needs-work')" title="Needs Work">👎</button>
-      </div>
-    </div>${saveFadeHtml}`, null);
-    scrollToMsg(fbMsg);
-  }
 }
 
 
