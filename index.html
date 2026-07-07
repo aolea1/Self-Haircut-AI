@@ -634,20 +634,21 @@ body {
 .input-wrap:focus-within { border-color: rgba(232,213,163,0.35); }
 
 .input-main {
-  display: flex; align-items: flex-end; gap: 8px;
-  padding: 10px 12px 8px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px;
 }
 
 .chat-textarea {
   flex: 1; background: none; border: none; outline: none;
   color: var(--text); font-family: 'DM Sans', sans-serif;
-  font-size: 14px; line-height: 1.5; resize: none;
-  min-height: 24px; max-height: 100px; overflow-y: auto;
+  font-size: 14px; line-height: 1.45; resize: none;
+  min-height: 22px; max-height: 100px; overflow-y: auto;
+  padding: 0; margin: 0;
 }
 .chat-textarea::placeholder { color: var(--text3); }
 
 .send-btn {
-  width: 34px; height: 34px; border-radius: 9px;
+  width: 30px; height: 30px; border-radius: 8px;
   border: none; background: var(--accent); cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: background 0.15s; flex-shrink: 0;
@@ -657,11 +658,11 @@ body {
 .usage-bar { text-align:center; font-size:11px; color:var(--text3); padding:2px 0 0; }
 .usage-bar span { color:var(--accent2); font-weight:600; cursor:pointer; }
 .usage-bar span:hover { text-decoration:underline; }
-.send-btn svg { width: 15px; height: 15px; stroke: #0d0d0d; }
+.send-btn svg { width: 14px; height: 14px; stroke: #0d0d0d; }
 
 .input-actions {
   display: flex; align-items: center; gap: 6px;
-  padding: 6px 12px 8px; border-top: 1px solid var(--border);
+  padding: 0 10px 8px; border-top: none;
 }
 
 .attach-btn.camera-btn { display:none; }
@@ -708,6 +709,8 @@ body {
   .input-wrap {
     transition: border-radius 0.2s ease;
   }
+
+  .send-hint { display: none; }
 
   /* Collapsed state */
   .input-dock.collapsed {
@@ -768,14 +771,15 @@ body {
 
 @media (pointer:coarse) { .attach-btn.camera-btn { display:inline-flex; } }
 .attach-btn {
-  display: flex; align-items: center; gap: 6px;
-  padding: 5px 10px; border-radius: 7px;
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 9px; border-radius: 7px;
   border: 1px solid var(--border2); background: none;
   color: var(--text2); font-family: 'DM Sans', sans-serif;
   font-size: 12px; cursor: pointer; transition: background 0.12s;
+  white-space: nowrap;
 }
 .attach-btn:hover { background: var(--surface2); color: var(--text); }
-.attach-btn svg { width: 13px; height: 13px; }
+.attach-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
 
 .upload-preview {
   display: none; padding: 8px 12px 4px; gap: 10px;
@@ -2810,7 +2814,7 @@ body {
           Take side profile
         </button>
         <span style="flex:1"></span>
-        <span style="font-size:11px;color:var(--text3);">↵ send</span>
+        <span class="send-hint" style="font-size:11px;color:var(--text3);">↵ send</span>
       </div>
       </div><!-- /inputExpandable -->
     </div>
