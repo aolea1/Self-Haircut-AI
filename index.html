@@ -2252,6 +2252,23 @@ body {
   color:rgba(80,220,130,0.95);
   background:rgba(80,220,130,0.08);
 }
+/* Topbar owner state */
+.credit-badge.owner {
+  border-color:rgba(232,213,163,0.5);
+  color:rgba(232,213,163,0.95);
+  background:rgba(232,213,163,0.08);
+  cursor:default; pointer-events:none;
+}
+/* Sidebar owner badge */
+.owner-active-badge {
+  display:none; align-items:flex-start; gap:10px;
+  padding:10px 12px; border-radius:10px; margin-bottom:10px;
+  background:rgba(232,213,163,0.06); border:1px solid rgba(232,213,163,0.2);
+}
+.owner-active-badge.visible { display:flex; }
+.owner-badge-icon { font-size:16px; line-height:1; padding-top:1px; }
+.owner-badge-text { font-size:12px; font-weight:700; color:rgba(232,213,163,0.9); line-height:1.4; }
+.owner-badge-sub  { font-size:11px; color:rgba(232,213,163,0.5); font-weight:400; margin-top:1px; }
 /* ── SAVE MY BEST FADE ── */
 .save-fade-card {
   margin-top: 14px; padding: 16px 18px;
@@ -2595,6 +2612,15 @@ body {
       <div>
         <div class="promo-badge-text">Free Access Active</div>
         <div class="promo-badge-sub" id="sidebarPromoExpiry">—</div>
+      </div>
+    </div>
+
+    <!-- Owner badge (shown only when backend returns isOwner:true) -->
+    <div class="owner-active-badge" id="sidebarOwnerBadge">
+      <div class="owner-badge-icon">★</div>
+      <div>
+        <div class="owner-badge-text">Owner</div>
+        <div class="owner-badge-sub">Unlimited access</div>
       </div>
     </div>
 
@@ -5101,7 +5127,20 @@ function _updateCreditDisplay() {
   const redeemSec    = document.getElementById('redeemSection');
 
   if (!window._currentUser) {
-    if (badge) badge.classList.remove('visible', 'low', 'empty', 'promo');
+    if (badge) badge.classList.remove('visible', 'low', 'empty', 'promo', 'owner');
+    return;
+  }
+
+  // Owner — show permanent "Unlimited" badge, skip all other logic
+  if (window._isOwner) {
+    if (badge)   { badge.classList.add('visible', 'owner'); badge.classList.remove('low', 'empty', 'promo'); }
+    if (countEl) countEl.textContent = 'Unlimited';
+    const ownerBadge = document.getElementById('sidebarOwnerBadge');
+    if (ownerBadge)  ownerBadge.classList.add('visible');
+    if (promoBadge)  promoBadge.classList.remove('visible');
+    if (fgBadge)     fgBadge.classList.remove('visible');
+    if (creditsRow)  creditsRow.style.display = 'none';
+    if (redeemSec)   redeemSec.style.display  = 'none';
     return;
   }
 
@@ -5272,6 +5311,14 @@ async function _checkCreditsAndGenerate(callback) {
     }
 
     const data = await res.json();
+
+    if (data.isOwner) {
+      window._isOwner     = true;
+      window._userCredits = null;
+      _updateCreditDisplay();
+      callback();
+      return;
+    }
 
     if (data.usedFreeGuide) {
       // Session just started — 1-hour window now open
@@ -6872,7 +6919,10 @@ async function _unlockFadeFinish(btn) {
     }
 
     const data = await res.json();
-    if (typeof data.credits === 'number') {
+    if (data.isOwner) {
+      window._isOwner = true;
+      _updateCreditDisplay();
+    } else if (typeof data.credits === 'number') {
       window._userCredits = data.credits;
       _updateCreditDisplay();
     }
@@ -7223,9 +7273,10 @@ document.getElementById('taperExampleModal')?.addEventListener('click', e => {
 let _authMode = 'signin'; // 'signin' | 'signup'
 let _authPendingAction = null; // callback to run after login
 
-window._currentUser       = null;
-window._userCredits       = null; // null = not yet loaded
-window._promoAccess       = null; // { code, redeemedAt, expiresAt } or null
+window._currentUser        = null;
+window._userCredits        = null; // null = not yet loaded; null also used for owner (unlimited)
+window._isOwner            = false;
+window._promoAccess        = null; // { code, redeemedAt, expiresAt } or null
 window._freeGuideExpiresAt = null; // null | 'available' | timestamp (ms)
 window._onAuthChange = (user) => {
   window._currentUser = user;
@@ -7251,12 +7302,24 @@ window._onAuthChange = (user) => {
         }
       }).catch(() => {});
     }
+    // Check owner status from backend (non-blocking, runs in parallel)
+    user.getIdToken().then(token =>
+      fetch(BACKEND_URL + '/me', { headers: { 'Authorization': 'Bearer ' + token } })
+    ).then(r => r.ok ? r.json() : null).then(me => {
+      if (me?.isOwner) {
+        window._isOwner     = true;
+        window._userCredits = null;
+        _updateCreditDisplay();
+      }
+    }).catch(() => {});
+
     // Load credit balance, promo access, and free guide status in parallel
     Promise.all([
       window._fbGetCredits        ? window._fbGetCredits(user.uid).catch(() => 0)        : Promise.resolve(0),
       window._fbGetPromoAccess    ? window._fbGetPromoAccess(user.uid).catch(() => null)  : Promise.resolve(null),
       window._fbGetFreeGuideStatus? window._fbGetFreeGuideStatus(user.uid).catch(() => null): Promise.resolve(null),
     ]).then(([credits, promo, fgStatus]) => {
+      if (window._isOwner) return; // owner display already set
       window._userCredits = credits;
       window._promoAccess = promo;
       if (fgStatus !== null) {
@@ -7278,6 +7341,7 @@ window._onAuthChange = (user) => {
     const greetEl = document.getElementById('authGreeting');
     if (greetEl) greetEl.textContent = '';
     window._userCredits        = null;
+    window._isOwner            = false;
     window._promoAccess        = null;
     window._freeGuideExpiresAt = null;
     _updateCreditDisplay();
@@ -8639,6 +8703,7 @@ function sidebarSignInGoogle() {
 function sidebarSignOut() {
   _sidebarUser = null;
   window._userCredits = null;
+  window._isOwner     = false;
   _updateCreditDisplay();
   if (window._fbSignOut) window._fbSignOut().catch(() => {});
   window._currentUser = null;
