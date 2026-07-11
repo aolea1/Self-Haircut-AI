@@ -2604,6 +2604,7 @@ body {
       <div class="sidebar-avatar" id="sidebarAvatar">?</div>
       <div class="sidebar-username" id="sidebarUsername">—</div>
       <button class="sidebar-signout" onclick="sidebarSignOut()">Sign out</button>
+      <a id="founderDashboardLink" href="/dashboard.html" style="display:none;margin-top:8px;font-size:11px;color:var(--text3);text-decoration:none;text-align:center;transition:color .12s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text3)'">★ Founder Dashboard</a>
     </div>
 
     <!-- Promo active banner (hidden when no active promo) -->
@@ -5167,6 +5168,8 @@ function _updateCreditDisplay() {
     if (countEl) countEl.textContent = 'Unlimited';
     const ownerBadge = document.getElementById('sidebarOwnerBadge');
     if (ownerBadge)  ownerBadge.classList.add('visible');
+    const dashLink = document.getElementById('founderDashboardLink');
+    if (dashLink) dashLink.style.display = 'block';
     if (promoBadge)  promoBadge.classList.remove('visible');
     if (fgBadge)     fgBadge.classList.remove('visible');
     if (creditsRow)  creditsRow.style.display = 'none';
