@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Founder Dashboard · SelfHaircut.ai</title>
+<style>
+:root {
+  --bg:      #0d0d0d;
+  --surface: #161616;
+  --surface2:#1e1e1e;
+  --border:  #232323;
+  --border2: #2a2a2a;
+  --text:    #f0ead6;
+  --text2:   #a8a090;
+  --text3:   #5a5450;
+  --accent:  #d4a853;
+  --accent2: #e8c46a;
+  --green:   #6ddb8e;
+  --red:     #ff6b6b;
+  --blue:    #6ab0ff;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'DM Sans',system-ui,sans-serif; font-size:14px; min-height:100vh; }
+
+/* ── LOADING ── */
+#loadingScreen {
+  position:fixed; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:14px; background:var(--bg); z-index:999;
+}
+#loadingScreen .logo { font-size:20px; font-weight:700; letter-spacing:-.5px; }
+#loadingScreen .logo span { color:var(--accent); }
+#loadingScreen .spin {
+  width:28px; height:28px; border:2px solid var(--border2);
+  border-top-color:var(--accent); border-radius:50%;
+  animation:spin .7s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ── TOPBAR ── */
+#topbar {
+  position:sticky; top:0; z-index:100;
+  background:rgba(13,13,13,.95); backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:10px;
+  padding:0 16px; height:52px;
+}
+.topbar-logo { font-size:15px; font-weight:700; letter-spacing:-.4px; white-space:nowrap; }
+.topbar-logo span { color:var(--accent); }
+.topbar-badge {
+  font-size:10px; font-weight:700; letter-spacing:.5px;
+  padding:2px 7px; border-radius:4px; border:1px solid rgba(212,168,83,.35);
+  color:rgba(212,168,83,.8); text-transform:uppercase;
+}
+.topbar-spacer { flex:1; }
+.range-select {
+  background:var(--surface2); border:1px solid var(--border2); color:var(--text2);
+  padding:5px 10px; border-radius:7px; font-size:12px; font-family:inherit; cursor:pointer;
+}
+.range-select:focus { outline:1px solid var(--accent); }
+#refreshBtn {
+  background:none; border:1px solid var(--border2); color:var(--text3);
+  padding:5px 10px; border-radius:7px; cursor:pointer; font-size:14px;
+  transition:color .12s;
+}
+#refreshBtn:hover { color:var(--text); }
+#signOutBtn {
+  background:none; border:1px solid var(--border2); color:var(--text3);
+  padding:5px 10px; border-radius:7px; cursor:pointer; font-size:12px; font-family:inherit;
+  transition:color .12s;
+}
+#signOutBtn:hover { color:var(--red); }
+
+/* ── TABS ── */
+#tabBar {
+  display:flex; overflow-x:auto; scrollbar-width:none;
+  border-bottom:1px solid var(--border);
+  background:var(--bg); padding:0 12px;
+}
+#tabBar::-webkit-scrollbar { display:none; }
+.tab {
+  flex-shrink:0; padding:11px 14px; font-size:13px; color:var(--text3);
+  border-bottom:2px solid transparent; cursor:pointer; transition:color .12s;
+  white-space:nowrap; background:none; border-top:none; border-left:none; border-right:none;
+  font-family:inherit;
+}
+.tab:hover { color:var(--text2); }
+.tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+/* ── CONTENT ── */
+#content { padding:20px 16px; max-width:1100px; margin:0 auto; }
+
+/* ── SECTION LABEL ── */
+.section-label {
+  font-size:11px; font-weight:700; letter-spacing:.8px;
+  color:var(--text3); text-transform:uppercase; margin-bottom:12px; margin-top:24px;
+}
+.section-label:first-child { margin-top:0; }
+
+/* ── STAT GRID ── */
+.stat-grid {
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px;
+}
+.stat-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  padding:14px 16px;
+}
+.stat-label { font-size:11px; color:var(--text3); margin-bottom:5px; }
+.stat-value { font-size:22px; font-weight:700; letter-spacing:-.5px; }
+.stat-value.green { color:var(--green); }
+.stat-value.red   { color:var(--red); }
+.stat-value.gold  { color:var(--accent); }
+.stat-sub { font-size:11px; color:var(--text3); margin-top:3px; }
+
+/* ── TABLE ── */
+.table-wrap { overflow-x:auto; border-radius:12px; border:1px solid var(--border); }
+table { width:100%; border-collapse:collapse; }
+th {
+  text-align:left; padding:10px 14px;
+  font-size:11px; font-weight:700; letter-spacing:.5px; color:var(--text3);
+  text-transform:uppercase; border-bottom:1px solid var(--border);
+  background:var(--surface); white-space:nowrap;
+}
+td {
+  padding:10px 14px; border-bottom:1px solid var(--border);
+  font-size:13px; color:var(--text2); white-space:nowrap;
+}
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:var(--surface2); }
+.tag {
+  display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;
+}
+.tag.green { background:rgba(109,219,142,.12); color:var(--green); }
+.tag.red   { background:rgba(255,107,107,.12); color:var(--red); }
+.tag.gold  { background:rgba(212,168,83,.12);  color:var(--accent); }
+.tag.blue  { background:rgba(106,176,255,.12); color:var(--blue); }
+.tag.gray  { background:var(--surface2); color:var(--text3); }
+
+/* ── SEARCH ── */
+.search-row { display:flex; gap:8px; margin-bottom:14px; }
+.search-input {
+  flex:1; background:var(--surface); border:1px solid var(--border2);
+  color:var(--text); padding:9px 12px; border-radius:9px;
+  font-family:inherit; font-size:13px; outline:none;
+  transition:border-color .15s;
+}
+.search-input:focus { border-color:rgba(212,168,83,.4); }
+.btn {
+  padding:8px 16px; border-radius:9px; border:none; font-family:inherit;
+  font-size:13px; cursor:pointer; transition:background .12s; font-weight:600;
+}
+.btn-primary { background:var(--accent); color:#0d0d0d; }
+.btn-primary:hover { background:var(--accent2); }
+.btn-secondary { background:var(--surface2); color:var(--text2); border:1px solid var(--border2); }
+.btn-secondary:hover { color:var(--text); }
+.btn-danger { background:rgba(255,107,107,.15); color:var(--red); border:1px solid rgba(255,107,107,.25); }
+.btn-danger:hover { background:rgba(255,107,107,.25); }
+.btn-sm { padding:4px 10px; font-size:12px; }
+
+/* ── USER DETAIL DRAWER ── */
+#userDrawer {
+  position:fixed; inset:0; z-index:200; display:none;
+  background:rgba(0,0,0,.7); backdrop-filter:blur(4px);
+}
+#userDrawer.open { display:flex; align-items:flex-end; }
+@media(min-width:600px) { #userDrawer.open { align-items:center; justify-content:center; } }
+#drawerPanel {
+  background:var(--surface); border-top:1px solid var(--border2);
+  border-radius:20px 20px 0 0; width:100%; max-height:80vh; overflow-y:auto;
+  padding:20px;
+}
+@media(min-width:600px) {
+  #drawerPanel { border-radius:16px; width:520px; max-height:90vh; }
+}
+.drawer-header { display:flex; align-items:center; gap:10px; margin-bottom:18px; }
+.drawer-close { margin-left:auto; background:none; border:none; color:var(--text3); font-size:20px; cursor:pointer; }
+.drawer-field { margin-bottom:12px; }
+.drawer-field-label { font-size:11px; color:var(--text3); margin-bottom:3px; }
+.drawer-field-val { font-size:14px; color:var(--text); }
+.drawer-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; }
+.grant-row { display:flex; gap:8px; margin-top:10px; }
+.grant-input {
+  width:80px; background:var(--surface2); border:1px solid var(--border2);
+  color:var(--text); padding:7px 10px; border-radius:8px; font-family:inherit; font-size:13px; outline:none;
+}
+
+/* ── FUNNEL ── */
+.funnel-wrap { display:flex; flex-direction:column; gap:6px; }
+.funnel-row { display:flex; align-items:center; gap:10px; }
+.funnel-label { width:180px; font-size:12px; color:var(--text2); flex-shrink:0; }
+.funnel-bar-wrap { flex:1; background:var(--surface2); border-radius:4px; height:18px; overflow:hidden; }
+.funnel-bar { height:100%; background:var(--accent); opacity:.7; border-radius:4px; transition:width .4s ease; }
+.funnel-count { width:50px; text-align:right; font-size:12px; color:var(--text3); }
+.funnel-pct { width:40px; text-align:right; font-size:11px; color:var(--green); }
+
+/* ── FEEDBACK CARDS ── */
+.feedback-grid { display:flex; flex-direction:column; gap:10px; }
+.feedback-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  padding:14px 16px;
+}
+.feedback-top { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.feedback-msg { font-size:13px; color:var(--text); line-height:1.5; margin-bottom:10px; }
+.feedback-meta { font-size:11px; color:var(--text3); }
+.status-select {
+  background:var(--surface2); border:1px solid var(--border2); color:var(--text2);
+  padding:4px 8px; border-radius:6px; font-size:11px; font-family:inherit; cursor:pointer;
+}
+
+/* ── HEALTH ROUTE TABLE ── */
+.health-bar { background:var(--surface2); border-radius:3px; height:6px; overflow:hidden; margin-top:3px; }
+.health-bar-fill { height:100%; background:var(--green); border-radius:3px; }
+.health-bar-fill.warn { background:var(--accent); }
+.health-bar-fill.danger { background:var(--red); }
+
+/* ── EMPTY STATE ── */
+.empty-state {
+  text-align:center; padding:48px 20px; color:var(--text3); font-size:13px;
+}
+
+/* ── TOAST ── */
+#toast {
+  position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+  background:var(--surface2); border:1px solid var(--border2); border-radius:10px;
+  padding:10px 20px; font-size:13px; color:var(--text);
+  opacity:0; pointer-events:none; transition:opacity .2s;
+  z-index:999; white-space:nowrap;
+}
+#toast.show { opacity:1; }
+
+/* ── ERROR BOX ── */
+.error-box {
+  background:rgba(255,107,107,.08); border:1px solid rgba(255,107,107,.25);
+  border-radius:10px; padding:14px 16px; color:var(--red); font-size:13px;
+}
+
+/* ── SPINNER ── */
+.loading-row { display:flex; align-items:center; gap:10px; color:var(--text3); padding:20px 0; }
+.mini-spin { width:16px; height:16px; border:2px solid var(--border2); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; }
+
+@media(max-width:600px) {
+  .stat-grid { grid-template-columns:repeat(2,1fr); }
+  .funnel-label { width:130px; font-size:11px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loadingScreen">
+  <div class="logo">SelfHaircut<span>.ai</span></div>
+  <div class="spin"></div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Main (hidden until auth verified) -->
+<div id="app" style="display:none">
+
+  <!-- Topbar -->
+  <div id="topbar">
+    <div class="topbar-logo">SelfHaircut<span>.ai</span></div>
+    <div class="topbar-badge">Founder</div>
+    <div class="topbar-spacer"></div>
+    <select class="range-select" id="rangeSelect" onchange="onRangeChange()">
+      <option value="today">Today</option>
+      <option value="7d" selected>Last 7 days</option>
+      <option value="30d">Last 30 days</option>
+      <option value="year">This year</option>
+    </select>
+    <button id="refreshBtn" onclick="refreshCurrentTab()" title="Refresh">↺</button>
+    <button id="signOutBtn" onclick="doSignOut()">Sign out</button>
+  </div>
+
+  <!-- Tab bar -->
+  <div id="tabBar">
+    <button class="tab active" data-tab="overview"   onclick="switchTab('overview')">Overview</button>
+    <button class="tab"        data-tab="users"      onclick="switchTab('users')">Users</button>
+    <button class="tab"        data-tab="analytics"  onclick="switchTab('analytics')">Analytics</button>
+    <button class="tab"        data-tab="logs"       onclick="switchTab('logs')">Logs</button>
+    <button class="tab"        data-tab="feedback"   onclick="switchTab('feedback')">Feedback</button>
+    <button class="tab"        data-tab="health"     onclick="switchTab('health')">Health</button>
+  </div>
+
+  <!-- Content -->
+  <div id="content">
+    <div id="tab-overview"></div>
+    <div id="tab-users"    style="display:none"></div>
+    <div id="tab-analytics"style="display:none"></div>
+    <div id="tab-logs"     style="display:none"></div>
+    <div id="tab-feedback" style="display:none"></div>
+    <div id="tab-health"   style="display:none"></div>
+  </div>
+
+</div>
+
+<!-- User Detail Drawer -->
+<div id="userDrawer" onclick="if(event.target===this)closeDrawer()">
+  <div id="drawerPanel">
+    <div class="drawer-header">
+      <div style="font-size:15px;font-weight:700;">User Detail</div>
+      <button class="drawer-close" onclick="closeDrawer()">×</button>
+    </div>
+    <div id="drawerContent"><div class="loading-row"><div class="mini-spin"></div> Loading…</div></div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp }            from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
+const FB_CONFIG = {
+  apiKey:            'AIzaSyCVcwmzhSGQXNIL-QAZ0dwOzTkkr_7xdkI',
+  authDomain:        'selfhaircutai.firebaseapp.com',
+  projectId:         'selfhaircutai',
+  storageBucket:     'selfhaircutai.firebasestorage.app',
+  messagingSenderId: '547059800196',
+  appId:             '1:547059800196:web:681fc8070f3cc8374e0ad1',
+};
+const BACKEND = 'https://selfhaircut-backend.onrender.com';
+
+const _app  = initializeApp(FB_CONFIG);
+const _auth = getAuth(_app);
+
+let _token   = null;
+let _curTab  = 'overview';
+let _loaded  = {};
+let _range   = '7d';
+
+// ── AUTH CHECK ──────────────────────────────────────────────────────────────
+onAuthStateChanged(_auth, async user => {
+  if (!user) return redirect('Not signed in.');
+  try {
+    _token = await user.getIdToken();
+    const me = await apiFetch('/me');
+    if (!me.isOwner) return redirect('Access denied.');
+    document.getElementById('loadingScreen').style.display = 'none';
+    document.getElementById('app').style.display           = '';
+    loadTab('overview');
+  } catch(e) {
+    redirect('Error: ' + e.message);
+  }
+});
+
+function redirect(msg) {
+  document.getElementById('loadingScreen').innerHTML = `<div style="color:var(--red);font-size:14px;">${msg}</div><a href="/" style="color:var(--accent);margin-top:12px;font-size:13px;">← Back to app</a>`;
+}
+
+// ── API HELPER ───────────────────────────────────────────────────────────────
+async function apiFetch(path, opts = {}) {
+  if (!_token && _auth.currentUser) _token = await _auth.currentUser.getIdToken();
+  const res = await fetch(BACKEND + path, {
+    ...opts,
+    headers: { 'Authorization': 'Bearer ' + _token, 'Content-Type': 'application/json', ...(opts.headers||{}) },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  if (res.status === 401) { _token = await _auth.currentUser?.getIdToken(true); throw new Error('Re-auth required'); }
+  if (!res.ok) { const e = await res.json().catch(()=>{}); throw new Error(e?.error || `HTTP ${res.status}`); }
+  return res.json();
+}
+
+// ── TABS ─────────────────────────────────────────────────────────────────────
+window.switchTab = function(tab) {
+  _curTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('[id^="tab-"]').forEach(el => el.style.display = el.id === `tab-${tab}` ? '' : 'none');
+  if (!_loaded[tab]) loadTab(tab);
+};
+
+window.onRangeChange = function() {
+  _range  = document.getElementById('rangeSelect').value;
+  _loaded = {};
+  loadTab(_curTab);
+};
+
+window.refreshCurrentTab = function() {
+  delete _loaded[_curTab];
+  loadTab(_curTab);
+};
+
+function loadTab(tab) {
+  _loaded[tab] = true;
+  const fns = { overview: loadOverview, users: loadUsers, analytics: loadAnalytics, logs: loadLogs, feedback: loadFeedback, health: loadHealth };
+  fns[tab]?.();
+}
+
+function setHtml(tab, html) {
+  document.getElementById(`tab-${tab}`).innerHTML = html;
+}
+
+function loading(tab) {
+  setHtml(tab, `<div class="loading-row"><div class="mini-spin"></div> Loading…</div>`);
+}
+
+// ── OVERVIEW ─────────────────────────────────────────────────────────────────
+async function loadOverview() {
+  loading('overview');
+  try {
+    const d = await apiFetch(`/founder/stats?range=${_range}`);
+    const u = d.users, r = d.revenue, c = d.credits, f = d.failures, ev = d.events || {};
+    const revDollars = r.totalCents ? (r.totalCents / 100).toFixed(2) : '0.00';
+    setHtml('overview', `
+      <div class="section-label">Users</div>
+      <div class="stat-grid">
+        ${stat('Total Users', u.total)}
+        ${stat('New Today', u.newToday, '', 'green')}
+        ${stat('New This Week', u.newThisWeek)}
+        ${stat('New This Month', u.newThisMonth)}
+        ${stat('Free Users', u.free)}
+        ${stat('Paid (credits)', u.paid, '', 'gold')}
+        ${stat('Promo Active', u.promo)}
+        ${stat('Out of Credits', u.outOfCredits, '', u.outOfCredits > 0 ? 'red' : '')}
+      </div>
+
+      <div class="section-label">Revenue (${_range})</div>
+      <div class="stat-grid">
+        ${stat('Revenue', '$' + revDollars, '', 'gold')}
+        ${stat('Credits Purchased', r.creditsPurchased || 0)}
+        ${stat('Credit Balance (total)', c.balance)}
+      </div>
+
+      <div class="section-label">Activity (${_range})</div>
+      <div class="stat-grid">
+        ${stat('Guides Started', ev.guide_started || 0)}
+        ${stat('Photos Uploaded', ev.photo_uploaded || 0)}
+        ${stat('Guides Completed', ev.guide_completed || 0)}
+        ${stat('Paywall Views', ev.paywall_viewed || 0)}
+        ${stat('Checkout Started', ev.checkout_started || 0)}
+        ${stat('Analysis Failures', f.total, '', f.total > 0 ? 'red' : '')}
+      </div>
+    `);
+  } catch(e) {
+    setHtml('overview', `<div class="error-box">Failed to load stats: ${e.message}</div>`);
+  }
+}
+
+function stat(label, value, sub = '', color = '') {
+  return `<div class="stat-card">
+    <div class="stat-label">${label}</div>
+    <div class="stat-value ${color}">${value ?? '—'}</div>
+    ${sub ? `<div class="stat-sub">${sub}</div>` : ''}
+  </div>`;
+}
+
+// ── USERS ────────────────────────────────────────────────────────────────────
+async function loadUsers(q = '') {
+  if (!q) loading('users');
+  try {
+    const d = await apiFetch('/founder/users/search', { method:'POST', body: { q } });
+    const rows = d.users.map(u => `
+      <tr>
+        <td>${u.email || '—'}</td>
+        <td style="font-size:11px;color:var(--text3)">${u.id.slice(0,12)}…</td>
+        <td>${u.credits}</td>
+        <td>${u.hasPromo ? '<span class="tag green">Promo</span>' : (u.freeGuideUsed ? '<span class="tag gray">Free used</span>' : '<span class="tag gray">Free</span>')}</td>
+        <td>${u.disabled ? '<span class="tag red">Disabled</span>' : '<span class="tag green">Active</span>'}</td>
+        <td>${u.createdAt ? fmtDate(u.createdAt) : '—'}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="openUserDrawer('${u.id}')">View</button></td>
+      </tr>`).join('');
+
+    setHtml('users', `
+      <div class="search-row">
+        <input class="search-input" id="userSearch" placeholder="Search by email or user ID…" value="${q}"
+          onkeydown="if(event.key==='Enter')loadUsersSearch()">
+        <button class="btn btn-primary" onclick="loadUsersSearch()">Search</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Email</th><th>UID</th><th>Credits</th><th>Status</th><th>Account</th><th>Joined</th><th></th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="7"><div class="empty-state">No users found</div></td></tr>'}</tbody>
+        </table>
+      </div>
+    `);
+  } catch(e) {
+    setHtml('users', `<div class="error-box">${e.message}</div>`);
+  }
+}
+
+window.loadUsersSearch = function() {
+  const q = document.getElementById('userSearch')?.value.trim() || '';
+  loadUsers(q);
+};
+
+// ── USER DRAWER ───────────────────────────────────────────────────────────────
+window.openUserDrawer = async function(uid) {
+  document.getElementById('userDrawer').classList.add('open');
+  document.getElementById('drawerContent').innerHTML = '<div class="loading-row"><div class="mini-spin"></div> Loading…</div>';
+  try {
+    const u = await apiFetch(`/founder/users/${uid}`);
+    document.getElementById('drawerContent').innerHTML = `
+      <div class="drawer-field"><div class="drawer-field-label">Email</div><div class="drawer-field-val">${u.email || '—'} ${u.emailVerified ? '<span class="tag green" style="font-size:10px">Verified</span>' : '<span class="tag red" style="font-size:10px">Unverified</span>'}</div></div>
+      <div class="drawer-field"><div class="drawer-field-label">UID</div><div class="drawer-field-val" style="font-size:12px;color:var(--text3)">${u.id}</div></div>
+      <div class="drawer-field"><div class="drawer-field-label">Display Name</div><div class="drawer-field-val">${u.displayName || '—'}</div></div>
+      <div class="drawer-field"><div class="drawer-field-label">Credits</div><div class="drawer-field-val">${u.credits}</div></div>
+      <div class="drawer-field"><div class="drawer-field-label">Joined</div><div class="drawer-field-val">${u.createdAt ? fmtDate(u.createdAt) : '—'}</div></div>
+      <div class="drawer-field"><div class="drawer-field-label">Status</div><div class="drawer-field-val">${u.disabled ? '<span class="tag red">Disabled</span>' : '<span class="tag green">Active</span>'}</div></div>
+      ${u.disabledReason ? `<div class="drawer-field"><div class="drawer-field-label">Disable reason</div><div class="drawer-field-val" style="color:var(--red)">${u.disabledReason}</div></div>` : ''}
+      ${u.promoAccess ? `<div class="drawer-field"><div class="drawer-field-label">Promo</div><div class="drawer-field-val">${u.promoAccess.code} — expires ${fmtDate(u.promoAccess.expiresAt)}</div></div>` : ''}
+
+      <div style="margin-top:16px;font-size:12px;font-weight:700;color:var(--text3);margin-bottom:6px;">Grant / Remove Credits</div>
+      <div class="grant-row">
+        <input class="grant-input" type="number" id="grantDelta" placeholder="±" step="1">
+        <input class="search-input" id="grantReason" placeholder="Reason (optional)" style="flex:1">
+        <button class="btn btn-primary btn-sm" onclick="grantCredits('${u.id}')">Apply</button>
+      </div>
+
+      <div class="drawer-actions" style="margin-top:16px;">
+        ${u.disabled
+          ? `<button class="btn btn-secondary btn-sm" onclick="setDisabled('${u.id}',false)">Restore Account</button>`
+          : `<button class="btn btn-danger btn-sm" onclick="promptDisable('${u.id}')">Disable Account</button>`
+        }
+      </div>
+
+      ${u.recentEvents?.length ? `
+        <div style="margin-top:18px;font-size:12px;font-weight:700;color:var(--text3);margin-bottom:6px;">Recent Events</div>
+        <div style="max-height:140px;overflow-y:auto;">
+          ${u.recentEvents.map(e => `<div style="font-size:11px;color:var(--text3);padding:3px 0">${fmtDate(e.at)} — ${e.event}</div>`).join('')}
+        </div>` : ''}
+
+      ${u.recentFailures?.length ? `
+        <div style="margin-top:14px;font-size:12px;font-weight:700;color:var(--red);margin-bottom:6px;">Recent Failures</div>
+        <div style="max-height:120px;overflow-y:auto;">
+          ${u.recentFailures.map(f => `<div style="font-size:11px;color:var(--text3);padding:3px 0">${fmtDate(f.at)} — ${f.feature||'?'}: ${f.reason||f.error||'?'}</div>`).join('')}
+        </div>` : ''}
+    `;
+  } catch(e) {
+    document.getElementById('drawerContent').innerHTML = `<div class="error-box">${e.message}</div>`;
+  }
+};
+
+window.closeDrawer = () => document.getElementById('userDrawer').classList.remove('open');
+
+window.grantCredits = async function(uid) {
+  const delta  = parseInt(document.getElementById('grantDelta')?.value);
+  const reason = document.getElementById('grantReason')?.value?.trim();
+  if (!delta || isNaN(delta)) { toast('Enter a credit amount (e.g. 5 or -5)'); return; }
+  try {
+    const d = await apiFetch('/founder/users/grant', { method:'POST', body: { uid, delta, reason } });
+    toast(`✓ Credits updated. New balance: ${d.credits}`);
+    openUserDrawer(uid);
+  } catch(e) { toast('Error: ' + e.message); }
+};
+
+window.promptDisable = function(uid) {
+  const reason = prompt('Reason for disabling this account (optional):');
+  if (reason === null) return; // cancelled
+  setDisabled(uid, true, reason);
+};
+
+window.setDisabled = async function(uid, disabled, reason = '') {
+  try {
+    await apiFetch('/founder/users/disable', { method:'POST', body: { uid, disabled, reason } });
+    toast(disabled ? '✓ Account disabled' : '✓ Account restored');
+    openUserDrawer(uid);
+    delete _loaded.users; loadUsers();
+  } catch(e) { toast('Error: ' + e.message); }
+};
+
+// ── ANALYTICS ─────────────────────────────────────────────────────────────────
+async function loadAnalytics() {
+  loading('analytics');
+  try {
+    const d = await apiFetch(`/founder/analytics?range=${_range}`);
+    const maxFunnel = d.funnel[0]?.count || 1;
+
+    const FUNNEL_LABELS = {
+      page_view: 'Page view', guide_started: 'Guide started',
+      photo_uploaded: 'Photo uploaded', step_completed: 'Step completed',
+      guide_completed: 'Guide completed', paywall_viewed: 'Paywall viewed',
+      checkout_started: 'Checkout started', checkout_completed: 'Checkout completed',
+    };
+    const FEATURE_LABELS = {
+      low_taper:'Low Taper', mid_taper:'Mid Taper', high_taper:'High Taper',
+      skin_fade:'Skin Fade', buzz_cut:'Buzz Cut', grade_fade:'Fade Rating',
+      fade_finish:'Fade Finish', barber_report:'Barber Report', ai_chat:'AI Chat',
+    };
+
+    const funnelRows = d.funnel.map(f => `
+      <div class="funnel-row">
+        <div class="funnel-label">${FUNNEL_LABELS[f.event] || f.event}</div>
+        <div class="funnel-bar-wrap">
+          <div class="funnel-bar" style="width:${f.count ? Math.max(2, (f.count/maxFunnel)*100) : 0}%"></div>
+        </div>
+        <div class="funnel-count">${f.count}</div>
+        <div class="funnel-pct">${f.pct != null && f.pct < 100 ? f.pct + '%' : ''}</div>
+      </div>`).join('');
+
+    const featureRows = d.features.map(f => `
+      <tr>
+        <td>${FEATURE_LABELS[f.feature] || f.feature}</td>
+        <td>${f.uses}</td>
+        <td>${f.unique}</td>
+      </tr>`).join('');
+
+    setHtml('analytics', `
+      <div class="section-label">Conversion Funnel (${_range})</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:14px;">${d.uniqueUsers} unique users · ${d.totalEvents} total events</div>
+      <div class="funnel-wrap">${funnelRows}</div>
+
+      <div class="section-label">Feature Usage (${_range})</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Feature</th><th>Total Uses</th><th>Unique Users</th></tr></thead>
+          <tbody>${featureRows}</tbody>
+        </table>
+      </div>
+      <div style="margin-top:16px;font-size:12px;color:var(--text3);">
+        Event data accumulates from log-event calls. New installs will populate this over time.
+      </div>
+    `);
+  } catch(e) {
+    setHtml('analytics', `<div class="error-box">${e.message}</div>`);
+  }
+}
+
+// ── LOGS ─────────────────────────────────────────────────────────────────────
+async function loadLogs() {
+  loading('logs');
+  try {
+    const d = await apiFetch('/founder/logs?limit=50');
+    if (!d.logs.length) { setHtml('logs', '<div class="empty-state">No failure logs yet.</div>'); return; }
+    const rows = d.logs.map(l => `
+      <tr>
+        <td>${fmtDate(l.at)}</td>
+        <td>${l.feature || '—'}</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${l.reason || l.error || '—'}</td>
+        <td>${l.uid ? l.uid.slice(0,10)+'…' : '—'}</td>
+        <td>${l.retried ? (l.retrySucceeded ? '<span class="tag green">Retry OK</span>' : '<span class="tag red">Retry fail</span>') : '<span class="tag gray">No retry</span>'}</td>
+        <td style="font-size:11px;color:var(--text3)">${l.device || '—'}</td>
+      </tr>`).join('');
+    setHtml('logs', `
+      <div style="font-size:12px;color:var(--text3);margin-bottom:14px;">${d.logs.length} most recent failures</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Time</th><th>Feature</th><th>Reason</th><th>User</th><th>Retry</th><th>Device</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `);
+  } catch(e) {
+    setHtml('logs', `<div class="error-box">${e.message}</div>`);
+  }
+}
+
+// ── FEEDBACK ─────────────────────────────────────────────────────────────────
+const STATUS_COLORS = { new:'blue', reviewing:'gold', fixed:'green', declined:'gray' };
+async function loadFeedback(filterStatus = '') {
+  loading('feedback');
+  try {
+    const url = '/founder/feedback' + (filterStatus ? `?status=${filterStatus}` : '');
+    const d   = await apiFetch(url);
+    if (!d.feedback.length) { setHtml('feedback', `<div class="empty-state">No feedback yet.</div>`); return; }
+    const cards = d.feedback.map(f => `
+      <div class="feedback-card">
+        <div class="feedback-top">
+          <span class="tag ${STATUS_COLORS[f.status] || 'gray'}">${f.status}</span>
+          <span class="tag gray">${f.type}</span>
+          ${f.feature ? `<span class="tag gray">${f.feature}</span>` : ''}
+          <span style="margin-left:auto;font-size:11px;color:var(--text3)">${fmtDate(f.at)}</span>
+        </div>
+        <div class="feedback-msg">${esc(f.message)}</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="feedback-meta">${f.email || f.uid?.slice(0,12) || 'Anonymous'}</div>
+          <select class="status-select" onchange="updateFeedback('${f.id}',this.value)">
+            <option value="new"       ${f.status==='new'?'selected':''}>New</option>
+            <option value="reviewing" ${f.status==='reviewing'?'selected':''}>Reviewing</option>
+            <option value="fixed"     ${f.status==='fixed'?'selected':''}>Fixed</option>
+            <option value="declined"  ${f.status==='declined'?'selected':''}>Declined</option>
+          </select>
+        </div>
+      </div>`).join('');
+
+    setHtml('feedback', `
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+        ${['','new','reviewing','fixed','declined'].map(s => `
+          <button class="btn btn-secondary btn-sm ${s===filterStatus?'':'opacity-70'}"
+            onclick="loadFeedbackFilter('${s}')">${s||'All'}</button>`).join('')}
+      </div>
+      <div class="feedback-grid">${cards}</div>
+    `);
+  } catch(e) {
+    setHtml('feedback', `<div class="error-box">${e.message}</div>`);
+  }
+}
+window.loadFeedbackFilter = s => loadFeedback(s);
+window.updateFeedback = async function(id, status) {
+  try {
+    await apiFetch(`/founder/feedback/${id}`, { method:'PATCH', body: { status } });
+    toast('✓ Status updated');
+  } catch(e) { toast('Error: ' + e.message); }
+};
+
+// ── HEALTH ───────────────────────────────────────────────────────────────────
+async function loadHealth() {
+  loading('health');
+  try {
+    const d = await apiFetch('/founder/health');
+    const envRows = Object.entries(d.env).map(([k,v]) => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
+        <span style="font-size:12px;color:var(--text2)">${k}</span>
+        <span class="tag ${v?'green':'red'}">${v?'Set':'Missing'}</span>
+      </div>`).join('');
+
+    const routeRows = d.routes.map(r => {
+      const cls = r.errorRate > 20 ? 'danger' : r.errorRate > 5 ? 'warn' : '';
+      return `<tr>
+        <td style="font-size:12px">${r.route}</td>
+        <td>${r.requests}</td>
+        <td>${r.avgMs}ms</td>
+        <td><div style="min-width:60px">${r.errorRate}%<div class="health-bar"><div class="health-bar-fill ${cls}" style="width:${Math.min(r.errorRate,100)}%"></div></div></div></td>
+      </tr>`;
+    }).join('');
+
+    const errRows = d.recentErrors.map(e => `
+      <div style="font-size:11px;color:var(--text3);padding:4px 0;border-bottom:1px solid var(--border)">
+        ${fmtDate(e.at)} — <span style="color:var(--red)">${e.route}</span> ${e.uid ? `uid:${e.uid.slice(0,10)}` : ''}
+      </div>`).join('') || '<div style="font-size:12px;color:var(--text3)">No recent errors</div>';
+
+    setHtml('health', `
+      <div class="stat-grid" style="margin-bottom:20px">
+        ${stat('Uptime', d.uptimeHuman)}
+        ${stat('Auth Failures', d.authFails, '', d.authFails > 10 ? 'red' : '')}
+        ${stat('Webhook Failures', d.webhookFails, '', d.webhookFails > 0 ? 'red' : '')}
+        ${stat('Total Routes', d.routes.length)}
+      </div>
+
+      <div class="section-label">Environment</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:20px">${envRows}</div>
+
+      <div class="section-label">Route Stats (since last restart)</div>
+      <div class="table-wrap" style="margin-bottom:20px">
+        <table>
+          <thead><tr><th>Route</th><th>Requests</th><th>Avg Time</th><th>Error Rate</th></tr></thead>
+          <tbody>${routeRows}</tbody>
+        </table>
+      </div>
+
+      <div class="section-label">Recent Errors</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px">${errRows}</div>
+    `);
+  } catch(e) {
+    setHtml('health', `<div class="error-box">${e.message}</div>`);
+  }
+}
+
+// ── SIGN OUT ──────────────────────────────────────────────────────────────────
+window.doSignOut = async function() {
+  await signOut(_auth);
+  location.href = '/';
+};
+
+// ── UTILS ────────────────────────────────────────────────────────────────────
+function fmtDate(ms) {
+  if (!ms) return '—';
+  return new Date(ms).toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+}
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function toast(msg, dur = 2800) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), dur);
+}
+window.toast = toast;
+</script>
+</body>
+</html>

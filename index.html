@@ -2952,6 +2952,35 @@ const state = {
 
 const BACKEND_URL = 'https://selfhaircut-backend.onrender.com';
 
+// Fire-and-forget analytics event — never blocks the user
+function _logEvent(event, data = {}) {
+  const user = window._currentUser;
+  if (!user) return;
+  user.getIdToken().then(token =>
+    fetch(BACKEND_URL + '/log-event', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event, data }),
+    })
+  ).catch(() => {});
+}
+
+// Log analysis failure with context
+function _logFailure(feature, reason, extra = {}) {
+  const user = window._currentUser;
+  if (!user) return;
+  user.getIdToken().then(token =>
+    fetch(BACKEND_URL + '/log-failure', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feature, reason, device: navigator.userAgent, ...extra }),
+    })
+  ).catch(() => {});
+}
+
+// Log page view once auth is ready (fires after _onAuthChange sets _currentUser)
+setTimeout(() => _logEvent('page_view', { ref: document.referrer || '' }), 3000);
+
 // Check AI preview availability once on load — no spinner shown if AI is off
 fetch(BACKEND_URL + '/health', { signal: AbortSignal.timeout(5000) })
   .then(r => r.json())
@@ -3205,6 +3234,7 @@ async function sendMessage() {
   }
 
   // No pattern matched — call real AI
+  _logEvent('feature_ai_chat');
   addTyping();
   try {
     const history = _chatHistory.slice(-6);
@@ -5211,6 +5241,7 @@ function _updateCreditDisplay() {
 }
 
 function showPurchaseScreen(titleOverride) {
+  _logEvent('paywall_viewed', { trigger: titleOverride || 'manual' });
   const titleEl = document.getElementById('creditSheetTitle');
   const subEl   = document.getElementById('creditSheetSub');
   if (titleOverride && titleEl) titleEl.textContent = titleOverride;
@@ -5233,6 +5264,7 @@ function buyCredits(amount, linkKey) {
     openAuthModal(() => showPurchaseScreen());
     return;
   }
+  _logEvent('checkout_started', { credits: amount });
   const baseUrl = STRIPE_LINKS[amount] || linkKey;
   const url = `${baseUrl}?prefilled_email=${encodeURIComponent(user.email || '')}&client_reference_id=${user.uid}`;
   window.open(url, '_blank');
@@ -5248,6 +5280,8 @@ async function _checkCreditsAndGenerate(callback) {
   }
 
   const user = window._currentUser;
+  // Wrap callback so every success path logs guide_started
+  const _cb = () => { _logEvent('guide_started', { style: state.taperStyle }); callback(); };
 
   // Load promo + credits together if neither is cached yet
   if (window._promoAccess === null && window._userCredits === null) {
@@ -5264,7 +5298,7 @@ async function _checkCreditsAndGenerate(callback) {
 
   // Active promo → proceed immediately, verify in background
   if (_isPromoActive()) {
-    callback();
+    _cb();
     ;(async () => {
       try {
         const token = await user.getIdToken();
@@ -5306,7 +5340,7 @@ async function _checkCreditsAndGenerate(callback) {
       }
       window._userCredits = Math.max(0, (window._userCredits || 1) - 1);
       _updateCreditDisplay();
-      callback();
+      _cb();
       return;
     }
 
@@ -5316,26 +5350,24 @@ async function _checkCreditsAndGenerate(callback) {
       window._isOwner     = true;
       window._userCredits = null;
       _updateCreditDisplay();
-      callback();
+      _cb();
       return;
     }
 
     if (data.usedFreeGuide) {
-      // Session just started — 1-hour window now open
       window._userCredits        = data.credits ?? 0;
       window._freeGuideExpiresAt = data.freeGuideExpiresAt ?? null;
       _updateCreditDisplay();
       _startFreeGuideTicker();
-      callback();
+      _cb();
       return;
     }
 
     if (data.freeGuideActive) {
-      // Still within the free guide session window
       window._userCredits        = data.credits ?? 0;
       window._freeGuideExpiresAt = data.freeGuideExpiresAt ?? null;
       _updateCreditDisplay();
-      callback();
+      _cb();
       return;
     }
 
@@ -5343,7 +5375,7 @@ async function _checkCreditsAndGenerate(callback) {
       window._userCredits = data.credits;
       _updateCreditDisplay();
     }
-    callback();
+    _cb();
 
   } catch(e) {
     // Network unreachable — allow through with client-side fallback
@@ -5353,7 +5385,7 @@ async function _checkCreditsAndGenerate(callback) {
     }
     window._userCredits = Math.max(0, (window._userCredits || 1) - 1);
     _updateCreditDisplay();
-    callback();
+    _cb();
     if (window._fbDeductCredit) window._fbDeductCredit(user.uid).catch(() => {});
   }
 }
@@ -6463,6 +6495,7 @@ async function presentFadePlanStep(i) {
   if (!plan || !plan[i]) return;
   state.currentStep = i;
   const step = plan[i];
+  if (i > 0) _logEvent('step_completed', { stepIndex: i, style: state.taperStyle, total: plan.length });
   _updateGuideProgress(i, plan.length);
 
   const offset = { x: state.fadeOffsetXFrac, y: state.fadeOffsetYFrac };
@@ -6703,6 +6736,7 @@ async function _fetchAndShowBarberReport(photoFile) {
   if (!photoFile) return;
   const fd = new FormData();
   fd.append('photo', photoFile);
+  _logEvent('feature_barber_report');
   try {
     const res = await fetch(BACKEND_URL + '/barber-report', { method: 'POST', body: fd });
     if (!res.ok) return;
@@ -6773,6 +6807,7 @@ function triggerGradeFadeUpload() {
   state.nextFileHandler = async (file) => {
     state.nextFileHandler = null;
     const typingMsg = addAIMessage('<p style="color:var(--text3);">Analyzing your finished fade…</p>', null);
+    _logEvent('feature_grade_fade');
     try {
       const fd = new FormData();
       fd.append('photo', file);
@@ -6958,6 +6993,7 @@ function _triggerFadeFinishUpload(card) {
       </div>`;
     }
 
+    _logEvent('feature_fade_finish');
     try {
       const token = await window._currentUser?.getIdToken();
       const fd    = new FormData();
@@ -7142,6 +7178,7 @@ function _buildFadeScoreCardHtml() {
 function addFadePlanWrapUp() {
   const style = state.taperStyle || 'low';
   const styleLabel = { low: 'Low Taper', mid: 'Mid Taper', high: 'High Taper', skin: 'Skin Fade', buzz: 'Buzz Cut' }[style] || 'Taper';
+  _logEvent('guide_completed', { style });
   _showGuideComplete(styleLabel);
 
   // Log to haircut history
@@ -8243,6 +8280,7 @@ function _triggerUpload_orig() {
 
 function handleFiles(e) {
   Array.from(e.target.files).forEach(f => {
+    _logEvent('photo_uploaded', { size: f.size, type: f.type });
     pendingFiles.push(f);
     const thumb = document.createElement('div');
     thumb.className = 'preview-thumb';
