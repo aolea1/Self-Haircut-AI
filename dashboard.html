@@ -356,7 +356,7 @@ async function apiFetch(path, opts = {}) {
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });
   if (res.status === 401) { _token = await _auth.currentUser?.getIdToken(true); throw new Error('Re-auth required'); }
-  if (!res.ok) { const e = await res.json().catch(()=>{}); throw new Error(e?.error || `HTTP ${res.status}`); }
+  if (!res.ok) { const e = await res.json().catch(()=>{}); throw new Error(e?.error + (e?.detail ? ` — ${e.detail}` : '') || `HTTP ${res.status}`); }
   return res.json();
 }
 
