@@ -5286,6 +5286,9 @@ async function _checkCreditsAndGenerate(callback) {
   // Wrap callback so every success path logs guide_started
   const _cb = () => { _logEvent('guide_started', { style: state.taperStyle }); callback(); };
 
+  // Owner has unlimited access — skip all credit checks
+  if (window._isOwner) { _cb(); return; }
+
   // Load promo + credits together if neither is cached yet
   if (window._promoAccess === null && window._userCredits === null) {
     try {
@@ -6930,6 +6933,23 @@ async function _unlockFadeFinish(btn) {
       const card = document.getElementById('fadeFinishUpsell');
       if (card) _unlockFadeFinish(card.querySelector('.ffu-unlock-btn'));
     });
+    return;
+  }
+
+  // Owner bypasses all credit checks
+  if (window._isOwner) {
+    const card = document.getElementById('fadeFinishUpsell');
+    if (card) {
+      card.innerHTML = `
+        <div class="ffu-upload-state">
+          <div class="ffu-eyebrow" style="margin-bottom:10px;">Fade Finish Package · Unlocked</div>
+          <div class="ffu-upload-title">Upload Your Finished Fade</div>
+          <div class="ffu-upload-sub">I'll analyze your haircut like a barber and show you exactly where to improve.</div>
+          <button class="ffu-upload-btn" onclick="_triggerFadeFinishUpload(this.closest('.fade-finish-upsell'))">
+            Upload Finished Haircut →
+          </button>
+        </div>`;
+    }
     return;
   }
 
