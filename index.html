@@ -5286,6 +5286,9 @@ async function _checkCreditsAndGenerate(callback) {
   // Wrap callback so every success path logs guide_started
   const _cb = () => { _logEvent('guide_started', { style: state.taperStyle }); callback(); };
 
+  // Wait for /me to resolve (handles Render cold-start delay) then check owner
+  if (window._meFetchPromise) await window._meFetchPromise;
+
   // Owner has unlimited access — skip all credit checks
   if (window._isOwner) { _cb(); return; }
 
@@ -5385,6 +5388,7 @@ async function _checkCreditsAndGenerate(callback) {
 
   } catch(e) {
     // Network unreachable — allow through with client-side fallback
+    if (window._isOwner) { _cb(); return; }
     if ((window._userCredits ?? 0) <= 0) {
       showPurchaseScreen('You\'re out of credits');
       return;
@@ -7362,8 +7366,8 @@ window._onAuthChange = (user) => {
         }
       }).catch(() => {});
     }
-    // Check owner status from backend (non-blocking, runs in parallel)
-    user.getIdToken().then(token =>
+    // Check owner status from backend — store promise so credit gate can await it
+    window._meFetchPromise = user.getIdToken().then(token =>
       fetch(BACKEND_URL + '/me', { headers: { 'Authorization': 'Bearer ' + token } })
     ).then(r => r.ok ? r.json() : null).then(me => {
       if (me?.isOwner) {
