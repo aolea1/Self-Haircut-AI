@@ -9471,7 +9471,7 @@ function switchShowcase(type, btn) {
       <canvas id="cropCanvas"></canvas>
     </div>
     <div id="cropTip">
-      <div id="cropTipToggle" onclick="this.closest('#cropTip').classList.toggle('tip-open')">
+      <div id="cropTipToggle" onclick="this.closest('#cropTip').classList.toggle('tip-open'); setTimeout(_cropDraw, 600)">
         <span id="cropTipLabel">Example Crop</span>
         <span id="cropTipChevron">▾</span>
       </div>
