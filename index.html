@@ -4130,7 +4130,7 @@ function renderPhotoTipOverlay() {
 
 // ── POINT PLACEMENT TUTORIAL ─────────────────────────────────────────────────
 function _ppTutSvg() {
-  return `<video src="crop_tutorial.mov" autoplay muted loop playsinline
+  return `<video src="point_placement_tutorial.mov" autoplay muted loop playsinline
     style="width:100%;display:block;border-radius:10px;background:#161616;"></video>`;
 }
 
@@ -4197,7 +4197,6 @@ function markEarPosition(file) {
 
         const marks = { top: { x: 0.56, y: 0.40 }, bottom: { x: 0.56, y: 0.52 } };
 
-        const isFirstTime = !localStorage.getItem('shc_earTutDone');
         const tutId = 'ppTut_' + Date.now();
 
         const msg = document.createElement('div');
@@ -4207,16 +4206,11 @@ function markEarPosition(file) {
 
             <!-- Point placement tutorial -->
             <div class="pp-tut-card" id="${tutId}">
-              ${isFirstTime ? `
-              <div style="padding:12px 14px 0;">
-                <div style="font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:rgba(232,213,163,0.6);margin-bottom:6px;">Before You Start</div>
-                <div style="font-size:13.5px;font-weight:700;color:var(--text);margin-bottom:4px;">Watch this quick example before placing your points.</div>
-              </div>` : `
               <div class="pp-tut-header" onclick="_ppTutToggle('${tutId}')">
-                <span class="pp-tut-header-label">▶ Watch Point Placement Example</span>
-                <span class="pp-tut-chevron" id="${tutId}_chev">▾</span>
-              </div>`}
-              <div class="pp-tut-body ${isFirstTime ? 'expanded' : 'collapsed'}" id="${tutId}_body">
+                <span class="pp-tut-header-label">▶ Point Placement Example</span>
+                <span class="pp-tut-chevron open" id="${tutId}_chev">▾</span>
+              </div>
+              <div class="pp-tut-body expanded" id="${tutId}_body">
                 <div style="padding:0 14px 4px;">
                   ${_ppTutSvg()}
                 </div>
@@ -4226,13 +4220,10 @@ function markEarPosition(file) {
                   <div class="pp-tut-label-item"><span class="pp-tut-dot blue"></span>Bottom of Ear Point</div>
                   <div class="pp-tut-label-item"><span class="pp-tut-dot green"></span>Guideline Point</div>
                 </div>
-                ${isFirstTime ? `<div style="padding:0 14px;">
-                  <button class="pp-tut-got-it" onclick="_ppTutDismiss('${tutId}')">Got It — Start Placing Points</button>
-                </div>` : ''}
               </div>
             </div>
 
-            <div id="${tutId}_workspace" style="${isFirstTime ? 'display:none' : ''}">
+            <div id="${tutId}_workspace">
               <p class="ear-mark-instruction"><strong>Mark the top of your ear</strong><br><span style="font-size:12px;color:var(--text3);">Drag the gold marker into place, then continue.</span></p>
               <div id="mpStatusBadge" style="display:none;margin-bottom:8px;padding:6px 10px;background:rgba(100,220,140,0.10);border:1px solid rgba(100,220,140,0.30);border-radius:10px;font-size:12px;color:rgba(120,220,150,0.9);font-weight:600;">
                 ✓ Auto-detected — drag to correct if needed
