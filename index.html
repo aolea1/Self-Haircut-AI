@@ -1515,6 +1515,10 @@ body {
   transition:background 0.2s;
 }
 .ffu-upload-btn:hover { background:rgba(109,219,142,0.2); }
+.ffu-photo-tips { margin:0 0 14px;padding:10px 12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px; }
+.ffu-tips-label { font-size:10px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:rgba(255,255,255,0.3);margin-bottom:7px; }
+.ffu-tip { font-size:11.5px;color:var(--text2);padding:2px 0 2px 14px;position:relative;line-height:1.5; }
+.ffu-tip::before { content:'·';position:absolute;left:4px;color:rgba(255,255,255,0.25); }
 .ffu-markup-preview {
   display:flex;align-items:center;gap:7px;margin-bottom:16px;
   padding:8px 12px;background:rgba(255,255,255,0.03);
@@ -6966,124 +6970,147 @@ async function _unlockFadeFinish(btn) {
     return;
   }
 
-  // Owner bypasses all credit checks
-  if (window._isOwner) {
-    const card = document.getElementById('fadeFinishUpsell');
-    if (card) {
-      card.innerHTML = `
-        <div class="ffu-upload-state">
-          <div class="ffu-eyebrow" style="margin-bottom:10px;">Fade Finish Package · Unlocked</div>
-          <div class="ffu-upload-title">Upload Your Finished Fade</div>
-          <div class="ffu-upload-sub">I'll analyze your haircut like a barber and show you exactly where to improve.</div>
-          <button class="ffu-upload-btn" onclick="_triggerFadeFinishUpload(this.closest('.fade-finish-upsell'))">
-            Upload Finished Haircut →
-          </button>
-        </div>`;
-    }
-    return;
-  }
+  // Show upload state directly — credit is only deducted by the server after successful analysis
+  _showFadeFinishUploadState(document.getElementById('fadeFinishUpsell'));
+}
 
-  btn.disabled = true;
-  btn.textContent = 'Checking credits…';
-
-  try {
-    const token = await window._currentUser.getIdToken();
-    const res   = await fetch(BACKEND_URL + '/deduct-credit', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-    });
-
-    if (res.status === 402) {
-      btn.disabled = false;
-      btn.textContent = 'Unlock Fade Finish Package';
-      showPurchaseScreen('You need 1 credit to unlock the Fade Finish Package.');
-      return;
-    }
-
-    if (!res.ok) {
-      btn.disabled = false;
-      btn.textContent = 'Unlock Fade Finish Package';
-      return;
-    }
-
-    const data = await res.json();
-    if (data.isOwner) {
-      window._isOwner = true;
-      _updateCreditDisplay();
-    } else if (typeof data.credits === 'number') {
-      window._userCredits = data.credits;
-      _updateCreditDisplay();
-    }
-
-    // Replace upsell card content with upload prompt
-    const card = document.getElementById('fadeFinishUpsell');
-    if (card) {
-      card.innerHTML = `
-        <div class="ffu-upload-state">
-          <div class="ffu-eyebrow" style="margin-bottom:10px;">Fade Finish Package · Unlocked</div>
-          <div class="ffu-upload-title">Upload Your Finished Fade</div>
-          <div class="ffu-upload-sub">I'll analyze your haircut like a barber and show you exactly where to improve.</div>
-          <button class="ffu-upload-btn" onclick="_triggerFadeFinishUpload(this.closest('.fade-finish-upsell'))">
-            Upload Finished Haircut →
-          </button>
-        </div>`;
-    }
-  } catch(e) {
-    btn.disabled = false;
-    btn.textContent = 'Unlock Fade Finish Package';
-  }
+function _showFadeFinishUploadState(card) {
+  if (!card) return;
+  card.innerHTML = `
+    <div class="ffu-upload-state">
+      <div class="ffu-eyebrow" style="margin-bottom:10px;">Fade Finish Package · Ready</div>
+      <div class="ffu-upload-title">Upload Your Finished Fade</div>
+      <div class="ffu-upload-sub">I'll analyze your haircut like a barber and show you exactly where to improve.</div>
+      <div class="ffu-photo-tips">
+        <div class="ffu-tips-label">For the most accurate review:</div>
+        <div class="ffu-tip">Use bright, even lighting</div>
+        <div class="ffu-tip">Show the full faded area</div>
+        <div class="ffu-tip">Keep the camera level</div>
+        <div class="ffu-tip">Avoid shadows over the temple</div>
+        <div class="ffu-tip">Use the original photo, not a screenshot</div>
+        <div class="ffu-tip">Upload one side at a time</div>
+      </div>
+      <button class="ffu-upload-btn" onclick="_triggerFadeFinishUpload(this.closest('.fade-finish-upsell'))">
+        Upload Finished Haircut →
+      </button>
+    </div>`;
 }
 
 function _triggerFadeFinishUpload(card) {
   state.nextFileHandler = async (file) => {
     state.nextFileHandler = null;
-
-    // Show loading state inside the card
-    if (card) {
-      card.innerHTML = `<div style="text-align:center;padding:16px 0;">
-        <div class="ffu-eyebrow" style="margin-bottom:8px;">Analyzing Your Haircut</div>
-        <div style="font-size:13px;color:var(--text2);">Reading your fade like a barber…</div>
-      </div>`;
-    }
-
     _logEvent('feature_fade_finish');
-    try {
-      const token = await window._currentUser?.getIdToken();
+
+    const setCardHtml = html => { if (card && card.isConnected) card.innerHTML = html; };
+
+    setCardHtml(`<div style="text-align:center;padding:20px 0;">
+      <div class="ffu-eyebrow" style="margin-bottom:8px;">Analyzing Your Haircut</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.6;">Reading your fade like a barber…</div>
+    </div>`);
+
+    const doFetch = async () => {
+      const token = await window._currentUser?.getIdToken(true);
       const fd    = new FormData();
       fd.append('photo', file);
-      const res = await fetch(BACKEND_URL + '/fade-finish', {
+      return fetch(BACKEND_URL + '/fade-finish', {
         method: 'POST',
         headers: token ? { 'Authorization': 'Bearer ' + token } : {},
         body: fd,
       });
+    };
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        const errMsg = errData.error === 'unusable_photo'
-          ? (errData.reason || 'The photo couldn\'t be read — try a clearer shot of your fade area.')
-          : errData.error === 'AI not configured'
-            ? 'The analysis service isn\'t ready yet. Try again later.'
-            : 'Analysis failed — please try again.';
-        if (card) card.innerHTML = `<p style="color:var(--text2);font-size:13px;padding:8px 0;">${errMsg}</p>`;
+    try {
+      let res = await doFetch();
+
+      // Server-side retry already happened; check for fallback flag
+      if (res.ok) {
+        const data = await res.json();
+
+        // Update credit display if deducted
+        if (typeof data.credits === 'number') {
+          window._userCredits = data.credits;
+          _updateCreditDisplay();
+        }
+
+        // Unusable photo
+        if (data.unusable === true || res.status === 422) {
+          setCardHtml(_buildFadeFinishFallbackHtml('The photo couldn\'t be read clearly. Try a brighter, more direct shot of your faded area.', card, file));
+          return;
+        }
+
+        // Fallback — analysis failed both attempts, no credit used
+        if (data.fallback === true) {
+          setCardHtml(_buildFadeFinishFallbackHtml(null, card, file));
+          return;
+        }
+
+        // Success
+        if (card && card.isConnected) {
+          const html = _buildFadeFinishResultHtml(data);
+          card.outerHTML = html;
+          scrollBottom();
+          const canvasId = (html.match(/id="(ffMarkupCanvas_\d+)"/) || [])[1];
+          if (canvasId && data.zones?.length) {
+            requestAnimationFrame(() => _drawFadeFinishMarkup(canvasId, data.zones));
+          }
+        }
         return;
       }
 
-      const data = await res.json();
-      if (card) {
-        const html = _buildFadeFinishResultHtml(data);
-        card.outerHTML = html;
-        scrollBottom();
-        // Draw zones after DOM is updated
-        const canvasId = (html.match(/id="(ffMarkupCanvas_\d+)"/) || [])[1];
-        if (canvasId && data.zones?.length) {
-          requestAnimationFrame(() => _drawFadeFinishMarkup(canvasId, data.zones));
-        }
+      // 402 — no credits (pre-check on server, nothing deducted)
+      if (res.status === 402) {
+        setCardHtml('');
+        showPurchaseScreen('You need 1 credit for the Fade Finish Package.');
+        return;
       }
+
+      // Other HTTP error
+      const errData = await res.json().catch(() => ({}));
+      if (errData.error === 'unusable_photo') {
+        setCardHtml(_buildFadeFinishFallbackHtml(errData.reason || null, card, file));
+        return;
+      }
+
+      // Generic failure → show fallback (no credit used)
+      setCardHtml(_buildFadeFinishFallbackHtml(null, card, file));
+
     } catch(e) {
-      if (card) card.innerHTML = `<p style="color:var(--text2);font-size:13px;padding:8px 0;">Couldn't reach the server — check your connection and try again.</p>`;
+      // Network error
+      setCardHtml(_buildFadeFinishFallbackHtml('Couldn\'t reach the server — check your connection.', card, file));
     }
   };
   document.getElementById('fileInput')?.click();
+}
+
+function _buildFadeFinishFallbackHtml(customMsg, card, file) {
+  const msg = customMsg || 'We couldn\'t complete the full visual scan.';
+  const checklistItems = [
+    'Look for any visible dark line above the guideline',
+    'Compare density above and below the temple',
+    'Check whether the sideburn shape is even on both sides',
+    'Inspect the area directly above the ear',
+    'Check whether the C-cup edge looks clean',
+    'Compare both sides under the same lighting',
+    'Use the corner of your trimmer only on visible dark spots',
+    'Avoid continuing to cut areas that already look blended',
+  ];
+  return `<div style="padding:4px 0;">
+    <div class="ffu-eyebrow" style="margin-bottom:8px;color:rgba(232,184,109,0.7);">Fade Finish · Analysis Incomplete</div>
+    <div style="font-size:13.5px;font-weight:700;color:var(--text);margin-bottom:6px;">We couldn't complete the visual scan</div>
+    <div style="font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:14px;">Your photo was uploaded successfully, but the detailed analysis could not be completed. Your credit was <strong style="color:#6ddb8e;">not used</strong>.</div>
+    <div style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.3);margin-bottom:9px;">Barber self-check</div>
+    <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:16px;">
+      ${checklistItems.map(item => `<label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer;padding:3px 0;">
+        <input type="checkbox" style="margin-top:3px;flex-shrink:0;accent-color:#e8d5a3;">
+        <span style="font-size:12px;color:var(--text2);line-height:1.5;">${item}</span>
+      </label>`).join('')}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button class="ffu-upload-btn" onclick="_triggerFadeFinishUpload(this.closest('.fade-finish-upsell'))">Try Analysis Again</button>
+      <button style="width:100%;padding:11px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:12px;color:var(--text2);font-size:13px;cursor:pointer;" onclick="_showFadeFinishUploadState(this.closest('.fade-finish-upsell'))">Upload Another Photo</button>
+      <button style="width:100%;padding:9px;background:none;border:none;color:rgba(255,255,255,0.25);font-size:12px;cursor:pointer;" onclick="this.closest('.fade-finish-upsell').remove()">Continue Without Analysis</button>
+    </div>
+  </div>`;
 }
 
 function _buildFadeFinishResultHtml(g) {
