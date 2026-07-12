@@ -1515,6 +1515,26 @@ body {
   transition:background 0.2s;
 }
 .ffu-upload-btn:hover { background:rgba(109,219,142,0.2); }
+.ffu-markup-preview {
+  display:flex;align-items:center;gap:7px;margin-bottom:16px;
+  padding:8px 12px;background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.07);border-radius:10px;
+}
+.ffu-dot {
+  width:9px;height:9px;border-radius:50%;flex-shrink:0;
+}
+.ffu-dot.green  { background:#6ddb8e; }
+.ffu-dot.yellow { background:#e8d5a3; }
+.ffu-dot.red    { background:#e87575; }
+.ffu-markup-label { font-size:11px;color:var(--text2);line-height:1.4; }
+.ff-list-section { margin-bottom:4px; }
+.ff-list-title { font-size:10px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;margin-bottom:7px; }
+.ff-list-title.green { color:rgba(109,219,142,0.7); }
+.ff-list-title.red   { color:rgba(232,117,117,0.7); }
+.ff-list-item { display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:var(--text2);padding:3px 0;line-height:1.5; }
+.ff-list-dot { width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:4px; }
+.ff-list-dot.green { background:#6ddb8e; }
+.ff-list-dot.red   { background:#e87575; }
 
 .fade-score-card {
   margin-bottom:16px;padding:18px 18px 14px;
@@ -6906,26 +6926,25 @@ function _buildGradeResultHtml(g) {
 
 function _showFadeFinishUpsell() {
   const html = `<div class="fade-finish-upsell" id="fadeFinishUpsell">
-    <div class="ffu-eyebrow">Premium Add-On · 1 Credit</div>
+    <div class="ffu-eyebrow">Fade Finish Package · +1 Credit</div>
     <div class="ffu-headline">Want To Finish Like A Barber?</div>
-    <div class="ffu-sub">Unlock the final touch-up package for your haircut.</div>
-    <div class="ffu-package-name">Fade Finish Package +1 Credit</div>
+    <div class="ffu-sub">Get a professional-style review of your completed fade.</div>
     <div class="ffu-checks">
-      <div class="ffu-section-label">Fade Analysis</div>
-      <div class="ffu-check">Upload your finished haircut</div>
-      <div class="ffu-check">Get your Fade Score</div>
-      <div class="ffu-check">See what you did well</div>
-      <div class="ffu-check">Find the biggest area to fix</div>
-      <div class="ffu-check">Get personalized barber recommendations</div>
-      <div class="ffu-section-label">Lineup Guidance</div>
-      <div class="ffu-check">Front lineup guide</div>
-      <div class="ffu-check">Temple lineup guide</div>
-      <div class="ffu-check">Sideburn cleanup guide</div>
-      <div class="ffu-check">Beard connection guidance if visible</div>
+      <div class="ffu-section-label">We'll Analyze</div>
+      <div class="ffu-check">Blend smoothness</div>
+      <div class="ffu-check">Dark spots and weight lines</div>
+      <div class="ffu-check">Sideburn balance</div>
+      <div class="ffu-check">C-cup shape</div>
+      <div class="ffu-check">Taper consistency</div>
+      <div class="ffu-check">Lineup recommendations</div>
+    </div>
+    <div class="ffu-markup-preview">
+      <span class="ffu-dot green"></span><span class="ffu-dot yellow"></span><span class="ffu-dot red"></span>
+      <span class="ffu-markup-label">Receive exact correction zones directly on your photo</span>
     </div>
     <div class="ffu-divider"></div>
-    <button class="ffu-unlock-btn" onclick="_unlockFadeFinish(this)">Unlock Fade Finish Package</button>
-    <button class="ffu-later-btn" onclick="this.closest('.fade-finish-upsell').remove()">Maybe Later</button>
+    <button class="ffu-unlock-btn" onclick="_unlockFadeFinish(this)">Get Fade Finish Package</button>
+    <button class="ffu-later-btn" onclick="this.closest('.fade-finish-upsell').remove()">I'll come back later</button>
   </div>`;
   const msg = addAIMessage(html, null);
   scrollToMsg(msg);
@@ -7044,8 +7063,14 @@ function _triggerFadeFinishUpload(card) {
 
       const data = await res.json();
       if (card) {
-        card.outerHTML = _buildFadeFinishResultHtml(data);
+        const html = _buildFadeFinishResultHtml(data);
+        card.outerHTML = html;
         scrollBottom();
+        // Draw zones after DOM is updated
+        const canvasId = (html.match(/id="(ffMarkupCanvas_\d+)"/) || [])[1];
+        if (canvasId && data.zones?.length) {
+          requestAnimationFrame(() => _drawFadeFinishMarkup(canvasId, data.zones));
+        }
       }
     } catch(e) {
       if (card) card.innerHTML = `<p style="color:var(--text2);font-size:13px;padding:8px 0;">Couldn't reach the server — check your connection and try again.</p>`;
@@ -7056,6 +7081,7 @@ function _triggerFadeFinishUpload(card) {
 
 function _buildFadeFinishResultHtml(g) {
   const score = g.overallScore || 0;
+  const scoreDisplay = (score / 10).toFixed(1);
   const band  = score >= 96 ? { label:'Barber-Level', color:'#b8e0ff' }
               : score >= 86 ? { label:'Clean',         color:'#6ddb8e' }
               : score >= 71 ? { label:'Good',           color:'#e8d5a3' }
@@ -7066,27 +7092,23 @@ function _buildFadeFinishResultHtml(g) {
   const confColor = conf === 'high' ? '#6ddb8e' : conf === 'medium' ? '#e8d5a3' : '#e8b86d';
   const confLabel = conf === 'high' ? 'High' : conf === 'medium' ? 'Medium' : 'Low';
   const confNote  = conf === 'low'
-    ? `<div style="font-size:11px;color:var(--text3);margin-top:10px;padding:8px 10px;background:rgba(232,184,109,0.08);border-radius:7px;line-height:1.5;">I can still review this, but a clearer side-profile photo would make the score more accurate.</div>`
+    ? `<div style="font-size:11px;color:var(--text3);margin:0 0 12px;padding:8px 10px;background:rgba(232,184,109,0.08);border-radius:7px;line-height:1.5;">A clearer side-profile photo would make the score more accurate — but I've done my best with this one.</div>`
     : '';
 
-  const metrics = [
-    g.guidelinePlacement && { label:'Guideline Placement', score:g.guidelinePlacement.score, note:g.guidelinePlacement.assessment },
-    g.blendQuality       && { label:'Blend Quality',       score:g.blendQuality.score,       note:g.blendQuality.assessment },
-    g.sideburnShape      && { label:'Sideburn Shape',      score:g.sideburnShape.score,      note:g.sideburnShape.assessment },
-    g.fadeConsistency    && { label:'Fade Consistency',    score:g.fadeConsistency.score,    note:g.fadeConsistency.assessment },
-    g.cleanupQuality     && { label:'Cleanup Quality',     score:g.cleanupQuality.score,     note:g.cleanupQuality.assessment },
-  ].filter(Boolean);
+  const strengths = (g.strengths || g.whatYouDidWell || []);
+  const improvements = (g.areasToImprove || []);
 
-  const metricsHtml = metrics.map(m => `
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
-      <div>
-        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px;">${m.label}</div>
-        <div style="font-size:11px;color:var(--text2);line-height:1.5;">${m.note}</div>
-      </div>
-      <div style="font-size:16px;font-weight:800;color:${m.score>=80?'#6ddb8e':m.score>=60?'#e8d5a3':'#e87575'};flex-shrink:0;">${m.score}</div>
-    </div>`).join('');
+  const strengthsHtml = strengths.length ? `
+    <div class="ff-list-section">
+      <div class="ff-list-title green">Strengths</div>
+      ${strengths.map(s => `<div class="ff-list-item green"><span class="ff-list-dot green"></span>${s}</div>`).join('')}
+    </div>` : '';
 
-  const wellItems = (g.whatYouDidWell || []).map(w => `<div class="fg-well-item">${w}</div>`).join('');
+  const improvementsHtml = improvements.length ? `
+    <div class="ff-list-section">
+      <div class="ff-list-title red">Areas To Improve</div>
+      ${improvements.map(i => `<div class="ff-list-item red"><span class="ff-list-dot red"></span>${i}</div>`).join('')}
+    </div>` : '';
 
   // Lineup section
   const lu = g.lineup || {};
@@ -7106,28 +7128,139 @@ function _buildFadeFinishResultHtml(g) {
     </div>`;
   }).join('');
 
+  const canvasId = 'ffMarkupCanvas_' + Date.now();
+
   return `<div class="fade-grade-card">
     <div class="fg-score-row">
       <div>
         <div style="font-size:10px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--text3);margin-bottom:4px;">Fade Finish · Fade Score</div>
         <div class="fg-score-label" style="color:${band.color};">${band.label}</div>
-        <div class="fg-score-denom">/100</div>
       </div>
-      <div style="text-align:right;">
-        <div class="fg-score-num" style="color:${band.color};">${score}</div>
-        <div style="font-size:10px;font-weight:600;color:${confColor};margin-top:2px;">Confidence: ${confLabel}</div>
+      <div style="text-align:right;line-height:1;">
+        <span class="fg-score-num" style="color:${band.color};">${scoreDisplay}</span><span class="fg-score-denom" style="font-size:16px;color:var(--text3);"> / 10</span>
+        <div style="font-size:10px;font-weight:600;color:${confColor};margin-top:4px;">Confidence: ${confLabel}</div>
       </div>
     </div>
-    ${confNote ? `<div style="padding:0 16px;">${confNote}</div>` : ''}
     <div class="fg-sections">
-      ${metricsHtml}
-      ${wellItems ? `<div><div class="fg-section-title">What You Did Well</div>${wellItems}</div>` : ''}
+      ${confNote}
+      ${strengthsHtml}
+      ${improvementsHtml}
+      ${(g.zones && g.zones.length) ? `
+      <div>
+        <div class="fg-section-title">Visual Markup</div>
+        <div style="position:relative;border-radius:12px;overflow:hidden;margin-top:6px;">
+          <canvas id="${canvasId}" style="width:100%;display:block;border-radius:12px;"></canvas>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:8px;">
+          <span style="font-size:10px;color:var(--text3);display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:#6ddb8e;display:inline-block;"></span>Looks good</span>
+          <span style="font-size:10px;color:var(--text3);display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:#e8d5a3;display:inline-block;"></span>Minor improvement</span>
+          <span style="font-size:10px;color:var(--text3);display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:#e87575;display:inline-block;"></span>Correction needed</span>
+        </div>
+      </div>` : ''}
       ${g.biggestImprovement ? `<div><div class="fg-section-title">Biggest Area To Fix</div><div class="fg-big-improvement">${g.biggestImprovement}</div></div>` : ''}
       ${g.barberRecommendation ? `<div><div class="fg-section-title">Barber Recommendation</div><div class="fg-rec">${g.barberRecommendation}</div></div>` : ''}
       ${lineupRows ? `<div><div class="fg-section-title">Lineup Guidance</div>${lineupRows}</div>` : ''}
       ${g.motivationalNote ? `<div class="fg-motivational">${g.motivationalNote}</div>` : ''}
     </div>
   </div>`;
+}
+
+function _drawFadeFinishMarkup(canvasId, zones) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !state.lastPhotoFile) return;
+  const img = new Image();
+  img.onload = () => {
+    canvas.width  = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+
+    const W = img.naturalWidth;
+    const H = img.naturalHeight;
+    const r = Math.max(18, Math.min(32, W * 0.045));
+
+    const colors = {
+      green:  { fill:'rgba(109,219,142,0.25)', stroke:'#6ddb8e', text:'#6ddb8e' },
+      yellow: { fill:'rgba(232,213,163,0.25)', stroke:'#e8d5a3', text:'#e8d5a3' },
+      red:    { fill:'rgba(232,117,117,0.25)', stroke:'#e87575', text:'#e87575' },
+    };
+
+    zones.forEach(z => {
+      const cx = z.x * W;
+      const cy = z.y * H;
+      const c  = colors[z.color] || colors.yellow;
+
+      // Glow
+      ctx.save();
+      ctx.shadowColor = c.stroke;
+      ctx.shadowBlur  = r * 1.2;
+
+      // Circle
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle   = c.fill;
+      ctx.fill();
+      ctx.strokeStyle = c.stroke;
+      ctx.lineWidth   = 2.5;
+      ctx.stroke();
+      ctx.restore();
+
+      // Arrow
+      if (z.arrowDir) {
+        const arrowLen = r * 1.3;
+        const dirs = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] };
+        const [dx, dy] = dirs[z.arrowDir] || [0, -1];
+        const ax = cx + dx * (r + 4);
+        const ay = cy + dy * (r + 4);
+        const ex = ax + dx * arrowLen;
+        const ey = ay + dy * arrowLen;
+        ctx.save();
+        ctx.strokeStyle = c.stroke;
+        ctx.lineWidth   = 2.5;
+        ctx.lineCap     = 'round';
+        ctx.shadowColor = c.stroke;
+        ctx.shadowBlur  = 6;
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(ex, ey);
+        ctx.stroke();
+        // Arrowhead
+        const hw = 7;
+        const perp = [-dy, dx];
+        ctx.beginPath();
+        ctx.moveTo(ex, ey);
+        ctx.lineTo(ex - dx * hw + perp[0] * hw * 0.5, ey - dy * hw + perp[1] * hw * 0.5);
+        ctx.lineTo(ex - dx * hw - perp[0] * hw * 0.5, ey - dy * hw - perp[1] * hw * 0.5);
+        ctx.closePath();
+        ctx.fillStyle = c.stroke;
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Label
+      if (z.label) {
+        const fontSize = Math.max(13, Math.min(18, W * 0.025));
+        ctx.font = `700 ${fontSize}px -apple-system, sans-serif`;
+        const textW = ctx.measureText(z.label).width;
+        const pad   = 8;
+        const lx    = Math.min(Math.max(cx - textW / 2, pad), W - textW - pad);
+        const ly    = cy + r + (z.arrowDir === 'down' ? r * 1.5 : 0) + fontSize + 8;
+        const clampedLy = Math.min(ly, H - pad);
+
+        // Label bg
+        ctx.fillStyle = 'rgba(0,0,0,0.62)';
+        ctx.beginPath();
+        ctx.roundRect(lx - pad, clampedLy - fontSize, textW + pad * 2, fontSize + pad, 6);
+        ctx.fill();
+
+        ctx.fillStyle = c.text;
+        ctx.fillText(z.label, lx, clampedLy);
+      }
+    });
+
+    URL.revokeObjectURL(img.src);
+  };
+  img.src = URL.createObjectURL(state.lastPhotoFile);
 }
 
 function _computeFadeScore() {
