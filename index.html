@@ -1535,6 +1535,13 @@ body {
 .ff-list-dot { width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:4px; }
 .ff-list-dot.green { background:#6ddb8e; }
 .ff-list-dot.red   { background:#e87575; }
+/* Onboarding */
+.ob-dot { width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,0.18);transition:background .25s,transform .25s; }
+.ob-dot.active { background:#e8d5a3;transform:scale(1.25); }
+.ob-illustration { width:100%;border-radius:16px;overflow:hidden;margin-bottom:20px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07); }
+.ob-eyebrow { font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:rgba(232,213,163,0.6);margin-bottom:8px; }
+.ob-title { font-size:20px;font-weight:800;color:var(--text);line-height:1.2;margin-bottom:8px; }
+.ob-sub { font-size:13px;color:var(--text2);line-height:1.6; }
 
 .fade-score-card {
   margin-bottom:16px;padding:18px 18px 14px;
@@ -8422,7 +8429,146 @@ async function captureARFrame() {
 
 
 
+// ── ONBOARDING ────────────────────────────────────────────────────────────────
+const _OB_SLIDES = [
+  {
+    eyebrow: 'Step 1 of 3',
+    title: 'Upload a side-profile photo',
+    sub: 'Take or upload a clear photo showing your ear and the side of your head. Natural lighting works best.',
+    svg: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;">
+      <rect width="320" height="180" fill="#1a1a1a"/>
+      <!-- Phone frame -->
+      <rect x="108" y="14" width="104" height="152" rx="14" fill="#222" stroke="rgba(255,255,255,0.1)" stroke-width="1.5"/>
+      <rect x="114" y="22" width="92" height="136" rx="8" fill="#0d0d0d"/>
+      <!-- Side profile silhouette -->
+      <ellipse cx="160" cy="74" rx="28" ry="32" fill="#2a2a2a"/>
+      <path d="M132 74 Q128 95 135 110 Q145 128 160 130 Q175 128 185 110 Q192 95 188 74" fill="#2a2a2a"/>
+      <ellipse cx="162" cy="96" rx="5" ry="3" fill="#1a1a1a"/>
+      <!-- Ear indicator -->
+      <circle cx="187" cy="85" r="6" fill="none" stroke="#e8d5a3" stroke-width="1.5" stroke-dasharray="3 2"/>
+      <line x1="187" y1="79" x2="187" y2="72" stroke="#e8d5a3" stroke-width="1.2" stroke-dasharray="2 2"/>
+      <!-- Upload arrow -->
+      <circle cx="160" cy="152" r="0" fill="none"/>
+      <!-- Left arrow label -->
+      <text x="48" y="78" font-size="9" fill="rgba(232,213,163,0.7)" font-family="-apple-system,sans-serif" font-weight="600">Side</text>
+      <text x="48" y="90" font-size="9" fill="rgba(232,213,163,0.7)" font-family="-apple-system,sans-serif" font-weight="600">profile</text>
+      <line x1="82" y1="84" x2="108" y2="84" stroke="rgba(232,213,163,0.4)" stroke-width="1" stroke-dasharray="3 2"/>
+      <!-- Right label -->
+      <text x="218" y="80" font-size="9" fill="rgba(232,213,163,0.7)" font-family="-apple-system,sans-serif" font-weight="600">Ear</text>
+      <text x="218" y="92" font-size="9" fill="rgba(232,213,163,0.7)" font-family="-apple-system,sans-serif" font-weight="600">visible</text>
+      <line x1="194" y1="85" x2="216" y2="85" stroke="rgba(232,213,163,0.4)" stroke-width="1" stroke-dasharray="3 2"/>
+      <!-- Upload button at bottom -->
+      <rect x="128" y="148" width="64" height="20" rx="10" fill="rgba(232,213,163,0.15)" stroke="rgba(232,213,163,0.4)" stroke-width="1"/>
+      <text x="160" y="162" font-size="8.5" fill="#e8d5a3" font-family="-apple-system,sans-serif" font-weight="700" text-anchor="middle">↑ Upload</text>
+    </svg>`,
+  },
+  {
+    eyebrow: 'Step 2 of 3',
+    title: 'AI shows exactly where to fade',
+    sub: 'Your taper guideline is placed directly on your photo — drag it to fine-tune the position for your head shape.',
+    svg: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;">
+      <rect width="320" height="180" fill="#1a1a1a"/>
+      <!-- Photo bg -->
+      <rect x="60" y="16" width="200" height="148" rx="12" fill="#1e1e1e" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+      <!-- Head silhouette -->
+      <ellipse cx="160" cy="76" rx="44" ry="50" fill="#252525"/>
+      <path d="M116 76 Q110 105 120 125 Q138 148 160 150 Q182 148 200 125 Q210 105 204 76" fill="#252525"/>
+      <!-- Ear shape -->
+      <ellipse cx="202" cy="90" rx="7" ry="10" fill="#2a2a2a" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+      <!-- Guideline -->
+      <line x1="72" y1="118" x2="248" y2="112" stroke="#e8d5a3" stroke-width="2.5" stroke-linecap="round"/>
+      <!-- Endpoint dots -->
+      <circle cx="72" cy="118" r="5" fill="#e8d5a3"/>
+      <circle cx="248" cy="112" r="5" fill="#e8d5a3"/>
+      <!-- Guard label -->
+      <rect x="130" y="96" width="60" height="18" rx="9" fill="rgba(232,213,163,0.15)" stroke="rgba(232,213,163,0.5)" stroke-width="1"/>
+      <text x="160" y="109" font-size="8.5" fill="#e8d5a3" font-family="-apple-system,sans-serif" font-weight="700" text-anchor="middle">Guard: None ✦ 0</text>
+      <!-- Drag hint -->
+      <text x="255" y="109" font-size="8" fill="rgba(255,255,255,0.35)" font-family="-apple-system,sans-serif">drag</text>
+      <!-- Fade zone -->
+      <path d="M72 118 Q160 115 248 112 L248 98 Q160 101 72 104 Z" fill="rgba(232,213,163,0.07)" stroke="rgba(232,213,163,0.15)" stroke-width="0.5"/>
+    </svg>`,
+  },
+  {
+    eyebrow: 'Step 3 of 3',
+    title: 'Follow the steps. Build your fade.',
+    sub: 'Get a personalized cut guide with guard numbers, motion direction, and exactly where to blend — for your head, your style.',
+    svg: `<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;">
+      <rect width="320" height="180" fill="#1a1a1a"/>
+      <!-- Step cards -->
+      <!-- Card 1 (active) -->
+      <rect x="20" y="16" width="185" height="68" rx="12" fill="#1e1e1e" stroke="rgba(232,213,163,0.4)" stroke-width="1.5"/>
+      <rect x="30" y="26" width="40" height="14" rx="7" fill="rgba(232,213,163,0.15)"/>
+      <text x="50" y="36.5" font-size="7.5" fill="#e8d5a3" font-family="-apple-system,sans-serif" font-weight="700" text-anchor="middle">Step 1</text>
+      <text x="30" y="54" font-size="9" fill="rgba(255,255,255,0.9)" font-family="-apple-system,sans-serif" font-weight="700">Soften the base</text>
+      <text x="30" y="66" font-size="8" fill="rgba(255,255,255,0.4)" font-family="-apple-system,sans-serif">Guard 0 · flick upward</text>
+      <text x="30" y="76" font-size="8" fill="rgba(255,255,255,0.4)" font-family="-apple-system,sans-serif">along the guideline</text>
+      <!-- Card 2 -->
+      <rect x="20" y="94" width="185" height="50" rx="12" fill="#1a1a1a" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+      <rect x="30" y="103" width="40" height="14" rx="7" fill="rgba(255,255,255,0.05)"/>
+      <text x="50" y="113.5" font-size="7.5" fill="rgba(255,255,255,0.35)" font-family="-apple-system,sans-serif" font-weight="700" text-anchor="middle">Step 2</text>
+      <text x="30" y="130" font-size="9" fill="rgba(255,255,255,0.35)" font-family="-apple-system,sans-serif">Build the blend</text>
+      <!-- Card 3 -->
+      <rect x="20" y="152" width="185" height="22" rx="10" fill="#1a1a1a" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+      <text x="30" y="167" font-size="9" fill="rgba(255,255,255,0.2)" font-family="-apple-system,sans-serif">Refine the taper</text>
+      <!-- Mini photo on right -->
+      <rect x="218" y="16" width="84" height="100" rx="10" fill="#1e1e1e" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+      <ellipse cx="260" cy="56" rx="22" ry="28" fill="#252525"/>
+      <path d="M238 56 Q234 72 240 83 Q250 94 260 95 Q270 94 280 83 Q286 72 282 56" fill="#252525"/>
+      <!-- Active zone highlight -->
+      <path d="M238 72 Q260 70 282 68 L282 58 Q260 60 238 62 Z" fill="rgba(232,213,163,0.2)" stroke="rgba(232,213,163,0.5)" stroke-width="1"/>
+      <text x="260" y="115" font-size="7" fill="rgba(255,255,255,0.3)" font-family="-apple-system,sans-serif" text-anchor="middle">your photo</text>
+    </svg>`,
+  },
+];
+
+let _obStep = 0;
+
+function _obRender() {
+  const s = _OB_SLIDES[_obStep];
+  document.getElementById('obSlide').innerHTML = `
+    <div class="ob-illustration">${s.svg}</div>
+    <div class="ob-eyebrow">${s.eyebrow}</div>
+    <div class="ob-title">${s.title}</div>
+    <div class="ob-sub">${s.sub}</div>
+  `;
+  document.querySelectorAll('.ob-dot').forEach((d, i) => d.classList.toggle('active', i === _obStep));
+  const btn = document.getElementById('obNextBtn');
+  btn.textContent = _obStep === 2 ? 'Start My Free Guide' : 'Next';
+}
+
+function _obNext() {
+  if (_obStep < 2) {
+    _obStep++;
+    _obRender();
+  } else {
+    _obFinish();
+  }
+}
+
+function _obSkip() {
+  _obFinish();
+}
+
+function _obFinish() {
+  localStorage.setItem('shc_obDone', '1');
+  document.getElementById('onboardOverlay').style.display = 'none';
+  showMessages();
+  document.getElementById('fileInput').click();
+}
+
+function _showOnboarding() {
+  _obStep = 0;
+  const overlay = document.getElementById('onboardOverlay');
+  overlay.style.display = 'flex';
+  _obRender();
+}
+
 function triggerUpload() {
+  if (!localStorage.getItem('shc_obDone')) {
+    _showOnboarding();
+    return;
+  }
   showMessages();
   document.getElementById('fileInput').click();
 }
@@ -9148,6 +9294,23 @@ function switchShowcase(type, btn) {
 
   <!-- Photo tip overlay -->
   <div id="photoTipOverlay"></div>
+
+  <!-- ONBOARDING OVERLAY -->
+  <div id="onboardOverlay" style="display:none;position:fixed;inset:0;z-index:9100;background:rgba(0,0,0,0.88);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:none;align-items:flex-end;justify-content:center;padding:0;" onclick="if(event.target===this)_obSkip()">
+    <div id="onboardCard" style="background:#111;border-radius:24px 24px 0 0;width:100%;max-width:480px;padding:28px 24px 36px;position:relative;box-shadow:0 -12px 48px rgba(0,0,0,0.6);">
+      <!-- Progress dots -->
+      <div style="display:flex;justify-content:center;gap:7px;margin-bottom:28px;">
+        <div class="ob-dot" id="obDot0"></div>
+        <div class="ob-dot" id="obDot1"></div>
+        <div class="ob-dot" id="obDot2"></div>
+      </div>
+      <!-- Slide content -->
+      <div id="obSlide"></div>
+      <!-- Buttons -->
+      <button id="obNextBtn" onclick="_obNext()" style="width:100%;padding:15px;background:linear-gradient(135deg,#e8d5a3,#c8a96e);border:none;border-radius:14px;color:#1a1410;font-size:15px;font-weight:800;cursor:pointer;margin-top:20px;letter-spacing:-0.01em;transition:transform .15s,box-shadow .15s;box-shadow:0 4px 20px rgba(232,213,163,0.3);">Next</button>
+      <button onclick="_obSkip()" style="width:100%;padding:11px;background:none;border:none;color:rgba(255,255,255,0.3);font-size:12.5px;cursor:pointer;margin-top:8px;transition:color .15s;">Skip Introduction</button>
+    </div>
+  </div>
 
   <!-- Crop modal -->
   <div id="cropModal">
