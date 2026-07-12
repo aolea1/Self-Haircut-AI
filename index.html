@@ -7339,7 +7339,7 @@ let _authPendingAction = null; // callback to run after login
 
 window._currentUser        = null;
 window._userCredits        = null; // null = not yet loaded; null also used for owner (unlimited)
-window._isOwner            = false;
+window._isOwner            = localStorage.getItem('shc_isOwner') === '1'; // restored instantly, verified by /me
 window._promoAccess        = null; // { code, redeemedAt, expiresAt } or null
 window._freeGuideExpiresAt = null; // null | 'available' | timestamp (ms)
 window._onAuthChange = (user) => {
@@ -7373,6 +7373,7 @@ window._onAuthChange = (user) => {
       if (me?.isOwner) {
         window._isOwner     = true;
         window._userCredits = null;
+        localStorage.setItem('shc_isOwner', '1');
         _updateCreditDisplay();
       }
     }).catch(() => {});
@@ -7406,6 +7407,7 @@ window._onAuthChange = (user) => {
     if (greetEl) greetEl.textContent = '';
     window._userCredits        = null;
     window._isOwner            = false;
+    localStorage.removeItem('shc_isOwner');
     window._promoAccess        = null;
     window._freeGuideExpiresAt = null;
     _updateCreditDisplay();
@@ -8769,6 +8771,7 @@ function sidebarSignOut() {
   _sidebarUser = null;
   window._userCredits = null;
   window._isOwner     = false;
+  localStorage.removeItem('shc_isOwner');
   _updateCreditDisplay();
   if (window._fbSignOut) window._fbSignOut().catch(() => {});
   window._currentUser = null;
