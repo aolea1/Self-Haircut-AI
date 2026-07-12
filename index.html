@@ -4130,41 +4130,8 @@ function renderPhotoTipOverlay() {
 
 // ── POINT PLACEMENT TUTORIAL ─────────────────────────────────────────────────
 function _ppTutSvg() {
-  // Animated SVG illustrating all 4 placement points on a side-profile silhouette
-  return `<svg viewBox="0 0 300 210" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;border-radius:10px;background:#161616;">
-    <!-- Head silhouette -->
-    <ellipse cx="148" cy="88" rx="52" ry="62" fill="#222"/>
-    <path d="M96 88 Q89 118 98 140 Q114 168 148 170 Q182 168 198 140 Q207 118 200 88" fill="#222"/>
-    <!-- Neck -->
-    <rect x="132" y="168" width="32" height="30" rx="6" fill="#1e1e1e"/>
-    <!-- Ear shape -->
-    <ellipse cx="199" cy="102" rx="9" ry="13" fill="#2a2a2a" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
-    <!-- ── POINT 1: Sideburn (white dot, bottom-left of head) ── -->
-    <circle cx="110" cy="148" r="7" fill="rgba(255,255,255,0.7)" opacity="0"
-      style="animation:pp-dot-appear 3.5s 0.3s ease both infinite"/>
-    <text x="74" y="166" font-size="10.5" font-weight="700" fill="rgba(255,255,255,0.7)" font-family="-apple-system,sans-serif" opacity="0"
-      style="animation:pp-label-appear 3.5s 0.3s ease both infinite">Sideburn</text>
-    <!-- ── POINT 2: Top of Ear (gold dot) ── -->
-    <circle cx="199" cy="91" r="7" fill="#e8d5a3" opacity="0"
-      style="animation:pp-dot-appear 3.5s 0.9s ease both infinite"/>
-    <text x="210" y="88" font-size="10.5" font-weight="700" fill="#e8d5a3" font-family="-apple-system,sans-serif" opacity="0"
-      style="animation:pp-label-appear 3.5s 0.9s ease both infinite">Top of Ear</text>
-    <!-- ── POINT 3: Bottom of Ear (blue dot) ── -->
-    <circle cx="199" cy="113" r="7" fill="#78c8ff" opacity="0"
-      style="animation:pp-dot-appear 3.5s 1.5s ease both infinite"/>
-    <text x="210" y="116" font-size="10.5" font-weight="700" fill="#78c8ff" font-family="-apple-system,sans-serif" opacity="0"
-      style="animation:pp-label-appear 3.5s 1.5s ease both infinite">Bottom of Ear</text>
-    <!-- ── POINT 4: Guideline (green horizontal line) ── -->
-    <line x1="96" y1="113" x2="208" y2="113" stroke="#6ddb8e" stroke-width="2.5" stroke-linecap="round"
-      stroke-dasharray="112" stroke-dashoffset="112" opacity="0"
-      style="animation:pp-guideline-appear 1.2s 2.2s ease forwards infinite"/>
-    <circle cx="96"  cy="113" r="5" fill="#6ddb8e" opacity="0" style="animation:pp-dot-appear 3.5s 2.3s ease both infinite"/>
-    <circle cx="208" cy="113" r="5" fill="#6ddb8e" opacity="0" style="animation:pp-dot-appear 3.5s 2.3s ease both infinite"/>
-    <text x="108" y="127" font-size="10.5" font-weight="700" fill="#6ddb8e" font-family="-apple-system,sans-serif" opacity="0"
-      style="animation:pp-label-appear 3.5s 2.3s ease both infinite">Guideline</text>
-    <!-- Replay label -->
-    <text x="150" y="198" font-size="9" fill="rgba(255,255,255,0.2)" font-family="-apple-system,sans-serif" text-anchor="middle">↻ Loops automatically</text>
-  </svg>`;
+  return `<video src="crop_example.mp4" autoplay muted loop playsinline
+    style="width:100%;display:block;border-radius:10px;background:#161616;"></video>`;
 }
 
 function _ppTutToggle(tutId, scrollTo) {
