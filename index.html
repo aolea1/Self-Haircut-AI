@@ -4130,7 +4130,7 @@ function renderPhotoTipOverlay() {
 
 // ── POINT PLACEMENT TUTORIAL ─────────────────────────────────────────────────
 function _ppTutSvg() {
-  return `<video src="crop_example.mp4" autoplay muted loop playsinline
+  return `<video src="crop_tutorial.mov" autoplay muted loop playsinline
     style="width:100%;display:block;border-radius:10px;background:#161616;"></video>`;
 }
 
@@ -8990,6 +8990,8 @@ function showCropModal(file) {
         _crop.img = img;
         const modal = document.getElementById('cropModal');
         modal.style.display = 'flex';
+        // Auto-open the tip every time the crop modal opens
+        document.getElementById('cropTip')?.classList.add('tip-open');
         // Draw after a frame so the modal is visible and sized
         requestAnimationFrame(() => { requestAnimationFrame(_cropDraw); });
 
@@ -9485,7 +9487,7 @@ function switchShowcase(type, btn) {
       <div id="cropTipBody">
         <div id="cropTipInner">
           <div id="cropTipCoachText">For the best results, include your entire sideburn and ear in the crop.</div>
-          <video src="crop_example.mp4" autoplay loop muted playsinline></video>
+          <video src="crop_tutorial.mov" autoplay loop muted playsinline></video>
           <div id="cropTipText">Tap anywhere outside to close.</div>
         </div>
       </div>
