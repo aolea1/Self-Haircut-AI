@@ -5153,9 +5153,19 @@ async function startTaperShaping() {
   msg.innerHTML = `${aiAvatar()}<div class="msg-body"><div class="msg-name">SelfHaircut.ai</div>
     <div class="msg-text">
       <p style="font-size:13.5px;line-height:1.6;margin:0 0 10px;color:var(--text);">Show me where you want your taper. Drag the four dots until the shape looks right for you.</p>
+      <div class="pp-tut-card" id="taperTut">
+        <div class="pp-tut-header" onclick="this.closest('.pp-tut-card').querySelector('.pp-tut-body').classList.toggle('expanded');this.closest('.pp-tut-card').querySelector('.pp-tut-body').classList.toggle('collapsed');this.querySelector('.pp-tut-chevron').classList.toggle('open');">
+          <span class="pp-tut-header-label">▶ Point Placement Example</span>
+          <span class="pp-tut-chevron open">▾</span>
+        </div>
+        <div class="pp-tut-body expanded">
+          <div style="padding:0 14px 12px;">
+            <video src="point_placement_tutorial.mov" autoplay muted loop playsinline style="width:100%;display:block;border-radius:10px;background:#161616;"></video>
+          </div>
+        </div>
+      </div>
       <div class="guide-img-wrap" style="position:relative;overflow:visible;"></div>
       <div class="drag-hint" style="margin-top:8px;">↕ Drag any dot to adjust your taper</div>
-      <button onclick="openTaperExample()" style="display:block;width:100%;margin-top:8px;padding:10px;background:rgba(232,213,163,0.08);border:1px solid rgba(232,213,163,0.25);border-radius:14px;color:rgba(232,213,163,0.82);font-size:14px;font-weight:600;cursor:pointer;letter-spacing:0.01em;">▶ See Example</button>
       <button class="opt-btn" style="margin-top:10px;width:100%;font-size:15px;padding:14px;letter-spacing:0.02em;" onclick="finalizeTaperShape(this)">That's My Taper — Let's Build This Fade</button>
     </div></div>`;
   messagesWrap.appendChild(msg);
