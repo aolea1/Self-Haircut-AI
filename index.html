@@ -5300,6 +5300,8 @@ function _isPromoActive() {
 }
 
 function _updateCreditDisplay() {
+  // Always keep localStorage in sync so the next page load renders instantly
+  if (typeof _saveUserStateCache === 'function') _saveUserStateCache();
   const badge        = document.getElementById('topbarCreditBadge');
   const countEl      = document.getElementById('topbarCreditCount');
   const sidebarCount = document.getElementById('sidebarCreditCount');
@@ -7625,10 +7627,42 @@ let _authMode = 'signin'; // 'signin' | 'signup'
 let _authPendingAction = null; // callback to run after login
 
 window._currentUser        = null;
-window._userCredits        = null; // null = not yet loaded; null also used for owner (unlimited)
-window._isOwner            = localStorage.getItem('shc_isOwner') === '1'; // restored instantly, verified by /me
-window._promoAccess        = null; // { code, redeemedAt, expiresAt } or null
-window._freeGuideExpiresAt = null; // null | 'available' | timestamp (ms)
+window._isOwner            = localStorage.getItem('shc_isOwner') === '1';
+// Restore credits/promo from cache so the badge shows instantly on every page load
+(function _restoreCachedState() {
+  try {
+    const cached = JSON.parse(localStorage.getItem('shc_userState') || 'null');
+    if (cached) {
+      window._userCredits        = cached.credits  ?? null;
+      window._promoAccess        = cached.promo    ?? null;
+      window._freeGuideExpiresAt = cached.fgExp    ?? null;
+    } else {
+      window._userCredits        = null;
+      window._promoAccess        = null;
+      window._freeGuideExpiresAt = null;
+    }
+  } catch(e) {
+    window._userCredits = null; window._promoAccess = null; window._freeGuideExpiresAt = null;
+  }
+  // Paint immediately if we have cached owner or credit state
+  if (window._isOwner || window._userCredits !== null) _updateCreditDisplay();
+})();
+function _saveUserStateCache() {
+  try {
+    if (window._isOwner) {
+      localStorage.setItem('shc_isOwner', '1');
+      localStorage.removeItem('shc_userState');
+    } else {
+      localStorage.removeItem('shc_isOwner');
+      localStorage.setItem('shc_userState', JSON.stringify({
+        credits: window._userCredits,
+        promo:   window._promoAccess,
+        fgExp:   window._freeGuideExpiresAt,
+      }));
+    }
+  } catch(e) {}
+}
+
 window._onAuthChange = (user) => {
   window._currentUser = user;
   const btn   = document.getElementById('authTopbarBtn');
@@ -7660,7 +7694,7 @@ window._onAuthChange = (user) => {
       if (me?.isOwner) {
         window._isOwner     = true;
         window._userCredits = null;
-        localStorage.setItem('shc_isOwner', '1');
+        _saveUserStateCache();
         _updateCreditDisplay();
       }
     }).catch(() => {});
@@ -7683,6 +7717,7 @@ window._onAuthChange = (user) => {
           window._freeGuideExpiresAt = null;
         }
       }
+      _saveUserStateCache();
       _updateCreditDisplay();
       if (typeof _startPromoTicker === 'function') _startPromoTicker();
       _startFreeGuideTicker();
@@ -7694,9 +7729,10 @@ window._onAuthChange = (user) => {
     if (greetEl) greetEl.textContent = '';
     window._userCredits        = null;
     window._isOwner            = false;
-    localStorage.removeItem('shc_isOwner');
     window._promoAccess        = null;
     window._freeGuideExpiresAt = null;
+    localStorage.removeItem('shc_isOwner');
+    localStorage.removeItem('shc_userState');
     _updateCreditDisplay();
     const heroCta = document.getElementById('heroFreeGuideCta');
     if (heroCta) { heroCta.style.display = ''; heroCta.onclick = () => openAuthModal(null); }
