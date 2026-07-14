@@ -281,6 +281,7 @@ tr:hover td { background:var(--surface2); }
     <button class="tab"        data-tab="logs"       onclick="switchTab('logs')">Logs</button>
     <button class="tab"        data-tab="feedback"   onclick="switchTab('feedback')">Feedback</button>
     <button class="tab"        data-tab="health"     onclick="switchTab('health')">Health</button>
+    <button class="tab"        data-tab="debug"      onclick="switchTab('debug')">Debug</button>
   </div>
 
   <!-- Content -->
@@ -291,6 +292,7 @@ tr:hover td { background:var(--surface2); }
     <div id="tab-logs"     style="display:none"></div>
     <div id="tab-feedback" style="display:none"></div>
     <div id="tab-health"   style="display:none"></div>
+    <div id="tab-debug"    style="display:none"></div>
   </div>
 
 </div>
@@ -381,7 +383,7 @@ window.refreshCurrentTab = function() {
 
 function loadTab(tab) {
   _loaded[tab] = true;
-  const fns = { overview: loadOverview, users: loadUsers, analytics: loadAnalytics, logs: loadLogs, feedback: loadFeedback, health: loadHealth };
+  const fns = { overview: loadOverview, users: loadUsers, analytics: loadAnalytics, logs: loadLogs, feedback: loadFeedback, health: loadHealth, debug: loadDebug };
   fns[tab]?.();
 }
 
@@ -741,6 +743,65 @@ async function loadHealth() {
     `);
   } catch(e) {
     setHtml('health', `<div class="error-box">${e.message}</div>`);
+  }
+}
+
+// ── DEBUG: AI REQUEST LOG ─────────────────────────────────────────────────────
+async function loadDebug() {
+  loading('debug');
+  try {
+    const d = await apiFetch('/founder/ai-requests?limit=100');
+    const items = d.items || [];
+    if (!items.length) { setHtml('debug', '<div class="empty-state">No AI requests logged yet.</div>'); return; }
+
+    const rows = items.map(r => {
+      const dt   = r.at ? new Date(r.at).toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit', second:'2-digit' }) : '—';
+      const ok   = r.success;
+      const badge = ok
+        ? '<span style="color:var(--green);font-weight:600">✓ OK</span>'
+        : '<span style="color:var(--red);font-weight:600">✗ FAIL</span>';
+      const cat  = r.errorCategory ? `<span style="color:var(--accent);font-size:11px">${esc(r.errorCategory)}</span>` : '';
+      const retry= r.retried ? '<span style="color:var(--text3);font-size:11px"> retried</span>' : '';
+      const ms   = r.totalMs != null ? `<span style="color:var(--text3);font-size:11px">${r.totalMs}ms</span>` : '';
+      const size = r.originalSize ? `${Math.round(r.originalSize/1024)}KB` : '—';
+      const dims = (r.originalWidth && r.originalHeight) ? `${r.originalWidth}×${r.originalHeight}` : '—';
+      const uid  = r.uid ? `<span style="font-size:11px;color:var(--text3)">${r.uid.slice(0,12)}</span>` : '';
+
+      const err1 = r.attempt1Error ? `<div style="font-size:11px;color:var(--red);margin-top:4px">A1: ${esc(r.attempt1Error)}</div>` : '';
+      const err2 = r.attempt2Error ? `<div style="font-size:11px;color:var(--red);margin-top:2px">A2: ${esc(r.attempt2Error)}</div>` : '';
+      const raw1 = r.attempt1Raw ? `<details style="margin-top:4px"><summary style="font-size:11px;cursor:pointer;color:var(--text3)">Raw A1 response</summary><pre style="font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--text3);margin:4px 0">${esc(r.attempt1Raw)}</pre></details>` : '';
+      const raw2 = r.attempt2Raw ? `<details style="margin-top:2px"><summary style="font-size:11px;cursor:pointer;color:var(--text3)">Raw A2 response</summary><pre style="font-size:10px;white-space:pre-wrap;word-break:break-all;color:var(--text3);margin:4px 0">${esc(r.attempt2Raw)}</pre></details>` : '';
+
+      return `<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--surface)">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px">
+          ${badge}
+          <span style="font-weight:600;font-size:13px">${esc(r.endpoint || '—')}</span>
+          ${cat}${retry}${ms}
+          <span style="margin-left:auto;font-size:11px;color:var(--text3)">${dt}</span>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--text3);margin-bottom:4px">
+          <span>Size: ${size}</span>
+          <span>Dims: ${dims}</span>
+          <span>Mime: ${esc(r.originalMime||'—')}</span>
+          <span>Model: ${esc(r.model||'—')}</span>
+          ${uid ? `<span>UID: ${uid}</span>` : ''}
+        </div>
+        ${err1}${err2}${raw1}${raw2}
+      </div>`;
+    }).join('');
+
+    const failCount = items.filter(r => !r.success).length;
+    setHtml('debug', `
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+        <span style="font-size:13px;color:var(--text2)">Last <strong>${items.length}</strong> AI requests</span>
+        <span style="color:var(--red);font-size:13px">${failCount} failed</span>
+        <span style="color:var(--green);font-size:13px">${items.length - failCount} succeeded</span>
+        <button class="btn-sm" onclick="loadDebug()" style="margin-left:auto">Refresh</button>
+      </div>
+      ${rows}
+    `);
+  } catch(e) {
+    setHtml('debug', `<div class="error-state">Failed to load debug log: ${esc(e?.error || e?.message || 'Unknown error')}</div>`);
   }
 }
 
