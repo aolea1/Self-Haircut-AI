@@ -3038,6 +3038,20 @@ function _logEvent(event, data = {}) {
 }
 
 // Log analysis failure with context
+// Maps backend reason codes to specific user-facing messages
+function _analysisErrorMsg(reason, status) {
+  if (reason === 'timeout')          return 'The AI took too long to respond. This can happen on busy periods — your photo was received. Try again in a moment.';
+  if (reason === 'overloaded')       return 'The AI is handling high demand right now. Your photo was received — please try again in 30 seconds.';
+  if (reason === 'api_error')        return 'The AI returned an error on both attempts. Your photo was received and no credit was used. Try again shortly.';
+  if (reason === 'bad_response')     return 'The AI returned an unexpected response. No credit was used. Please try again.';
+  if (reason === 'unreadable_image') return 'We couldn\'t read your photo — it may be corrupted. Try saving it as a JPEG and uploading again.';
+  if (reason === 'not_configured')   return 'The AI analysis service is temporarily unavailable. Please try again later.';
+  if (reason === 'no_file')          return 'The photo didn\'t upload correctly. Please try again.';
+  if (status === 402)                return null; // handled separately (paywall)
+  if (status === 422)                return null; // handled separately (unusable photo)
+  return 'Analysis failed on both attempts. No credit was used. Please try again or upload a clearer photo.';
+}
+
 function _logFailure(feature, reason, extra = {}) {
   const user = window._currentUser;
   if (!user) return;
@@ -3843,13 +3857,16 @@ async function claudeAnalysis(file, isFreePreview = false) {
     if (isFreePreview) {
       await freeAnalysis(file);
     } else {
-      addAIMessage(`<p>Server error (${res.status}). Please try again in a moment.</p>`, null);
+      const errData = await res.json().catch(() => ({}));
+      const msg = _analysisErrorMsg(errData.reason, res.status);
+      addAIMessage(`<p>${msg || `Server error (${res.status}). Please try again in a moment.`}</p>`, null);
+      _logFailure('analyze', errData.reason || res.status, { status: res.status });
     }
     return;
   }
   let guide;
   try { guide = await res.json(); } catch(e) {
-    addAIMessage('<p>Unexpected server response. Please try again.</p>', null);
+    addAIMessage('<p>The server returned an unexpected response. No credit was used. Please try again.</p>', null);
     return;
   }
   state.phase = 'guide-shown';
@@ -6883,12 +6900,18 @@ async function _fetchAndShowBarberReport(photoFile) {
   _logEvent('feature_barber_report');
   try {
     const res = await fetch(BACKEND_URL + '/barber-report', { method: 'POST', body: fd });
-    if (!res.ok) return;
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      console.warn('[BarberReport] Failed:', res.status, errData.reason || errData.error);
+      _logFailure('barber_report', errData.reason || res.status, { status: res.status });
+      return; // silent — barber report is a bonus, don't interrupt the main flow
+    }
     const r = await res.json();
     const msg = addAIMessage(_buildBarberReportHtml(r), null);
     scrollToMsg(msg);
   } catch(e) {
-    console.warn('[BarberReport] Failed:', e.message);
+    console.warn('[BarberReport] Network error:', e.message);
+    _logFailure('barber_report', 'network_error', { message: e.message });
   }
 }
 
@@ -6959,12 +6982,12 @@ function triggerGradeFadeUpload() {
       typingMsg.remove();
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        if (errData.error === 'AI not configured') {
-          addAIMessage('<p style="color:var(--text2);">The AI analysis service isn\'t configured yet. Please try again later.</p>', null);
-        } else if (errData.error === 'unusable_photo') {
-          addAIMessage(`<p style="color:var(--text2);">${errData.reason || 'The photo couldn\'t be analyzed — make sure at least the fade/ear area is visible and try again.'}</p>`, null);
+        if (errData.error === 'unusable_photo') {
+          addAIMessage(`<p style="color:var(--text2);">${errData.reason || 'Make sure the fade and ear area are visible in the photo, then try again.'}</p>`, null);
         } else {
-          addAIMessage('<p style="color:var(--text2);">Analysis failed — please try again.</p>', null);
+          const msg = _analysisErrorMsg(errData.reason, res.status);
+          addAIMessage(`<p style="color:var(--text2);">${msg || 'Analysis failed — please try again.'}</p>`, null);
+          _logFailure('grade_fade', errData.reason || res.status, { status: res.status });
         }
         return;
       }
@@ -6973,7 +6996,7 @@ function triggerGradeFadeUpload() {
       scrollToMsg(msg);
     } catch(e) {
       typingMsg?.remove();
-      addAIMessage('<p style="color:var(--text2);">Couldn\'t reach the analysis server — check your connection and try again.</p>', null);
+      addAIMessage('<p style="color:var(--text2);">Couldn\'t reach the server — check your connection and try again.</p>', null);
     }
   };
   document.getElementById('fileInput')?.click();
