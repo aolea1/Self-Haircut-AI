@@ -2287,17 +2287,26 @@ body {
   cursor:pointer;margin-bottom:14px;transition:background 0.15s;
 }
 .sidebar-buy-btn:hover { background:rgba(232,213,163,0.18); }
-/* Promo active badge in sidebar */
-.promo-active-badge {
-  display:none;align-items:center;gap:8px;
-  padding:11px 14px;border-radius:12px;
-  background:rgba(80,220,130,0.07);border:1px solid rgba(80,220,130,0.28);
-  margin-bottom:10px;
+/* Sidebar single-line status indicator */
+.sidebar-status {
+  display:none;align-items:center;gap:7px;
+  padding:7px 12px;border-radius:20px;
+  font-size:12px;font-weight:600;margin-bottom:10px;
+  border:1px solid transparent;
 }
-.promo-active-badge.visible { display:flex; }
-.promo-dot { width:7px;height:7px;border-radius:50%;background:rgba(80,220,130,0.9);flex-shrink:0;box-shadow:0 0 6px rgba(80,220,130,0.7); }
-.promo-badge-text { font-size:12px;font-weight:700;color:rgba(80,220,130,0.9);line-height:1.4; }
-.promo-badge-sub  { font-size:11px;color:rgba(80,220,130,0.55);font-weight:400;margin-top:1px; }
+.sidebar-status.visible { display:flex; }
+.sidebar-status.status-owner  { color:rgba(232,213,163,0.85);border-color:rgba(232,213,163,0.2);background:rgba(232,213,163,0.05); }
+.sidebar-status.status-promo  { color:rgba(80,220,130,0.9);border-color:rgba(80,220,130,0.25);background:rgba(80,220,130,0.05); }
+.sidebar-status.status-free   { color:rgba(80,220,130,0.9);border-color:rgba(80,220,130,0.25);background:rgba(80,220,130,0.05); }
+.sidebar-status-dot { width:6px;height:6px;border-radius:50%;flex-shrink:0; }
+.status-owner .sidebar-status-dot  { background:rgba(232,213,163,0.8); }
+.status-promo .sidebar-status-dot,
+.status-free  .sidebar-status-dot  { background:rgba(80,220,130,0.9);box-shadow:0 0 5px rgba(80,220,130,0.6); }
+/* Promo active badge in sidebar — keep for JS refs but replaced by sidebar-status */
+.promo-active-badge { display:none; }
+.promo-active-badge.visible { display:none; }
+.promo-dot { display:none; }
+.promo-badge-text,.promo-badge-sub { display:none; }
 /* Redeem code section */
 .redeem-section { margin-bottom:12px; }
 .redeem-toggle {
@@ -2671,10 +2680,6 @@ body {
 
   <!-- SIGNED OUT STATE -->
   <div id="sidebarSignedOut" class="sidebar-signin" style="display:flex;">
-    <div class="sidebar-signin-copy">
-      <strong>Save your taper setups.</strong><br>
-      Create a free account to revisit your cuts and pick up where you left off.
-    </div>
     <button class="sidebar-google-btn" onclick="openAuthModal(null); closeSidebar();" style="background:#e8d5a3;color:#1a1410;">
       Log In / Create Account
     </button>
@@ -2683,41 +2688,14 @@ body {
 
   <!-- SIGNED IN STATE -->
   <div id="sidebarSignedIn" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
-    <div id="sidebarUserRow" class="sidebar-user-row">
-      <div class="sidebar-avatar" id="sidebarAvatar">?</div>
-      <div class="sidebar-username" id="sidebarUsername">—</div>
-      <button class="sidebar-signout" onclick="sidebarSignOut()">Sign out</button>
-      <a id="founderDashboardLink" href="/dashboard.html" style="display:none;margin-top:8px;font-size:11px;color:var(--text3);text-decoration:none;text-align:center;transition:color .12s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text3)'">★ Founder Dashboard</a>
+
+    <!-- Single status line: owner / promo / free guide -->
+    <div class="sidebar-status" id="sidebarStatus">
+      <span class="sidebar-status-dot"></span>
+      <span id="sidebarStatusText"></span>
     </div>
 
-    <!-- Promo active banner (hidden when no active promo) -->
-    <div class="promo-active-badge" id="sidebarPromoBadge">
-      <div class="promo-dot"></div>
-      <div>
-        <div class="promo-badge-text">Free Access Active</div>
-        <div class="promo-badge-sub" id="sidebarPromoExpiry">—</div>
-      </div>
-    </div>
-
-    <!-- Owner badge (shown only when backend returns isOwner:true) -->
-    <div class="owner-active-badge" id="sidebarOwnerBadge">
-      <div class="owner-badge-icon">★</div>
-      <div>
-        <div class="owner-badge-text">Owner</div>
-        <div class="owner-badge-sub">Unlimited access</div>
-      </div>
-    </div>
-
-    <!-- Free guide banner (hidden when not applicable) -->
-    <div class="promo-active-badge" id="sidebarFreeGuideBadge">
-      <div class="promo-dot"></div>
-      <div>
-        <div class="promo-badge-text">Free Guide</div>
-        <div class="promo-badge-sub" id="sidebarFreeGuideExpiry">—</div>
-      </div>
-    </div>
-
-    <!-- Credits row (hidden while promo is active) -->
+    <!-- Credits row -->
     <div class="sidebar-credits-row" id="sidebarCreditsRow">
       <div>
         <div class="sidebar-credits-label">Credits</div>
@@ -2726,9 +2704,14 @@ body {
       <button class="sidebar-buy-btn" style="width:auto;margin:0;padding:8px 14px;font-size:12.5px;" onclick="showPurchaseScreen();closeSidebar();">Buy Credits</button>
     </div>
 
-    <!-- Redeem code -->
+    <!-- Hidden legacy badge refs so JS doesn't break -->
+    <div id="sidebarPromoBadge" style="display:none;"><span id="sidebarPromoExpiry"></span></div>
+    <div id="sidebarOwnerBadge" style="display:none;"></div>
+    <div id="sidebarFreeGuideBadge" style="display:none;"><span id="sidebarFreeGuideExpiry"></span></div>
+
+    <!-- Redeem code (collapsed by default) -->
     <div class="redeem-section" id="redeemSection">
-      <button class="redeem-toggle" id="redeemToggleBtn" onclick="_toggleRedeemInput()">Redeem access code</button>
+      <button class="redeem-toggle" id="redeemToggleBtn" onclick="_toggleRedeemInput()">Have a promo code?</button>
       <div class="redeem-input-row" id="redeemInputRow">
         <input class="redeem-input" id="redeemCodeInput" type="text" placeholder="Enter code" maxlength="32"
           onkeydown="if(event.key==='Enter')_submitRedeemCode()">
@@ -2759,9 +2742,14 @@ body {
   </div>
 
   <div class="sidebar-bottom" id="sidebarBottom" style="display:none;">
-    <div style="font-size:11px;color:var(--text3);text-align:center;line-height:1.5;">
-      Cuts and notes sync to your account automatically.
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0 4px;">
+      <div id="sidebarUserRow" class="sidebar-user-row" style="flex:1;min-width:0;">
+        <div class="sidebar-avatar" id="sidebarAvatar" style="width:22px;height:22px;font-size:10px;">?</div>
+        <div class="sidebar-username" id="sidebarUsername" style="font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</div>
+      </div>
+      <button class="sidebar-signout" onclick="sidebarSignOut()" style="font-size:11px;padding:4px 8px;flex-shrink:0;">Sign out</button>
     </div>
+    <a id="founderDashboardLink" href="/dashboard.html" style="display:none;margin-top:6px;font-size:10.5px;color:var(--text3);text-decoration:none;text-align:center;transition:color .12s;padding:2px 0;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text3)'">★ Founder Dashboard</a>
   </div>
 </aside>
 
@@ -2810,7 +2798,7 @@ body {
       <div class="lp-hero">
         <div id="personalGreeting"></div>
         <div id="recreateBanner"></div>
-        <p id="authGreeting" style="font-size:13.5px;font-weight:600;color:rgba(232,213,163,0.70);margin-bottom:6px;min-height:0;"></p>
+        <p id="authGreeting" style="display:none;"></p>
         <h1 class="lp-h1">Stop Paying $50 For A Cleanup</h1>
         <p class="lp-sub">Upload a picture. Shape your taper. Follow the fade.</p>
         <p id="heroFreeGuideCta" class="lp-free-cta" style="display:none;">Make a free account and get your first guide free.</p>
@@ -5310,86 +5298,69 @@ function _isPromoActive() {
 }
 
 function _updateCreditDisplay() {
-  // Always keep localStorage in sync so the next page load renders instantly
   if (typeof _saveUserStateCache === 'function') _saveUserStateCache();
   const badge        = document.getElementById('topbarCreditBadge');
   const countEl      = document.getElementById('topbarCreditCount');
   const sidebarCount = document.getElementById('sidebarCreditCount');
   const creditsRow   = document.getElementById('sidebarCreditsRow');
-  const promoBadge   = document.getElementById('sidebarPromoBadge');
-  const promoExpiry  = document.getElementById('sidebarPromoExpiry');
   const redeemSec    = document.getElementById('redeemSection');
+  const statusEl     = document.getElementById('sidebarStatus');
+  const statusText   = document.getElementById('sidebarStatusText');
+
+  const setStatus = (cls, text) => {
+    if (!statusEl) return;
+    statusEl.className = 'sidebar-status visible ' + cls;
+    if (statusText) statusText.textContent = text;
+  };
+  const clearStatus = () => { if (statusEl) statusEl.className = 'sidebar-status'; };
 
   if (!window._currentUser) {
     if (badge) badge.classList.remove('visible', 'low', 'empty', 'promo', 'owner');
+    clearStatus();
     return;
   }
 
-  // Owner — show permanent "Unlimited" badge, skip all other logic
   if (window._isOwner) {
     if (badge)   { badge.classList.add('visible', 'owner'); badge.classList.remove('low', 'empty', 'promo'); }
     if (countEl) countEl.textContent = 'Unlimited';
-    const ownerBadge = document.getElementById('sidebarOwnerBadge');
-    if (ownerBadge)  ownerBadge.classList.add('visible');
+    setStatus('status-owner', '★ Unlimited access');
     const dashLink = document.getElementById('founderDashboardLink');
     if (dashLink) dashLink.style.display = 'block';
-    if (promoBadge)  promoBadge.classList.remove('visible');
-    if (fgBadge)     fgBadge.classList.remove('visible');
-    if (creditsRow)  creditsRow.style.display = 'none';
-    if (redeemSec)   redeemSec.style.display  = 'none';
+    if (creditsRow) creditsRow.style.display = 'none';
+    if (redeemSec)  redeemSec.style.display  = 'none';
     return;
   }
 
   const promoActive = _isPromoActive();
-
-  const fgExp     = window._freeGuideExpiresAt;
-  const fgActive  = fgExp && fgExp !== 'available' && fgExp > Date.now();
-  const fgAvail   = fgExp === 'available';
-
-  // Sidebar free guide badge (separate from promo badge)
-  const fgBadge   = document.getElementById('sidebarFreeGuideBadge');
-  const fgExpiry  = document.getElementById('sidebarFreeGuideExpiry');
+  const fgExp    = window._freeGuideExpiresAt;
+  const fgActive = fgExp && fgExp !== 'available' && fgExp > Date.now();
+  const fgAvail  = fgExp === 'available';
 
   if (promoActive) {
-    // Topbar: green promo badge
     if (badge)   { badge.classList.add('visible', 'promo'); badge.classList.remove('low', 'empty'); }
     if (countEl) countEl.textContent = 'Free Access';
-    // Sidebar
-    if (promoBadge) promoBadge.classList.add('visible');
-    if (fgBadge)    fgBadge.classList.remove('visible');
+    const remaining = _promoTimeRemaining(window._promoAccess.expiresAt);
+    setStatus('status-promo', `Free Access · ${remaining ? 'expires in ' + remaining : 'expiring soon'}`);
     if (creditsRow) creditsRow.style.display = 'none';
     if (redeemSec)  redeemSec.style.display  = 'none';
-    if (promoExpiry) {
-      const remaining = _promoTimeRemaining(window._promoAccess.expiresAt);
-      promoExpiry.textContent = remaining ? `Expires in ${remaining}` : 'Expiring soon';
-    }
   } else if (fgActive) {
-    // Free guide session in progress
     if (badge)   { badge.classList.add('visible', 'promo'); badge.classList.remove('low', 'empty'); }
     const mins = Math.ceil((fgExp - Date.now()) / 60000);
     if (countEl) countEl.textContent = `Free Guide — ${mins}m`;
-    if (promoBadge) promoBadge.classList.remove('visible');
-    if (fgBadge)    fgBadge.classList.add('visible');
+    setStatus('status-free', `Free guide · ${mins}m remaining`);
     if (creditsRow) creditsRow.style.display = 'none';
     if (redeemSec)  redeemSec.style.display  = '';
-    if (fgExpiry) fgExpiry.textContent = `${mins} minute${mins === 1 ? '' : 's'} remaining`;
   } else if (fgAvail) {
-    // Free guide not yet started
     if (badge)   { badge.classList.add('visible', 'promo'); badge.classList.remove('low', 'empty'); }
     if (countEl) countEl.textContent = 'Free Guide';
-    if (promoBadge) promoBadge.classList.remove('visible');
-    if (fgBadge)    fgBadge.classList.add('visible');
+    setStatus('status-free', 'Free guide available');
     if (creditsRow) creditsRow.style.display = 'none';
     if (redeemSec)  redeemSec.style.display  = '';
-    if (fgExpiry) fgExpiry.textContent = 'Tap to start your free guided haircut';
   } else {
-    // Normal credit display
     const credits = window._userCredits;
-    if (promoBadge) promoBadge.classList.remove('visible');
-    if (fgBadge)    fgBadge.classList.remove('visible');
+    clearStatus();
     if (creditsRow) creditsRow.style.display = '';
     if (redeemSec)  redeemSec.style.display  = '';
-
     if (credits === null) {
       if (badge) badge.classList.remove('visible', 'low', 'empty', 'promo');
       if (sidebarCount) sidebarCount.textContent = '—';
