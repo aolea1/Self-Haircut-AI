@@ -781,6 +781,10 @@ body {
 .attach-btn:hover { background: var(--surface2); color: var(--text); }
 .attach-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
 
+/* Compact upload buttons once a photo is in session */
+.photo-uploaded .attach-btn { padding: 4px 7px; font-size: 0; gap: 0; }
+.photo-uploaded .attach-btn svg { width: 15px; height: 15px; }
+
 .upload-preview {
   display: none; padding: 8px 12px 4px; gap: 10px;
   flex-direction: column; align-items: flex-start;
@@ -3154,6 +3158,9 @@ function showMessages() {
 }
 
 // ── HELPERS ──
+function _markPhotoUploaded() {
+  inputDock?.classList.add('photo-uploaded');
+}
 function esc(str) {
   return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
@@ -3718,6 +3725,7 @@ async function analyzePhoto(file) {
   state.tools = state.tools || 'clippers';
   state.phase = 'guide-shown';
   state.lastPhotoFile = croppedFile;
+  _markPhotoUploaded();
   state.profileSide = await detectProfileSide(croppedFile);
   await showTaperPreview(croppedFile);
   await startTaperShaping();
@@ -3809,6 +3817,7 @@ async function freeAnalysis(file) {
     const used = getUsage();
     state.phase = 'guide-shown';
     state.lastPhotoFile = file;
+    _markPhotoUploaded();
 
     if (state.taperStyle === 'buzz') {
       // Buzz: set a sensible default guideLine then build the plan directly
@@ -3871,6 +3880,7 @@ async function claudeAnalysis(file, isFreePreview = false) {
   }
   state.phase = 'guide-shown';
   state.lastPhotoFile = file;
+  _markPhotoUploaded();
   const styleLabels = { low: 'Low Taper', mid: 'Mid Taper', high: 'High Taper', skin: 'Skin Fade' };
   const label = styleLabels[guide.taperType] || styleLabels[state.taperStyle] || 'Taper';
   const used = getUsage();
@@ -9132,6 +9142,7 @@ function resetChat() {
   messagesWrap.innerHTML = ''; messagesWrap.classList.remove('visible');
   chatArea.scrollTop = 0; uploadPreview.innerHTML = '';
   uploadPreview.classList.remove('has-files');
+  inputDock?.classList.remove('photo-uploaded');
   chatInput.value = ''; chatInput.style.height = 'auto';
   sendBtn.disabled = true; closeSidebar();
 }
