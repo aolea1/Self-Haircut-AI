@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auto-Placement Test — SelfHaircut.ai</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f0f0f; --surface: #1a1a1a; --surface2: #222;
+    --border: #2e2e2e; --text: #e8e8e8; --text2: #aaa; --text3: #666;
+    --green: #22c55e; --red: #ef4444; --yellow: #f59e0b; --blue: #6366f1;
+    --gold: rgba(232,213,163,0.95);
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', system-ui, sans-serif; font-size: 13px; line-height: 1.5; padding: 24px; }
+  h1 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { color: var(--text3); font-size: 12px; margin-bottom: 24px; }
+  .grid { display: grid; grid-template-columns: 380px 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .panel-title { font-weight: 600; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text3); margin-bottom: 12px; }
+  input[type="file"] { display: none; }
+  .upload-zone {
+    border: 2px dashed var(--border); border-radius: 8px; padding: 32px 16px; text-align: center;
+    cursor: pointer; transition: border-color 0.15s; color: var(--text2);
+  }
+  .upload-zone:hover { border-color: var(--gold); }
+  .upload-zone.has-file { border-color: var(--green); border-style: solid; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 9px 18px; border-radius: 8px; border: none; cursor: pointer;
+    font-family: inherit; font-size: 13px; font-weight: 600; transition: opacity 0.12s;
+  }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: var(--gold); color: #1a1100; width: 100%; margin-top: 12px; }
+  .btn-secondary { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+  .btn-secondary:hover:not(:disabled) { color: var(--text); }
+  .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.2); border-top-color: var(--text); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; }
+  .badge-green { background: rgba(34,197,94,0.15); color: var(--green); }
+  .badge-red { background: rgba(239,68,68,0.15); color: var(--red); }
+  .badge-yellow { background: rgba(245,158,11,0.15); color: var(--yellow); }
+  .badge-blue { background: rgba(99,102,241,0.15); color: var(--blue); }
+  .row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--border); }
+  .row:last-child { border-bottom: none; }
+  .row-label { color: var(--text3); flex-shrink: 0; margin-right: 12px; }
+  .row-value { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-align: right; word-break: break-all; }
+  .row-value.ok { color: var(--green); }
+  .row-value.warn { color: var(--yellow); }
+  .row-value.err { color: var(--red); }
+  .section { margin-bottom: 16px; }
+  .section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text3); margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+  pre { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-size: 10.5px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; color: var(--text2); max-height: 260px; overflow-y: auto; }
+  .canvas-wrap { position: relative; display: inline-block; }
+  canvas { border-radius: 8px; display: block; }
+  .canvas-label { position: absolute; top: 6px; left: 8px; background: rgba(0,0,0,0.65); color: #fff; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; letter-spacing: 0.05em; pointer-events: none; }
+  .route-auto { background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.3); color: var(--green); padding: 10px 14px; border-radius: 8px; font-weight: 600; }
+  .route-manual { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); color: var(--yellow); padding: 10px 14px; border-radius: 8px; font-weight: 600; }
+  .route-fail { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: var(--red); padding: 10px 14px; border-radius: 8px; font-weight: 600; }
+  .canvases { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+  .error-box { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); border-radius: 8px; padding: 10px 12px; color: var(--red); font-size: 12px; }
+  #results { display: none; }
+  .conf-bar-wrap { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+  .conf-bar { height: 100%; border-radius: 3px; transition: width 0.4s; }
+  .timing-row { font-size: 11px; color: var(--text3); text-align: right; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h1>Auto-Placement Test Environment</h1>
+<p class="subtitle">Developer tool — not linked from the app. Tests the /analyze v2 pipeline end-to-end.</p>
+
+<div class="grid">
+
+  <!-- LEFT: Upload + controls -->
+  <div>
+    <div class="panel" style="margin-bottom:16px;">
+      <div class="panel-title">Upload Photo</div>
+      <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+        <div style="font-size:28px;margin-bottom:8px;">📷</div>
+        <div>Click to upload a side-profile photo</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;">Any format · Any size</div>
+      </div>
+      <input type="file" id="fileInput" accept="image/*" onchange="onFileSelected(event)">
+      <div id="fileInfo" style="margin-top:10px;font-size:12px;color:var(--text3);display:none;"></div>
+
+      <div style="margin-top:14px;">
+        <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:6px;">Taper style</label>
+        <select id="styleSelect" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;width:100%;">
+          <option value="low">Low Taper</option>
+          <option value="mid">Mid Taper</option>
+          <option value="high">High Taper</option>
+          <option value="skin">Skin Fade</option>
+        </select>
+      </div>
+
+      <button class="btn btn-primary" id="analyzeBtn" onclick="runAnalysis()" disabled>
+        Analyze Photo
+      </button>
+
+      <div id="analyzeStatus" style="display:none;margin-top:10px;text-align:center;"></div>
+    </div>
+
+    <!-- Route decision -->
+    <div class="panel" id="routePanel" style="display:none;margin-bottom:16px;">
+      <div class="panel-title">Routing Decision</div>
+      <div id="routeDecision"></div>
+      <div id="routeReason" style="font-size:12px;color:var(--text2);margin-top:8px;"></div>
+    </div>
+
+    <!-- Key metrics -->
+    <div class="panel" id="metricsPanel" style="display:none;">
+      <div class="panel-title">Analysis Metrics</div>
+
+      <div class="section">
+        <div class="section-title">Detection</div>
+        <div class="row"><span class="row-label">Valid</span><span class="row-value" id="mValid">—</span></div>
+        <div class="row"><span class="row-label">Side</span><span class="row-value" id="mSide">—</span></div>
+        <div class="row"><span class="row-label">Failure reason</span><span class="row-value" id="mFailure">—</span></div>
+        <div class="row"><span class="row-label">Validation</span><span class="row-value" id="mValidation">—</span></div>
+        <div class="row"><span class="row-label">Total time</span><span class="row-value" id="mTime">—</span></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Confidence</div>
+        <div class="row"><span class="row-label">Score</span><span class="row-value" id="mConf">—</span></div>
+        <div class="conf-bar-wrap"><div class="conf-bar" id="mConfBar" style="width:0%"></div></div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:3px;">
+          <span>0</span><span>↑60% (min)</span><span>↑85% (high)</span><span>100</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Crop (original-image fracs)</div>
+        <div class="row"><span class="row-label">xFrac</span><span class="row-value" id="cX">—</span></div>
+        <div class="row"><span class="row-label">yFrac</span><span class="row-value" id="cY">—</span></div>
+        <div class="row"><span class="row-label">widthFrac</span><span class="row-value" id="cW">—</span></div>
+        <div class="row"><span class="row-label">heightFrac</span><span class="row-value" id="cH">—</span></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Guide Line (original fracs)</div>
+        <div class="row"><span class="row-label">startX / Y</span><span class="row-value" id="glStart">—</span></div>
+        <div class="row"><span class="row-label">endX / Y</span><span class="row-value" id="glEnd">—</span></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Taper Shape (original fracs)</div>
+        <div class="row"><span class="row-label">sideburn top</span><span class="row-value" id="tsSbTop">—</span></div>
+        <div class="row"><span class="row-label">sideburn bottom</span><span class="row-value" id="tsSbBot">—</span></div>
+        <div class="row"><span class="row-label">rear top</span><span class="row-value" id="tsRrTop">—</span></div>
+        <div class="row"><span class="row-label">rear bottom</span><span class="row-value" id="tsRrBot">—</span></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Remapped State (crop-relative fracs)</div>
+        <div class="row"><span class="row-label">guideLine.lineYFrac</span><span class="row-value" id="rGlY">—</span></div>
+        <div class="row"><span class="row-label">guideLine.startX/endX</span><span class="row-value" id="rGlX">—</span></div>
+        <div class="row"><span class="row-label">sideburn p0</span><span class="row-value" id="rSbP0">—</span></div>
+        <div class="row"><span class="row-label">sideburn p1</span><span class="row-value" id="rSbP1">—</span></div>
+        <div class="row"><span class="row-label">rear p0</span><span class="row-value" id="rRrP0">—</span></div>
+        <div class="row"><span class="row-label">rear p1</span><span class="row-value" id="rRrP1">—</span></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Reasoning</div>
+        <div id="mReasoning" style="font-size:12px;color:var(--text2);font-style:italic;padding:4px 0;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Canvases + raw JSON -->
+  <div>
+    <div class="panel" style="margin-bottom:16px;">
+      <div class="panel-title">Visual Output</div>
+      <div class="canvases" id="canvasArea">
+        <div style="color:var(--text3);font-size:12px;">Upload a photo and run analysis to see visual output.</div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:16px;">
+      <div class="panel-title">Generated Preview (gpt-image-1)</div>
+      <div id="previewArea" style="color:var(--text3);font-size:12px;">
+        Preview will appear here after analysis (requires OPENAI_API_KEY on backend).
+      </div>
+      <button class="btn btn-secondary" id="previewBtn" onclick="runPreview()" style="margin-top:10px;display:none;" disabled>
+        Generate Preview
+      </button>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Raw API Response</div>
+      <pre id="rawJson">Run analysis to see response.</pre>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const BACKEND = 'https://selfhaircut-backend.onrender.com';
+const AUTO_PLACEMENT_HIGH_CONFIDENCE = 0.85;
+const AUTO_PLACEMENT_MIN_CONFIDENCE  = 0.60;
+
+let _file = null;
+let _analysis = null;
+let _croppedFile = null;
+let _t0 = 0;
+
+// ── FILE SELECTION ─────────────────────────────────────────────────────────────
+function onFileSelected(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  _file = file;
+  _analysis = null;
+  _croppedFile = null;
+  document.getElementById('uploadZone').classList.add('has-file');
+  document.getElementById('fileInfo').style.display = 'block';
+  document.getElementById('fileInfo').textContent =
+    `${file.name} · ${(file.size / 1024).toFixed(1)} KB · ${file.type || 'unknown type'}`;
+  document.getElementById('analyzeBtn').disabled = false;
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('routePanel').style.display = 'none';
+  document.getElementById('metricsPanel').style.display = 'none';
+  document.getElementById('rawJson').textContent = 'Run analysis to see response.';
+  document.getElementById('canvasArea').innerHTML = '';
+  document.getElementById('previewArea').innerHTML = '<span style="color:var(--text3);font-size:12px;">Run analysis first.</span>';
+  document.getElementById('previewBtn').style.display = 'none';
+  // Show original image immediately
+  showOriginalCanvas(file);
+}
+
+function showOriginalCanvas(file) {
+  const area = document.getElementById('canvasArea');
+  area.innerHTML = '';
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const maxW = 340;
+      const scale = Math.min(1, maxW / img.width);
+      const W = Math.round(img.width * scale), H = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = W; canvas.height = H;
+      canvas.getContext('2d').drawImage(img, 0, 0, W, H);
+      canvas.style.cssText = 'border-radius:8px;';
+      const wrap = document.createElement('div');
+      wrap.className = 'canvas-wrap';
+      wrap.style.width = W + 'px';
+      const lbl = document.createElement('div');
+      lbl.className = 'canvas-label'; lbl.textContent = 'ORIGINAL';
+      wrap.appendChild(canvas); wrap.appendChild(lbl);
+      area.appendChild(wrap);
+      area._origImg  = img;
+      area._origW    = W;
+      area._origH    = H;
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── ANALYSIS ───────────────────────────────────────────────────────────────────
+async function runAnalysis() {
+  if (!_file) return;
+  _t0 = performance.now();
+
+  const btn = document.getElementById('analyzeBtn');
+  const status = document.getElementById('analyzeStatus');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Analyzing…';
+  status.style.display = 'none';
+
+  let data;
+  try {
+    const fd = new FormData();
+    fd.append('photo', _file);
+    fd.append('style', document.getElementById('styleSelect').value);
+    const res = await fetch(BACKEND + '/analyze', { method: 'POST', body: fd });
+    data = await res.json();
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${data.error || JSON.stringify(data)}`);
+    }
+  } catch(e) {
+    btn.innerHTML = 'Analyze Photo';
+    btn.disabled = false;
+    status.style.display = 'block';
+    status.innerHTML = `<div class="error-box">❌ ${e.message}</div>`;
+    document.getElementById('rawJson').textContent = 'Error — see status above.';
+    return;
+  }
+
+  const elapsed = Math.round(performance.now() - _t0);
+  _analysis = data;
+
+  btn.innerHTML = 'Analyze Photo';
+  btn.disabled = false;
+
+  document.getElementById('rawJson').textContent = JSON.stringify(data, null, 2);
+  renderMetrics(data, elapsed);
+  renderCanvases(data);
+  renderRoute(data);
+
+  document.getElementById('routePanel').style.display = 'block';
+  document.getElementById('metricsPanel').style.display = 'block';
+  document.getElementById('previewBtn').style.display = 'inline-flex';
+  document.getElementById('previewBtn').disabled = false;
+}
+
+// ── METRICS ────────────────────────────────────────────────────────────────────
+function f3(n) { return typeof n === 'number' ? n.toFixed(3) : '—'; }
+function pt(x, y) { return `(${f3(x)}, ${f3(y)})`; }
+
+function renderMetrics(d, elapsed) {
+  const set = (id, val, cls) => {
+    const el = document.getElementById(id);
+    el.textContent = val;
+    if (cls) el.className = 'row-value ' + cls;
+  };
+
+  set('mValid',   d.valid ? 'true' : 'false', d.valid ? 'ok' : 'err');
+  set('mSide',    d.side || '—', d.side === 'unknown' ? 'warn' : (d.side ? 'ok' : ''));
+  set('mFailure', d.failureReason || 'none', d.failureReason ? 'warn' : 'ok');
+  set('mValidation', d._validationOk === false
+    ? `FAILED (${(d._validationErrors || []).join('; ')})`
+    : d._validationOk ? 'PASSED' : '—',
+    d._validationOk === false ? 'err' : d._validationOk ? 'ok' : '');
+  set('mTime', elapsed + ' ms');
+
+  const conf = typeof d.confidence === 'number' ? d.confidence : null;
+  if (conf !== null) {
+    const pct = Math.round(conf * 100);
+    const cls = conf >= AUTO_PLACEMENT_HIGH_CONFIDENCE ? 'ok'
+              : conf >= AUTO_PLACEMENT_MIN_CONFIDENCE  ? 'warn' : 'err';
+    set('mConf', `${pct}% (${conf.toFixed(3)})`, cls);
+    const bar = document.getElementById('mConfBar');
+    bar.style.width = pct + '%';
+    bar.style.background = conf >= 0.85 ? '#22c55e' : conf >= 0.60 ? '#f59e0b' : '#ef4444';
+  }
+
+  const c = d.crop;
+  if (c) {
+    set('cX', f3(c.xFrac));
+    set('cY', f3(c.yFrac));
+    set('cW', f3(c.widthFrac));
+    set('cH', f3(c.heightFrac));
+  }
+
+  const gl = d.guideLine;
+  if (gl) {
+    set('glStart', pt(gl.startXFrac, gl.startYFrac));
+    set('glEnd',   pt(gl.endXFrac,   gl.endYFrac));
+  }
+
+  const ts = d.taperShape;
+  if (ts) {
+    set('tsSbTop', pt(ts.sideburnTopXFrac,    ts.sideburnTopYFrac));
+    set('tsSbBot', pt(ts.sideburnBottomXFrac, ts.sideburnBottomYFrac));
+    set('tsRrTop', pt(ts.rearTopXFrac,        ts.rearTopYFrac));
+    set('tsRrBot', pt(ts.rearBottomXFrac,     ts.rearBottomYFrac));
+  }
+
+  // Remapped (crop-relative) coords
+  if (d.valid && d.confidence >= AUTO_PLACEMENT_MIN_CONFIDENCE && c && gl && ts) {
+    const remap = computeRemap(d);
+    const r = remap;
+    set('rGlY', f3(r.guideLine.lineYFrac));
+    set('rGlX', `${f3(r.guideLine.startXFrac)} → ${f3(r.guideLine.endXFrac)}`);
+    set('rSbP0', pt(r.taperLines.sideburn.p0.x, r.taperLines.sideburn.p0.y));
+    set('rSbP1', pt(r.taperLines.sideburn.p1.x, r.taperLines.sideburn.p1.y));
+    set('rRrP0', pt(r.taperLines.rear.p0.x, r.taperLines.rear.p0.y));
+    set('rRrP1', pt(r.taperLines.rear.p1.x, r.taperLines.rear.p1.y));
+  }
+
+  document.getElementById('mReasoning').textContent = d.reasoningSummary || '(not returned)';
+}
+
+// ── COORDINATE REMAPPING (mirrors index.html _remapAnalysisCoords) ─────────────
+function remapF(origFrac, cropOrigin, cropSize) {
+  return Math.max(0, Math.min(1, (origFrac - cropOrigin) / cropSize));
+}
+
+function computeRemap(d) {
+  const c = d.crop, ts = d.taperShape, gl = d.guideLine;
+  const rx = f => remapF(f, c.xFrac, c.widthFrac);
+  const ry = f => remapF(f, c.yFrac, c.heightFrac);
+  const sbBotX = rx(ts.sideburnBottomXFrac), sbBotY = ry(ts.sideburnBottomYFrac);
+  const sbTopX = rx(ts.sideburnTopXFrac),    sbTopY = ry(ts.sideburnTopYFrac);
+  const rrBotX = rx(ts.rearBottomXFrac),     rrBotY = ry(ts.rearBottomYFrac);
+  const rrTopX = rx(ts.rearTopXFrac),        rrTopY = ry(ts.rearTopYFrac);
+  const glStartX = rx(gl.startXFrac), glStartY = ry(gl.startYFrac);
+  const glEndX   = rx(gl.endXFrac),   glEndY   = ry(gl.endYFrac);
+  const lineYFrac = (glStartY + glEndY) / 2;
+  return {
+    taperLines: {
+      sideburn: { p0: {x:sbBotX,y:sbBotY}, p1: {x:sbTopX,y:sbTopY} },
+      rear:     { p0: {x:rrBotX,y:rrBotY}, p1: {x:rrTopX,y:rrTopY} },
+    },
+    guideLine: {
+      lineYFrac,
+      startXFrac: Math.min(glStartX, glEndX),
+      endXFrac:   Math.max(glStartX, glEndX),
+      earTopFrac: Math.min(sbTopY, rrTopY),
+    },
+  };
+}
+
+// ── ROUTING ────────────────────────────────────────────────────────────────────
+function geometryIsValid(d) {
+  if (!d || !d.valid) return false;
+  const ir = v => typeof v === 'number' && isFinite(v) && v >= 0 && v <= 1;
+  const c = d.crop;
+  if (!c || !ir(c.xFrac) || !ir(c.yFrac)) return false;
+  if (typeof c.widthFrac  !== 'number' || c.widthFrac  < 0.10) return false;
+  if (typeof c.heightFrac !== 'number' || c.heightFrac < 0.15) return false;
+  const gl = d.guideLine;
+  if (!gl || !ir(gl.startXFrac) || !ir(gl.startYFrac) || !ir(gl.endXFrac) || !ir(gl.endYFrac)) return false;
+  if (gl.startXFrac >= gl.endXFrac) return false;
+  const ts = d.taperShape;
+  if (!ts) return false;
+  const keys = ['sideburnTopXFrac','sideburnTopYFrac','sideburnBottomXFrac','sideburnBottomYFrac',
+                 'rearTopXFrac','rearTopYFrac','rearBottomXFrac','rearBottomYFrac'];
+  if (!keys.every(k => ir(ts[k]))) return false;
+  if (ts.sideburnTopYFrac >= ts.sideburnBottomYFrac) return false;
+  if (ts.rearTopYFrac     >= ts.rearBottomYFrac)     return false;
+  if (Math.abs(ts.sideburnBottomXFrac - ts.rearBottomXFrac) < 0.015) return false;
+  if ((ts.sideburnBottomYFrac - ts.sideburnTopYFrac) < 0.03) return false;
+  if ((ts.rearBottomYFrac     - ts.rearTopYFrac)     < 0.03) return false;
+  return true;
+}
+
+function renderRoute(d) {
+  const panel = document.getElementById('routePanel');
+  const dec   = document.getElementById('routeDecision');
+  const rsn   = document.getElementById('routeReason');
+
+  const conf    = typeof d.confidence === 'number' ? d.confidence : 0;
+  const geoOk   = geometryIsValid(d);
+  const valOk   = d._validationOk !== false;
+
+  let html, reason;
+
+  if (d._v2 && d.valid && conf >= AUTO_PLACEMENT_MIN_CONFIDENCE && valOk && geoOk) {
+    html = `<div class="route-auto">✓ AUTOMATIC PLACEMENT${conf >= AUTO_PLACEMENT_HIGH_CONFIDENCE ? '' : ' (medium confidence)'}</div>`;
+    reason = `Confidence ${Math.round(conf * 100)}% ≥ ${Math.round(AUTO_PLACEMENT_MIN_CONFIDENCE * 100)}% threshold · geometry valid · validation passed`;
+  } else if (!d._v2) {
+    html = `<div class="route-fail">⚠ V2 NOT ACTIVE — flag off or legacy response</div>`;
+    reason = 'FEATURE_AUTO_PLACEMENT is not enabled on the backend. Using legacy v1 response.';
+  } else {
+    html = `<div class="route-manual">⟶ MANUAL FALLBACK</div>`;
+    const reasons = [];
+    if (!d.valid) reasons.push('valid=false');
+    if (conf < AUTO_PLACEMENT_MIN_CONFIDENCE) reasons.push(`confidence ${Math.round(conf*100)}% < ${Math.round(AUTO_PLACEMENT_MIN_CONFIDENCE*100)}%`);
+    if (!valOk) reasons.push('schema validation failed: ' + (d._validationErrors || []).join(', '));
+    if (!geoOk) reasons.push('frontend geometry check failed');
+    reason = reasons.join(' · ') || d.failureReason || 'unknown';
+  }
+
+  dec.innerHTML = html;
+  rsn.textContent = reason;
+}
+
+// ── CANVAS RENDERING ───────────────────────────────────────────────────────────
+function drawCropBox(ctx, W, H, crop) {
+  const x = crop.xFrac * W, y = crop.yFrac * H;
+  const w = crop.widthFrac * W, h = crop.heightFrac * H;
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.clearRect(x, y, w, h);
+  ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 2;
+  ctx.setLineDash([6,4]);
+  ctx.strokeRect(x, y, w, h);
+  ctx.restore();
+}
+
+function drawGuideAndTaper(ctx, W, H, d) {
+  const ts = d.taperShape, gl = d.guideLine;
+  const px = f => f * W, py = f => f * H;
+
+  // Taper fill
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(px(ts.sideburnBottomXFrac), py(ts.sideburnBottomYFrac));
+  ctx.lineTo(px(ts.sideburnTopXFrac),    py(ts.sideburnTopYFrac));
+  ctx.lineTo(px(ts.rearTopXFrac),        py(ts.rearTopYFrac));
+  ctx.lineTo(px(ts.rearBottomXFrac),     py(ts.rearBottomYFrac));
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(232,213,163,0.15)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(232,213,163,0.9)'; ctx.lineWidth = 1.8; ctx.setLineDash([]);
+  ctx.stroke();
+  ctx.restore();
+
+  // Four taper handles
+  const handles = [
+    { x: ts.sideburnBottomXFrac, y: ts.sideburnBottomYFrac, label: 'SB bot' },
+    { x: ts.sideburnTopXFrac,    y: ts.sideburnTopYFrac,    label: 'SB top' },
+    { x: ts.rearBottomXFrac,     y: ts.rearBottomYFrac,     label: 'RR bot' },
+    { x: ts.rearTopXFrac,        y: ts.rearTopYFrac,        label: 'RR top' },
+  ];
+  handles.forEach(h => {
+    ctx.save();
+    ctx.beginPath(); ctx.arc(px(h.x), py(h.y), 5, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(232,213,163,0.95)'; ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = '9px monospace';
+    ctx.fillText(h.label, px(h.x) + 8, py(h.y) + 3);
+    ctx.restore();
+  });
+
+  // Guide line
+  ctx.save();
+  ctx.strokeStyle = 'rgba(232,213,163,0.9)'; ctx.lineWidth = 2;
+  ctx.setLineDash([7, 5]);
+  ctx.shadowColor = 'rgba(232,213,163,0.5)'; ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.moveTo(px(gl.startXFrac), py(gl.startYFrac));
+  ctx.lineTo(px(gl.endXFrac),   py(gl.endYFrac));
+  ctx.stroke();
+  ctx.restore();
+}
+
+async function renderCanvases(d) {
+  const area = document.getElementById('canvasArea');
+  // Keep the original canvas (already drawn by showOriginalCanvas)
+  const existingWraps = area.querySelectorAll('.canvas-wrap');
+
+  // Remove everything except the original
+  while (area.children.length > 1) area.removeChild(area.lastChild);
+
+  const origImg = area._origImg;
+  if (!origImg) return;
+  const W = area._origW, H = area._origH;
+
+  // 1. Original + crop box overlay
+  const cropCanvas = document.createElement('canvas');
+  cropCanvas.width = W; cropCanvas.height = H;
+  const cc = cropCanvas.getContext('2d');
+  cc.drawImage(origImg, 0, 0, W, H);
+  if (d.crop) drawCropBox(cc, W, H, d.crop);
+  // Draw guide + taper on the original at full scale (for context)
+  if (d.taperShape && d.guideLine) drawGuideAndTaper(cc, W, H, d);
+
+  const cropWrap = makeCanvasWrap(cropCanvas, 'ORIGINAL + PLACEMENT');
+  area.appendChild(cropWrap);
+
+  // 2. Cropped image with remapped overlay
+  if (d.valid && d.confidence >= AUTO_PLACEMENT_MIN_CONFIDENCE && d.crop && d.taperShape) {
+    const crop = d.crop;
+    const sx = Math.round(crop.xFrac * origImg.naturalWidth);
+    const sy = Math.round(crop.yFrac * origImg.naturalHeight);
+    const sw = Math.min(Math.round(crop.widthFrac  * origImg.naturalWidth),  origImg.naturalWidth  - sx);
+    const sh = Math.min(Math.round(crop.heightFrac * origImg.naturalHeight), origImg.naturalHeight - sy);
+
+    const croppedCanvas = document.createElement('canvas');
+    const cScale = Math.min(1, 340 / sw);
+    croppedCanvas.width  = Math.round(sw * cScale);
+    croppedCanvas.height = Math.round(sh * cScale);
+    const cctx = croppedCanvas.getContext('2d');
+    cctx.drawImage(origImg, sx, sy, sw, sh, 0, 0, croppedCanvas.width, croppedCanvas.height);
+
+    // Draw remapped overlay on the cropped canvas
+    const remap = computeRemap(d);
+    const cW = croppedCanvas.width, cH = croppedCanvas.height;
+    const ts = remap.taperLines, gl = remap.guideLine;
+
+    // Taper fill
+    cctx.save();
+    cctx.beginPath();
+    cctx.moveTo(ts.sideburn.p0.x * cW, ts.sideburn.p0.y * cH);
+    cctx.lineTo(ts.sideburn.p1.x * cW, ts.sideburn.p1.y * cH);
+    cctx.lineTo(ts.rear.p1.x     * cW, ts.rear.p1.y     * cH);
+    cctx.lineTo(ts.rear.p0.x     * cW, ts.rear.p0.y     * cH);
+    cctx.closePath();
+    cctx.fillStyle = 'rgba(232,213,163,0.15)'; cctx.fill();
+    cctx.strokeStyle = 'rgba(232,213,163,0.9)'; cctx.lineWidth = 1.8; cctx.setLineDash([]);
+    cctx.stroke();
+    cctx.restore();
+
+    // Handles
+    [[ts.sideburn.p0,'SB·bot'],[ts.sideburn.p1,'SB·top'],[ts.rear.p0,'RR·bot'],[ts.rear.p1,'RR·top']].forEach(([p,lbl]) => {
+      cctx.save();
+      cctx.beginPath(); cctx.arc(p.x * cW, p.y * cH, 5, 0, Math.PI * 2);
+      cctx.fillStyle = 'rgba(232,213,163,0.95)'; cctx.fill();
+      cctx.fillStyle = '#fff'; cctx.font = '9px monospace';
+      cctx.fillText(lbl, p.x * cW + 7, p.y * cH + 3);
+      cctx.restore();
+    });
+
+    // Guide line
+    cctx.save();
+    cctx.strokeStyle = 'rgba(232,213,163,0.9)'; cctx.lineWidth = 2; cctx.setLineDash([7,5]);
+    cctx.shadowColor = 'rgba(232,213,163,0.5)'; cctx.shadowBlur = 8;
+    cctx.beginPath();
+    cctx.moveTo(gl.startXFrac * cW, gl.lineYFrac * cH);
+    cctx.lineTo(gl.endXFrac   * cW, gl.lineYFrac * cH);
+    cctx.stroke();
+    cctx.restore();
+
+    const croppedWrap = makeCanvasWrap(croppedCanvas, 'CROPPED + REMAPPED');
+    area.appendChild(croppedWrap);
+
+    // Store for preview generation
+    croppedCanvas.toBlob(blob => {
+      if (blob) _croppedFile = new File([blob], 'crop.jpg', { type: 'image/jpeg' });
+    }, 'image/jpeg', 0.92);
+  }
+}
+
+function makeCanvasWrap(canvas, label) {
+  const wrap = document.createElement('div');
+  wrap.className = 'canvas-wrap';
+  wrap.style.width = canvas.width + 'px';
+  const lbl = document.createElement('div');
+  lbl.className = 'canvas-label'; lbl.textContent = label;
+  wrap.appendChild(canvas); wrap.appendChild(lbl);
+  return wrap;
+}
+
+// ── PREVIEW ────────────────────────────────────────────────────────────────────
+async function runPreview() {
+  const btn = document.getElementById('previewBtn');
+  const area = document.getElementById('previewArea');
+  const photoFile = _croppedFile || _file;
+  if (!photoFile) return;
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Generating…';
+  area.innerHTML = '<span style="color:var(--text3);font-size:12px;">Calling gpt-image-1 — this takes 20–40 seconds…</span>';
+
+  try {
+    const fd = new FormData();
+    fd.append('photo', photoFile);
+    const res = await fetch(BACKEND + '/generate-preview', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok || !data.previewUrl) throw new Error(data.error || 'No preview URL');
+
+    const beforeUrl = URL.createObjectURL(photoFile);
+    area.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;">
+        <div style="position:relative;">
+          <img src="${beforeUrl}" style="width:100%;border-radius:8px;display:block;">
+          <span style="position:absolute;bottom:5px;left:6px;background:rgba(0,0,0,0.6);color:#fff;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;">BEFORE</span>
+        </div>
+        <div style="position:relative;">
+          <img src="${data.previewUrl}" style="width:100%;border-radius:8px;display:block;">
+          <span style="position:absolute;bottom:5px;left:6px;background:rgba(0,0,0,0.6);color:#fff;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;">AFTER</span>
+        </div>
+      </div>`;
+  } catch(e) {
+    area.innerHTML = `<div class="error-box">Preview failed: ${e.message}</div>`;
+  }
+
+  btn.innerHTML = 'Regenerate Preview';
+  btn.disabled = false;
+}
+
+// Allow drag-drop onto upload zone
+const zone = document.getElementById('uploadZone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor='var(--gold)'; });
+zone.addEventListener('dragleave', () => { zone.style.borderColor = ''; });
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.style.borderColor = '';
+  const file = e.dataTransfer?.files?.[0];
+  if (!file) return;
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  document.getElementById('fileInput').files = dt.files;
+  onFileSelected({ target: { files: [file] } });
+});
+</script>
+</body>
+</html>

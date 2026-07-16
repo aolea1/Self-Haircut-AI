@@ -3004,8 +3004,13 @@ let _chatHistory = []; // rolling window for /chat context
     if (!isMobileWidth()) { collapsed = false; dock.classList.remove('collapsed'); }
   }, { passive: true });
 })();
-let _aiPreviewEnabled = false; // set true after /health confirms openai: true
-let userScrolledUp = false;
+let _aiPreviewEnabled     = false; // set true after /health confirms openai: true
+let _autoPlacementEnabled = false; // set true after /health confirms autoPlacement: true
+let userScrolledUp        = false;
+
+// Auto-placement confidence thresholds — must match backend constants
+const AUTO_PLACEMENT_HIGH_CONFIDENCE = 0.85;
+const AUTO_PLACEMENT_MIN_CONFIDENCE  = 0.60;
 
 const FREE_CLAUDE_LIMIT = 2; // first N free analyses use real Claude
 
@@ -3074,8 +3079,14 @@ setTimeout(() => _logEvent('page_view', { ref: document.referrer || '' }), 3000)
 // Check AI preview availability once on load — no spinner shown if AI is off
 fetch(BACKEND_URL + '/health', { signal: AbortSignal.timeout(5000) })
   .then(r => r.json())
-  .then(d => { _aiPreviewEnabled = d.openai === true; })
-  .catch(() => { _aiPreviewEnabled = false; });
+  .then(d => {
+    _aiPreviewEnabled     = d.openai === true;
+    _autoPlacementEnabled = d.autoPlacement === true;
+  })
+  .catch(() => {
+    _aiPreviewEnabled     = false;
+    _autoPlacementEnabled = false;
+  });
 const FREE_LIMIT = 5;
 
 // ── INPUT ──
@@ -3720,6 +3731,9 @@ function photoRetakeMessage(issues) {
 
 // ── PHOTO ANALYSIS ──
 async function analyzePhoto(file) {
+  if (_autoPlacementEnabled) return autoAnalyzePhoto(file);
+
+  // ── MANUAL FLOW (unchanged when flag is off) ──
   const croppedFile = await showCropModal(file);
   state.taperStyle = state.taperStyle || 'low';
   state.tools = state.tools || 'clippers';
@@ -3728,6 +3742,420 @@ async function analyzePhoto(file) {
   _markPhotoUploaded();
   state.profileSide = await detectProfileSide(croppedFile);
   await showTaperPreview(croppedFile);
+  await startTaperShaping();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AUTO-PLACEMENT PIPELINE
+// Sends the raw (uncropped) photo to /analyze, gets full geometry back from
+// Claude, validates it, applies crop + coordinate remapping, populates state,
+// and shows a confirmation screen.  Falls back to the manual flow on any failure.
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function autoAnalyzePhoto(file) {
+  state.taperStyle = state.taperStyle || 'low';
+  state.tools      = state.tools      || 'clippers';
+
+  addTyping('Reading your photo');
+  showMessages();
+
+  const t0 = performance.now();
+  let analysis;
+  try {
+    const fd = new FormData();
+    fd.append('photo', file);
+    fd.append('style', state.taperStyle);
+
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), 65000);
+    const res = await fetch(BACKEND_URL + '/analyze', { method: 'POST', body: fd, signal: controller.signal });
+    clearTimeout(tid);
+
+    const data = await res.json();
+    const elapsed = Math.round(performance.now() - t0);
+    console.log('[AutoPlacement] /analyze', elapsed + 'ms', { valid: data.valid, confidence: data.confidence, side: data.side, _v2: data._v2, _validationOk: data._validationOk });
+
+    removeTyping();
+
+    if (!res.ok) {
+      const msg = _analysisErrorMsg(data?.reason, res.status) || 'Could not analyze the photo. Please try again.';
+      addAIMessage(`<p>${msg}</p>`, null);
+      _logFailure('analyze-auto', data?.reason || res.status, { status: res.status });
+      return;
+    }
+
+    analysis = data;
+  } catch(e) {
+    removeTyping();
+    const isTimeout = e.name === 'AbortError';
+    addAIMessage(`<p>${isTimeout ? 'The AI took too long to analyze your photo.' : 'Could not reach the server — check your connection.'} You can place the taper manually instead.</p>`,
+      [{ label: 'Place manually', onclick: `analyzePhotoManual(window._lastAutoFile)` }]);
+    window._lastAutoFile = file;
+    return;
+  }
+
+  // Route: automatic or manual fallback
+  if (
+    analysis._v2 &&
+    analysis.valid &&
+    typeof analysis.confidence === 'number' &&
+    analysis.confidence >= AUTO_PLACEMENT_MIN_CONFIDENCE &&
+    analysis._validationOk !== false &&
+    geometryIsValid(analysis)
+  ) {
+    await applyAutomaticPlacement(file, analysis);
+  } else {
+    const reason = _autoFailureMessage(analysis);
+    console.log('[AutoPlacement] fallback to manual —', reason, { confidence: analysis.confidence, valid: analysis.valid, errors: analysis._validationErrors });
+    await beginManualPlacementFallback(file, reason);
+  }
+}
+
+// Called by the "Place manually" button when auto-analysis fails
+window.analyzePhotoManual = function(file) {
+  if (file) beginManualPlacementFallback(file, null);
+};
+
+// ── GEOMETRY VALIDATION (frontend mirror of backend validateAnalysisV2) ────────
+function geometryIsValid(analysis) {
+  if (!analysis || !analysis.valid) return false;
+  const inRange = v => typeof v === 'number' && isFinite(v) && v >= 0 && v <= 1;
+
+  const c = analysis.crop;
+  if (!c || !inRange(c.xFrac) || !inRange(c.yFrac)) return false;
+  if (typeof c.widthFrac  !== 'number' || c.widthFrac  < 0.10) return false;
+  if (typeof c.heightFrac !== 'number' || c.heightFrac < 0.15) return false;
+
+  const gl = analysis.guideLine;
+  if (!gl) return false;
+  if (!inRange(gl.startXFrac) || !inRange(gl.startYFrac) || !inRange(gl.endXFrac) || !inRange(gl.endYFrac)) return false;
+  if (gl.startXFrac >= gl.endXFrac) return false;
+
+  const ts = analysis.taperShape;
+  if (!ts) return false;
+  const keys = ['sideburnTopXFrac','sideburnTopYFrac','sideburnBottomXFrac','sideburnBottomYFrac',
+                 'rearTopXFrac','rearTopYFrac','rearBottomXFrac','rearBottomYFrac'];
+  if (!keys.every(k => inRange(ts[k]))) return false;
+
+  // Top must be above bottom (smaller Y = higher on screen)
+  if (ts.sideburnTopYFrac >= ts.sideburnBottomYFrac) return false;
+  if (ts.rearTopYFrac     >= ts.rearBottomYFrac)     return false;
+
+  // The two vertical boundary lines must have a meaningful X gap
+  if (Math.abs(ts.sideburnBottomXFrac - ts.rearBottomXFrac) < 0.015) return false;
+
+  // Each line must have a meaningful vertical span
+  if ((ts.sideburnBottomYFrac - ts.sideburnTopYFrac) < 0.03) return false;
+  if ((ts.rearBottomYFrac     - ts.rearTopYFrac)     < 0.03) return false;
+
+  return true;
+}
+
+// ── COORDINATE REMAPPING ──────────────────────────────────────────────────────
+// Converts Claude's original-image fractions → crop-relative fractions.
+// After _cropImageFromFracs, all pixel coordinates are relative to the crop,
+// so every downstream fraction must be remapped the same way.
+function _remapToFrac(origFrac, cropOrigin, cropSize) {
+  return Math.max(0, Math.min(1, (origFrac - cropOrigin) / cropSize));
+}
+
+function _remapAnalysisCoords(analysis) {
+  const { crop: c, taperShape: ts, guideLine: gl } = analysis;
+  const rx = f => _remapToFrac(f, c.xFrac, c.widthFrac);
+  const ry = f => _remapToFrac(f, c.yFrac, c.heightFrac);
+
+  const sbBotX = rx(ts.sideburnBottomXFrac), sbBotY = ry(ts.sideburnBottomYFrac);
+  const sbTopX = rx(ts.sideburnTopXFrac),    sbTopY = ry(ts.sideburnTopYFrac);
+  const rrBotX = rx(ts.rearBottomXFrac),     rrBotY = ry(ts.rearBottomYFrac);
+  const rrTopX = rx(ts.rearTopXFrac),        rrTopY = ry(ts.rearTopYFrac);
+
+  const glStartX = rx(gl.startXFrac), glStartY = ry(gl.startYFrac);
+  const glEndX   = rx(gl.endXFrac),   glEndY   = ry(gl.endYFrac);
+  const lineYFrac  = (glStartY + glEndY) / 2;
+  const startXFrac = Math.min(glStartX, glEndX);
+  const endXFrac   = Math.max(glStartX, glEndX);
+  const earTopFrac = Math.min(sbTopY, rrTopY);
+
+  return {
+    taperLines: {
+      sideburn: { p0: { x: sbBotX, y: sbBotY }, p1: { x: sbTopX, y: sbTopY } },
+      rear:     { p0: { x: rrBotX, y: rrBotY }, p1: { x: rrTopX, y: rrTopY } },
+    },
+    guideLine: {
+      lineYFrac,
+      startXFrac,
+      endXFrac,
+      earTopFrac,
+      earMidFrac: lineYFrac,
+    },
+  };
+}
+
+// ── CROP HELPER ───────────────────────────────────────────────────────────────
+// Reads the original file, slices the crop rectangle, returns a new File blob.
+// The original file is preserved in state.originalPhotoFile untouched.
+function _cropImageFromFracs(file, crop) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const W = img.naturalWidth, H = img.naturalHeight;
+        const sx = Math.round(crop.xFrac * W);
+        const sy = Math.round(crop.yFrac * H);
+        const sw = Math.min(Math.round(crop.widthFrac  * W), W - sx);
+        const sh = Math.min(Math.round(crop.heightFrac * H), H - sy);
+        if (sw < 10 || sh < 10) return reject(new Error('crop dimensions too small'));
+        const canvas = document.createElement('canvas');
+        canvas.width = sw; canvas.height = sh;
+        canvas.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+        canvas.toBlob(blob => {
+          if (!blob) return reject(new Error('toBlob failed'));
+          resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+        }, 'image/jpeg', 0.92);
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// ── APPLY AUTOMATIC PLACEMENT ─────────────────────────────────────────────────
+// Sets all state from Claude's geometry. Never called when confidence is low.
+async function applyAutomaticPlacement(originalFile, analysis) {
+  // Preserve the original for "Adjust Placement" re-crop if needed
+  state.originalPhotoFile = originalFile;
+
+  // 1. Crop
+  let croppedFile;
+  try {
+    croppedFile = await _cropImageFromFracs(originalFile, analysis.crop);
+  } catch(e) {
+    console.warn('[AutoPlacement] crop failed, using original', e.message);
+    croppedFile = originalFile;
+  }
+
+  // 2. Remap all coordinates from original-image space → crop space
+  const remapped = _remapAnalysisCoords(analysis);
+
+  // 3. Populate state — this is the same shape finalizeTaperShape() produces
+  state.lastPhotoFile   = croppedFile;
+  state.phase           = 'guide-shown';
+  state.profileSide     = analysis.side !== 'unknown' ? analysis.side : 'right';
+  state.taperLines      = remapped.taperLines;
+  state.guideLine       = remapped.guideLine;
+  state.fadeGeometry    = {
+    earXfrac:      (remapped.guideLine.startXFrac + remapped.guideLine.endXFrac) / 2,
+    earTopFrac:    remapped.guideLine.earTopFrac,
+    earBottomFrac: remapped.guideLine.lineYFrac,
+    earMidFrac:    remapped.guideLine.lineYFrac,
+  };
+  state.fadeOffsetXFrac = 0;
+  state.fadeOffsetYFrac = 0;
+  _markPhotoUploaded();
+
+  console.log('[AutoPlacement] state populated', {
+    side: state.profileSide,
+    confidence: analysis.confidence,
+    taperLines: state.taperLines,
+    guideLine:  state.guideLine,
+    fadeGeometry: state.fadeGeometry,
+  });
+
+  // 4. Show confirmation screen
+  await showAutoPlacementConfirmation(croppedFile, analysis, remapped);
+}
+
+// ── CONFIRMATION SCREEN ───────────────────────────────────────────────────────
+async function showAutoPlacementConfirmation(croppedFile, analysis, remapped) {
+  const { img, canvas, ctx, W, H } = await loadScaledCanvas(croppedFile);
+
+  // Draw static taper overlay (no drag handlers — read-only preview)
+  const overlayLines = {
+    sideburn:   { p0: { ...remapped.taperLines.sideburn.p0 }, p1: { ...remapped.taperLines.sideburn.p1 } },
+    rear:       { p0: { ...remapped.taperLines.rear.p0 },     p1: { ...remapped.taperLines.rear.p1 } },
+    _glowPhase: 0.8,
+  };
+  drawTaperShapeOverlay(ctx, W, H, overlayLines);
+
+  // Draw bald guide line as a dashed gold line
+  const gl = remapped.guideLine;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(232,213,163,0.9)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([7, 5]);
+  ctx.shadowColor = 'rgba(232,213,163,0.6)'; ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.moveTo(gl.startXFrac * W, gl.lineYFrac * H);
+  ctx.lineTo(gl.endXFrac   * W, gl.lineYFrac * H);
+  ctx.stroke();
+  ctx.restore();
+
+  canvas.style.cssText = 'width:100%;max-width:460px;border-radius:10px;display:block;margin:0 0 12px;';
+
+  const isHighConf = analysis.confidence >= AUTO_PLACEMENT_HIGH_CONFIDENCE;
+  const sideText   = analysis.side === 'left' ? 'Left side' : analysis.side === 'right' ? 'Right side' : null;
+  const confPct    = Math.round(analysis.confidence * 100);
+
+  const msg = document.createElement('div');
+  msg.className = 'msg';
+  const msgBody = document.createElement('div');
+  msgBody.className = 'msg-body';
+  msgBody.innerHTML = `<div class="msg-name">SelfHaircut.ai</div>`;
+
+  const msgText = document.createElement('div');
+  msgText.className = 'msg-text';
+
+  const header = document.createElement('div');
+  header.innerHTML = `
+    <p style="font-weight:600;font-size:14px;margin:0 0 6px;">Here's where your taper should begin</p>
+    ${sideText ? `<p style="font-size:12px;color:var(--text3);margin:0 0 10px;">${sideText} detected${!isHighConf ? ` · ${confPct}% confidence` : ''}</p>` : ''}`;
+  msgText.appendChild(header);
+  msgText.appendChild(canvas);
+
+  // Medium-confidence notice
+  if (!isHighConf) {
+    const note = document.createElement('p');
+    note.style.cssText = 'color:rgba(255,180,80,0.9);font-size:12px;margin:0 0 10px;line-height:1.5;';
+    note.textContent = 'Please check the placement looks right before continuing.';
+    msgText.appendChild(note);
+  }
+
+  // Preview area — populated async
+  const previewArea = document.createElement('div');
+  previewArea.id = 'apcPreviewArea';
+  if (_aiPreviewEnabled) {
+    previewArea.innerHTML = `<div style="display:flex;align-items:center;gap:8px;margin:4px 0 12px;color:var(--text3);font-size:12px;">
+      <div class="typing-dot" style="animation-delay:0s"></div>
+      <div class="typing-dot" style="animation-delay:0.2s"></div>
+      <div class="typing-dot" style="animation-delay:0.4s"></div>
+      Generating preview…
+    </div>`;
+  }
+  msgText.appendChild(previewArea);
+
+  // Action buttons
+  const actions = document.createElement('div');
+  actions.style.cssText = 'display:flex;flex-direction:column;gap:8px;margin-top:4px;';
+  actions.innerHTML = `
+    <button class="opt-btn apc-confirm-btn" style="font-size:15px;padding:13px 16px;letter-spacing:0.01em;">
+      Yes — Show Me the Steps
+    </button>
+    <button class="opt-btn" style="background:none;border:1px solid var(--border2);color:var(--text2);font-size:13px;padding:10px 14px;">
+      Adjust Placement
+    </button>`;
+  msgText.appendChild(actions);
+
+  msgBody.appendChild(msgText);
+  msg.appendChild(document.createRange().createContextualFragment(aiAvatar().trim()));
+  msg.appendChild(msgBody);
+  messagesWrap.appendChild(msg);
+  showMessages();
+  scrollToMsg(msg);
+
+  // Wire buttons — scoped to this message
+  const [confirmBtn, adjustBtn] = actions.querySelectorAll('button');
+
+  confirmBtn.onclick = function() {
+    confirmBtn.disabled = true; adjustBtn.disabled = true;
+    confirmBtn.textContent = '✓ Let\'s build this fade';
+    confirmBtn.style.opacity = '0.7';
+    const next = addAIMessage('<p>Let\'s build your fade. Every step is mapped to the taper shape you just confirmed.</p>', null);
+    scrollToMsg(next);
+    _checkCreditsAndGenerate(() => {
+      buildFadePlan();
+      state.currentStep = 0;
+      presentFadePlanStep(0);
+    });
+  };
+
+  adjustBtn.onclick = function() {
+    confirmBtn.disabled = true; adjustBtn.disabled = true;
+    adjustBtn.textContent = 'Opening adjustment…';
+    // state.taperLines already holds the AI coords — startTaperShaping will
+    // use them as initial drag positions so the user starts from a good place.
+    startTaperShaping();
+  };
+
+  // Fetch the generated preview in background
+  if (_aiPreviewEnabled) {
+    _fetchAutoPreview(croppedFile, previewArea);
+  }
+}
+
+// Fetches /generate-preview and renders a before/after comparison
+async function _fetchAutoPreview(croppedFile, containerEl) {
+  try {
+    const fd = new FormData();
+    fd.append('photo', croppedFile);
+    const res = await fetch(BACKEND_URL + '/generate-preview', {
+      method: 'POST', body: fd, signal: AbortSignal.timeout(30000),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!data.previewUrl) throw new Error('no url');
+
+    const beforeUrl = URL.createObjectURL(croppedFile);
+    containerEl.innerHTML = `
+      <p style="font-size:11px;color:var(--text3);margin:8px 0 6px;font-weight:500;">What it could look like</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+        <div style="position:relative;border-radius:8px;overflow:hidden;">
+          <img src="${beforeUrl}" style="width:100%;display:block;" alt="Before">
+          <span style="position:absolute;bottom:5px;left:6px;background:rgba(0,0,0,0.6);color:#fff;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;letter-spacing:0.05em;">BEFORE</span>
+        </div>
+        <div style="position:relative;border-radius:8px;overflow:hidden;">
+          <img src="${data.previewUrl}" style="width:100%;display:block;" alt="After">
+          <span style="position:absolute;bottom:5px;left:6px;background:rgba(0,0,0,0.6);color:#fff;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;letter-spacing:0.05em;">AFTER</span>
+        </div>
+      </div>`;
+  } catch(e) {
+    console.warn('[AutoPreview] failed:', e.message);
+    containerEl.innerHTML = ''; // silent fail — don't show an error for a bonus feature
+  }
+}
+
+// ── FAILURE MESSAGE MAPPER ────────────────────────────────────────────────────
+function _autoFailureMessage(analysis) {
+  if (!analysis) return null;
+  const reasonMap = {
+    ear_not_visible:         "We couldn't clearly see your ear. Try turning your head more to the side.",
+    head_not_sideways:       "Your head isn't turned far enough to the side — take a true side-profile photo.",
+    sideburn_out_of_frame:   "The sideburn area is outside the frame. Step back or tilt the camera.",
+    too_dark_or_blurry:      "The photo is too dark or blurry. Try again in better lighting.",
+    hair_covering_landmarks: "Hair is covering the landmarks needed for accurate placement.",
+    not_a_person:            "We couldn't detect a person in this photo.",
+    not_a_haircut_photo:     "This doesn't look like a haircut photo.",
+  };
+  if (analysis.failureReason && reasonMap[analysis.failureReason]) {
+    return reasonMap[analysis.failureReason];
+  }
+  if (!analysis.valid) {
+    return "We couldn't use this photo for automatic placement.";
+  }
+  if (typeof analysis.confidence === 'number' && analysis.confidence < AUTO_PLACEMENT_MIN_CONFIDENCE) {
+    const specific = analysis.failureReason && reasonMap[analysis.failureReason];
+    return specific || `The photo confidence is too low (${Math.round(analysis.confidence * 100)}%). Try a clearer side-profile shot.`;
+  }
+  if (analysis._validationErrors?.length) {
+    return "The AI placement data didn't pass validation. You can place the taper manually.";
+  }
+  return null;
+}
+
+// ── MANUAL FALLBACK ───────────────────────────────────────────────────────────
+// Called when auto-placement confidence is too low or geometry fails validation.
+// Explains the issue then hands off to the manual crop + taper shaping flow.
+async function beginManualPlacementFallback(file, reason) {
+  if (reason) {
+    addAIMessage(`<p>${reason}</p><p style="color:var(--text3);font-size:13px;margin-top:6px;">Place your taper manually below — drag the points to match your sideburn and ear.</p>`, null);
+  }
+  const croppedFile = await showCropModal(file);
+  state.lastPhotoFile   = croppedFile;
+  state.phase           = 'guide-shown';
+  state.profileSide     = await detectProfileSide(croppedFile);
+  _markPhotoUploaded();
   await startTaperShaping();
 }
 
@@ -5118,17 +5546,29 @@ async function startTaperShaping() {
   const { img, canvas, ctx, W, H } = await loadScaledCanvas(state.lastPhotoFile);
   removeTyping();
 
-  // Default taper placement — user will drag these to fit their sideburn/ear.
-  // 'left': left side of head visible, face pointing right → sideburn on RIGHT, rear on LEFT.
-  // 'right': right side of head visible, face pointing left → sideburn on LEFT, rear on RIGHT.
-  const botY = 0.60, topY = 0.32;
-  const sbX  = side === 'left' ? 0.52 : 0.44;
-  const reX  = side === 'left' ? 0.36 : 0.60;
-
-  const lines = {
-    sideburn: { p0: { x: sbX, y: botY }, p1: { x: sbX, y: topY } },
-    rear:     { p0: { x: reX, y: botY }, p1: { x: reX, y: topY } },
-  };
+  // If auto-placement already populated state.taperLines, use those coords as
+  // the starting positions so the user adjusts from the AI's best guess
+  // rather than the hardcoded defaults.
+  let lines;
+  if (state.taperLines &&
+      state.taperLines.sideburn?.p0 && state.taperLines.sideburn?.p1 &&
+      state.taperLines.rear?.p0     && state.taperLines.rear?.p1) {
+    lines = {
+      sideburn: { p0: { ...state.taperLines.sideburn.p0 }, p1: { ...state.taperLines.sideburn.p1 } },
+      rear:     { p0: { ...state.taperLines.rear.p0 },     p1: { ...state.taperLines.rear.p1 }     },
+    };
+  } else {
+    // Default taper placement — user will drag these to fit their sideburn/ear.
+    // 'left': left side of head visible, face pointing right → sideburn on RIGHT, rear on LEFT.
+    // 'right': right side of head visible, face pointing left → sideburn on LEFT, rear on RIGHT.
+    const botY = 0.60, topY = 0.32;
+    const sbX  = side === 'left' ? 0.52 : 0.44;
+    const reX  = side === 'left' ? 0.36 : 0.60;
+    lines = {
+      sideburn: { p0: { x: sbX, y: botY }, p1: { x: sbX, y: topY } },
+      rear:     { p0: { x: reX, y: botY }, p1: { x: reX, y: topY } },
+    };
+  }
 
   // Compact precision magnifier — shown only when dragging p1 (top taper points).
   const bubble       = document.createElement('div');
@@ -9137,7 +9577,7 @@ function resetChat() {
   started = false; pendingFiles = [];
   state.taperStyle = null; state.tools = null; state.phase = 'intro'; state.shownPhotoTip = false;
   state.fadePlan = null; state.currentStep = 0; state.lastPhotoFile = null; state.nextFileHandler = null;
-  state.guideLine = null; state.taperLines = null; state.profileSide = null; state.fadeGeometry = null; state.fadeOffsetXFrac = 0; state.fadeOffsetYFrac = 0;
+  state.guideLine = null; state.taperLines = null; state.profileSide = null; state.fadeGeometry = null; state.fadeOffsetXFrac = 0; state.fadeOffsetYFrac = 0; state.originalPhotoFile = null;
   _hideGuideProgress();
   messagesWrap.innerHTML = ''; messagesWrap.classList.remove('visible');
   chatArea.scrollTop = 0; uploadPreview.innerHTML = '';
