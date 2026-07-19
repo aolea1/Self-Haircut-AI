@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Haircut State Lab · SelfHaircut.ai</title>
+<style>
+:root {
+  --bg:      #0d0d0d;
+  --surface: #161616;
+  --surface2:#1e1e1e;
+  --border:  #232323;
+  --border2: #2a2a2a;
+  --text:    #f0ead6;
+  --text2:   #a8a090;
+  --text3:   #5a5450;
+  --accent:  #d4a853;
+  --accent2: #e8c46a;
+  --green:   #6ddb8e;
+  --red:     #ff6b6b;
+  --blue:    #6ab0ff;
+  --cyan:    #4fd3e8;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'DM Sans',system-ui,sans-serif; font-size:13px; min-height:100vh; line-height:1.5; }
+
+#loadingScreen {
+  position:fixed; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:14px; background:var(--bg); z-index:999;
+}
+#loadingScreen .logo { font-size:18px; font-weight:700; letter-spacing:-.5px; }
+#loadingScreen .logo span { color:var(--accent); }
+#loadingScreen .spin {
+  width:26px; height:26px; border:2px solid var(--border2);
+  border-top-color:var(--accent); border-radius:50%;
+  animation:spin .7s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+
+#app { display:none; padding:20px; max-width:1400px; margin:0 auto; }
+header { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; }
+h1 { font-size:17px; font-weight:700; }
+h1 span { color:var(--accent); }
+.subtitle { color:var(--text3); font-size:12px; margin-bottom:16px; }
+.signout { color:var(--text3); font-size:11px; cursor:pointer; text-decoration:underline; }
+
+.status-strip { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
+.status-pill {
+  display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px;
+  font-size:11px; font-weight:600; border:1px solid var(--border2); background:var(--surface2); color:var(--text3);
+}
+.status-pill.done { color:var(--green); border-color:rgba(109,219,142,0.35); background:rgba(109,219,142,0.08); }
+.status-pill.failed { color:var(--red); border-color:rgba(255,107,107,0.35); background:rgba(255,107,107,0.08); }
+.status-pill.disabled { color:var(--text3); }
+.status-dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+
+.grid { display:grid; grid-template-columns:340px 1fr; gap:16px; align-items:start; }
+@media (max-width:980px) { .grid { grid-template-columns:1fr; } }
+
+.panel { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px; margin-bottom:16px; }
+.panel-title { font-weight:700; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--text3); margin-bottom:12px; }
+
+input[type=file] { display:none; }
+.upload-zone {
+  border:2px dashed var(--border2); border-radius:8px; padding:28px 14px; text-align:center;
+  cursor:pointer; color:var(--text2); transition:border-color .15s;
+}
+.upload-zone:hover { border-color:var(--accent); }
+.upload-zone.has-file { border-color:var(--green); border-style:solid; }
+
+.btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  padding:9px 16px; border-radius:8px; border:none; cursor:pointer;
+  font-family:inherit; font-size:12.5px; font-weight:700; width:100%; transition:opacity .12s;
+}
+.btn:disabled { opacity:.35; cursor:not-allowed; }
+.btn-primary { background:var(--accent); color:#1a1100; margin-top:10px; }
+.btn-secondary { background:var(--surface2); color:var(--text2); border:1px solid var(--border2); }
+.btn + .btn { margin-top:8px; }
+.mini-spin { width:13px; height:13px; border:2px solid rgba(255,255,255,.25); border-top-color:#1a1100; border-radius:50%; animation:spin .6s linear infinite; display:inline-block; }
+
+.toggle-row { display:flex; align-items:center; gap:8px; padding:5px 0; font-size:12px; color:var(--text2); cursor:pointer; user-select:none; }
+.toggle-row input { accent-color:var(--accent); }
+.toggle-row .swatch { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+
+.conf-row { padding:6px 0; }
+.conf-label { display:flex; justify-content:space-between; font-size:11.5px; color:var(--text2); margin-bottom:3px; }
+.conf-bar-wrap { height:5px; background:var(--surface2); border-radius:3px; overflow:hidden; }
+.conf-bar { height:100%; border-radius:3px; }
+
+.canvas-wrap { position:relative; display:inline-block; max-width:100%; }
+canvas { border-radius:8px; display:block; max-width:100%; background:#000; }
+.empty-canvas { color:var(--text3); font-size:12px; padding:40px; text-align:center; }
+
+.rules-table { width:100%; border-collapse:collapse; font-size:11px; }
+.rules-table th { text-align:left; color:var(--text3); font-weight:600; padding:4px 6px; border-bottom:1px solid var(--border2); }
+.rules-table td { padding:5px 6px; border-bottom:1px solid var(--border); color:var(--text2); vertical-align:top; }
+.rules-table code { color:var(--cyan); font-family:'JetBrains Mono',monospace; font-size:10.5px; }
+
+.warn-box { background:rgba(212,168,83,0.08); border:1px solid rgba(212,168,83,0.25); border-radius:6px; padding:8px 10px; font-size:11.5px; color:var(--accent2); margin-top:8px; }
+.error-box { background:rgba(255,107,107,0.1); border:1px solid rgba(255,107,107,0.3); border-radius:6px; padding:8px 10px; font-size:12px; color:var(--red); margin-top:8px; }
+
+pre { background:var(--surface2); border:1px solid var(--border2); border-radius:6px; padding:10px; font-size:10px; overflow:auto; max-height:220px; color:var(--text2); white-space:pre-wrap; word-break:break-all; }
+.section-label { font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text3); margin:12px 0 6px; }
+</style>
+</head>
+<body>
+
+<div id="loadingScreen">
+  <div class="logo">SelfHaircut<span>.ai</span></div>
+  <div class="spin"></div>
+  <div style="color:var(--text3);font-size:12px;">Loading Haircut State Lab…</div>
+</div>
+
+<div id="app">
+  <header>
+    <h1>Haircut State <span>Lab</span></h1>
+    <span class="signout" onclick="doSignOut()">Sign out</span>
+  </header>
+  <p class="subtitle">Private development tool — not linked from the app. Anatomy detection and deterministic haircut planning only; no image or video generation yet.</p>
+  <p class="subtitle" id="backendIndicator" style="margin-top:-10px;"></p>
+
+  <div class="status-strip" id="statusStrip">
+    <div class="status-pill" id="stAnatomy"><span class="status-dot"></span>Anatomy detected</div>
+    <div class="status-pill" id="stPlan"><span class="status-dot"></span>Haircut plan calculated</div>
+    <div class="status-pill" id="stMask"><span class="status-dot"></span>Mask created</div>
+    <div class="status-pill disabled"><span class="status-dot"></span>Image generation not configured</div>
+  </div>
+
+  <div class="grid">
+    <!-- LEFT: controls -->
+    <div>
+      <div class="panel">
+        <div class="panel-title">1 · Upload</div>
+        <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+          <div style="font-size:24px;margin-bottom:6px;">📷</div>
+          <div>Click to upload a side-profile photo</div>
+        </div>
+        <input type="file" id="fileInput" accept="image/*" onchange="onFileSelected(event)">
+        <div id="fileInfo" style="margin-top:8px;font-size:11px;color:var(--text3);display:none;"></div>
+        <button class="btn btn-primary" id="analyzeBtn" onclick="runAnalyzeAnatomy()" disabled>Analyze Anatomy</button>
+        <button class="btn btn-secondary" id="planBtn" onclick="runPlanHaircut()" disabled>Calculate Haircut Plan</button>
+      </div>
+
+      <div class="panel" id="togglesPanel" style="display:none;">
+        <div class="panel-title">2 · Overlay Toggles</div>
+        <label class="toggle-row"><input type="checkbox" checked data-layer="original" onchange="drawCanvas()"><span class="swatch" style="background:#888;"></span>Original image</label>
+        <label class="toggle-row"><input type="checkbox" checked data-layer="earBox" onchange="drawCanvas()"><span class="swatch" style="background:#4fd3e8;"></span>Ear bounding box</label>
+        <label class="toggle-row"><input type="checkbox" checked data-layer="earMid" onchange="drawCanvas()"><span class="swatch" style="background:#6ab0ff;"></span>Ear midpoint</label>
+        <label class="toggle-row"><input type="checkbox" checked data-layer="sideburn" onchange="drawCanvas()"><span class="swatch" style="background:#e8c46a;"></span>Sideburn boundary</label>
+        <label class="toggle-row"><input type="checkbox" checked data-layer="temple" onchange="drawCanvas()"><span class="swatch" style="background:#c084fc;"></span>Temple hair boundary</label>
+        <label class="toggle-row"><input type="checkbox" data-layer="contour" onchange="drawCanvas()"><span class="swatch" style="background:#6ddb8e;"></span>Head contour</label>
+        <label class="toggle-row"><input type="checkbox" checked data-layer="baldLine" onchange="drawCanvas()"><span class="swatch" style="background:#ff6b6b;"></span>Planned bald line</label>
+        <label class="toggle-row"><input type="checkbox" data-layer="mask" onchange="drawCanvas()"><span class="swatch" style="background:#fff;"></span>Active-zone mask</label>
+      </div>
+
+      <div class="panel" id="confPanel" style="display:none;">
+        <div class="panel-title">Confidence (kept separate — not one score)</div>
+        <div class="section-label">Anatomy stage</div>
+        <div id="anatomyConf"></div>
+        <div class="section-label">Planner stage</div>
+        <div id="plannerConf"></div>
+        <div id="warningsBox"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: visual + data -->
+    <div>
+      <div class="panel">
+        <div class="panel-title">Visual Output</div>
+        <div class="canvas-wrap" id="canvasWrap"><div class="empty-canvas">Upload a photo to begin.</div></div>
+      </div>
+
+      <div class="panel" id="rulesPanel" style="display:none;">
+        <div class="panel-title">Applied Rules (how the geometry was produced)</div>
+        <table class="rules-table">
+          <thead><tr><th>Rule</th><th>Input</th><th>Result</th></tr></thead>
+          <tbody id="rulesBody"></tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Raw Anatomy Response</div>
+        <pre id="anatomyJson">Run analysis to see response.</pre>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Raw Planner Response</div>
+        <pre id="planJson">Run planning to see response.</pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp }            from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
+const FB_CONFIG = {
+  apiKey:            'AIzaSyCVcwmzhSGQXNIL-QAZ0dwOzTkkr_7xdkI',
+  authDomain:        'selfhaircutai.firebaseapp.com',
+  projectId:         'selfhaircutai',
+  storageBucket:     'selfhaircutai.firebasestorage.app',
+  messagingSenderId: '547059800196',
+  appId:             '1:547059800196:web:681fc8070f3cc8374e0ad1',
+};
+// Backend base URL is deliberately NOT a bare hardcoded constant. This page
+// is meant to be pointed at a Render preview environment (or localhost)
+// during phase-1 review, not production, and there is no reliable way to
+// guess a preview URL in advance. Override with ?backend=https://... once
+// (it persists via localStorage) or edit DEFAULT_BACKEND below once you know
+// the real preview URL. The active URL is always shown in the header so
+// it's never ambiguous which backend a given test run hit.
+const DEFAULT_BACKEND = 'https://selfhaircut-backend.onrender.com'; // production — do not test phase-1 against this
+const _backendParam = new URLSearchParams(location.search).get('backend');
+if (_backendParam) localStorage.setItem('labBackendUrl', _backendParam);
+const BACKEND = _backendParam || localStorage.getItem('labBackendUrl') || DEFAULT_BACKEND;
+
+const _backendEl = document.getElementById('backendIndicator');
+if (_backendEl) {
+  const isProd = BACKEND === DEFAULT_BACKEND;
+  _backendEl.innerHTML = isProd
+    ? `⚠ Backend: <code>${BACKEND}</code> (production — add <code>?backend=https://your-preview-url</code> to test phase-1 elsewhere)`
+    : `Backend: <code>${BACKEND}</code>`;
+  _backendEl.style.color = isProd ? 'var(--red)' : 'var(--green)';
+}
+
+const _app  = initializeApp(FB_CONFIG);
+const _auth = getAuth(_app);
+let _token = null;
+
+onAuthStateChanged(_auth, async user => {
+  if (!user) return redirect('Not signed in.');
+  try {
+    _token = await user.getIdToken();
+    const me = await apiFetch('/me');
+    if (!me.isOwner) return redirect('Access denied — owner only.');
+    document.getElementById('loadingScreen').style.display = 'none';
+    document.getElementById('app').style.display = '';
+  } catch(e) {
+    redirect('Error: ' + e.message);
+  }
+});
+
+function redirect(msg) {
+  document.getElementById('loadingScreen').innerHTML =
+    `<div style="color:var(--red);font-size:14px;">${msg}</div><a href="/" style="color:var(--accent);margin-top:12px;font-size:13px;">← Back to app</a>`;
+}
+
+window.doSignOut = () => signOut(_auth).then(() => location.reload());
+
+async function apiFetch(path, opts = {}) {
+  if (!_token && _auth.currentUser) _token = await _auth.currentUser.getIdToken();
+  const res = await fetch(BACKEND + path, {
+    ...opts,
+    headers: { 'Authorization': 'Bearer ' + _token, 'Content-Type': 'application/json', ...(opts.headers||{}) },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  if (res.status === 401) { _token = await _auth.currentUser?.getIdToken(true); throw new Error('Re-auth required — try again'); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.error || `HTTP ${res.status}`), { data });
+  return data;
+}
+
+async function apiUpload(path, formData) {
+  if (!_token && _auth.currentUser) _token = await _auth.currentUser.getIdToken();
+  const res = await fetch(BACKEND + path, { method: 'POST', headers: { 'Authorization': 'Bearer ' + _token }, body: formData });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.error || `HTTP ${res.status}`), { data });
+  return data;
+}
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+let _file = null, _img = null, _testId = null, _anatomy = null, _plan = null, _maskImg = null;
+
+window.onFileSelected = function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  _file = file; _testId = null; _anatomy = null; _plan = null; _maskImg = null;
+  document.getElementById('uploadZone').classList.add('has-file');
+  document.getElementById('fileInfo').style.display = 'block';
+  document.getElementById('fileInfo').textContent = `${file.name} · ${(file.size/1024).toFixed(1)} KB`;
+  document.getElementById('analyzeBtn').disabled = false;
+  document.getElementById('planBtn').disabled = true;
+  document.getElementById('togglesPanel').style.display = 'none';
+  document.getElementById('confPanel').style.display = 'none';
+  document.getElementById('rulesPanel').style.display = 'none';
+  document.getElementById('anatomyJson').textContent = 'Run analysis to see response.';
+  document.getElementById('planJson').textContent = 'Run planning to see response.';
+  setStatus('stAnatomy', 'pending'); setStatus('stPlan', 'pending'); setStatus('stMask', 'pending');
+
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => { _img = img; drawCanvas(); };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+};
+
+function setStatus(id, state) {
+  const el = document.getElementById(id);
+  el.className = 'status-pill' + (state === 'done' ? ' done' : state === 'failed' ? ' failed' : '');
+}
+
+window.runAnalyzeAnatomy = async function() {
+  if (!_file) return;
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = true; btn.innerHTML = '<div class="mini-spin"></div> Analyzing…';
+  try {
+    const fd = new FormData();
+    fd.append('photo', _file);
+    const data = await apiUpload('/lab/analyze-anatomy', fd);
+    _testId = data.testId;
+    document.getElementById('anatomyJson').textContent = JSON.stringify(data, null, 2);
+    if (data.anatomyStatus !== 'success') {
+      setStatus('stAnatomy', 'failed');
+      document.getElementById('anatomyJson').textContent += `\n\nFAILED: ${data.anatomyFailureReason || 'unknown error'}`;
+      btn.disabled = false; btn.innerHTML = 'Analyze Anatomy';
+      return;
+    }
+    _anatomy = data.anatomy;
+    setStatus('stAnatomy', 'done');
+    document.getElementById('togglesPanel').style.display = '';
+    document.getElementById('confPanel').style.display = '';
+    document.getElementById('planBtn').disabled = false;
+    renderAnatomyConfidence(data.anatomy.confidence, data.validation);
+    drawCanvas();
+  } catch(e) {
+    setStatus('stAnatomy', 'failed');
+    document.getElementById('anatomyJson').textContent = 'ERROR: ' + e.message;
+  } finally {
+    btn.disabled = false; btn.innerHTML = 'Analyze Anatomy';
+  }
+};
+
+window.runPlanHaircut = async function() {
+  if (!_testId) return;
+  const btn = document.getElementById('planBtn');
+  btn.disabled = true; btn.innerHTML = '<div class="mini-spin"></div> Planning…';
+  try {
+    const data = await apiFetch('/lab/plan-haircut', { method: 'POST', body: { testId: _testId, methodVersion: 'angel_low_taper_v1' } });
+    document.getElementById('planJson').textContent = JSON.stringify(data, null, 2);
+    if (data.planStatus !== 'success') {
+      setStatus('stPlan', 'failed');
+      btn.disabled = false; btn.innerHTML = 'Calculate Haircut Plan';
+      return;
+    }
+    _plan = data.plan;
+    setStatus('stPlan', 'done');
+    setStatus('stMask', 'done');
+    renderPlannerConfidence(data.plan);
+    renderAppliedRules(data.plan.appliedRules);
+    document.getElementById('rulesPanel').style.display = '';
+    if (data.maskUrl) {
+      const mi = new Image();
+      mi.crossOrigin = 'anonymous';
+      mi.onload = () => { _maskImg = mi; drawCanvas(); };
+      mi.src = data.maskUrl;
+    }
+    drawCanvas();
+  } catch(e) {
+    setStatus('stPlan', 'failed');
+    document.getElementById('planJson').textContent = 'ERROR: ' + e.message;
+  } finally {
+    btn.disabled = false; btn.innerHTML = 'Calculate Haircut Plan';
+  }
+};
+
+function confRow(label, value) {
+  const pct = Math.round((value || 0) * 100);
+  const color = value >= 0.85 ? 'var(--green)' : value >= 0.60 ? 'var(--accent)' : 'var(--red)';
+  return `<div class="conf-row"><div class="conf-label"><span>${label}</span><span>${pct}%</span></div><div class="conf-bar-wrap"><div class="conf-bar" style="width:${pct}%;background:${color};"></div></div></div>`;
+}
+
+function renderAnatomyConfidence(conf, validation) {
+  const c = conf || {};
+  document.getElementById('anatomyConf').innerHTML =
+    confRow('Overall', c.overall) + confRow('Ear', c.ear) + confRow('Sideburn', c.sideburn) +
+    confRow('Temple boundary', c.templeHairBoundary) + confRow('Head contour', c.headContour) +
+    (validation && validation.ok === false ? `<div class="error-box">Schema validation failed: ${(validation.errors||[]).join('; ')}</div>` : '');
+}
+
+function renderPlannerConfidence(plan) {
+  document.getElementById('plannerConf').innerHTML = confRow('Planner confidence', plan.plannerConfidence) +
+    `<div style="font-size:10.5px;color:var(--text3);margin-top:4px;">Derived only from ear + sideburn confidence — deliberately not the same number as anatomy overall confidence.</div>`;
+  const warnBox = document.getElementById('warningsBox');
+  const allWarnings = [...(plan.warnings || [])];
+  warnBox.innerHTML = allWarnings.length ? `<div class="warn-box">${allWarnings.map(w => `⚠ ${w}`).join('<br>')}</div>` : '';
+}
+
+function renderAppliedRules(rules) {
+  document.getElementById('rulesBody').innerHTML = (rules || []).map(r =>
+    `<tr><td><code>${r.rule}</code></td><td>${r.input}</td><td><code>${JSON.stringify(r.result)}</code></td></tr>`
+  ).join('');
+}
+
+// ── CANVAS ───────────────────────────────────────────────────────────────────
+function layerOn(name) {
+  const el = document.querySelector(`[data-layer="${name}"]`);
+  return el ? el.checked : false;
+}
+
+window.drawCanvas = function() {
+  const wrap = document.getElementById('canvasWrap');
+  if (!_img) { wrap.innerHTML = '<div class="empty-canvas">Upload a photo to begin.</div>'; return; }
+
+  const maxW = 620;
+  const scale = Math.min(1, maxW / _img.width);
+  const W = Math.round(_img.width * scale), H = Math.round(_img.height * scale);
+
+  let canvas = wrap.querySelector('canvas');
+  if (!canvas) { canvas = document.createElement('canvas'); wrap.innerHTML = ''; wrap.appendChild(canvas); }
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  if (layerOn('original')) ctx.drawImage(_img, 0, 0, W, H);
+  else { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); }
+
+  if (_maskImg && layerOn('mask')) {
+    ctx.save(); ctx.globalAlpha = 0.55;
+    ctx.drawImage(_maskImg, 0, 0, W, H);
+    ctx.restore();
+  }
+
+  if (_anatomy) drawAnatomy(ctx, W, H, _anatomy);
+  if (_plan && _plan.baldLine) drawPlan(ctx, W, H, _plan);
+};
+
+function px(f, W) { return f * W; }
+function dot(ctx, x, y, color, label) {
+  ctx.save();
+  ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2);
+  ctx.fillStyle = color; ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke();
+  if (label) { ctx.fillStyle = '#fff'; ctx.font = 'bold 9px monospace'; ctx.fillText(label, x + 7, y - 6); }
+  ctx.restore();
+}
+function polyline(ctx, pts, W, H, color, close) {
+  if (!pts || pts.length < 2) return;
+  ctx.save();
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath();
+  ctx.moveTo(px(pts[0].x, W), px(pts[0].y, H));
+  pts.slice(1).forEach(p => ctx.lineTo(px(p.x, W), px(p.y, H)));
+  if (close) ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawAnatomy(ctx, W, H, a) {
+  const ear = a.ear, sb = a.sideburn;
+  if (ear && ear.boundingBox && layerOn('earBox')) {
+    ctx.save();
+    ctx.strokeStyle = '#4fd3e8'; ctx.lineWidth = 1.5; ctx.setLineDash([5,3]);
+    ctx.strokeRect(px(ear.boundingBox.x, W), px(ear.boundingBox.y, H), px(ear.boundingBox.width, W), px(ear.boundingBox.height, H));
+    ctx.restore();
+  }
+  if (ear && ear.midpoint && layerOn('earMid')) dot(ctx, px(ear.midpoint.x, W), px(ear.midpoint.y, H), '#6ab0ff', 'EAR MID');
+  if (sb && layerOn('sideburn')) {
+    polyline(ctx, sb.boundary && sb.boundary.length >= 2 ? sb.boundary : [sb.top, sb.bottom], W, H, '#e8c46a', false);
+    if (sb.top) dot(ctx, px(sb.top.x, W), px(sb.top.y, H), '#e8c46a');
+    if (sb.bottom) dot(ctx, px(sb.bottom.x, W), px(sb.bottom.y, H), '#e8c46a');
+  }
+  if (layerOn('temple')) polyline(ctx, a.templeHairBoundary, W, H, '#c084fc', false);
+  if (layerOn('contour')) polyline(ctx, a.headContour, W, H, '#6ddb8e', false);
+}
+
+function drawPlan(ctx, W, H, plan) {
+  if (!layerOn('baldLine')) return;
+  const bl = plan.baldLine;
+  const pts = [bl.start, ...(bl.controlPoints || []), bl.end];
+  polyline(ctx, pts, W, H, '#ff6b6b', false);
+  dot(ctx, px(bl.start.x, W), px(bl.start.y, H), '#ff6b6b', 'START');
+  dot(ctx, px(bl.end.x, W), px(bl.end.y, H), '#ff6b6b', 'END');
+}
+</script>
+</body>
+</html>
